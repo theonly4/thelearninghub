@@ -5,10 +5,18 @@ import { ProgressIndicator } from "@/components/ProgressIndicator";
 import { LockedQuizCard } from "@/components/LockedQuizCard";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Link } from "react-router-dom";
 import { useProgress } from "@/contexts/ProgressContext";
 import { getMaterialsForWorkforceGroup } from "@/data/trainingMaterials";
 import { getQuizzesForWorkforceGroup } from "@/data/quizzes";
+import { WorkforceGroup, WORKFORCE_GROUP_LABELS } from "@/types/hipaa";
 import { 
   FileText, 
   Award, 
@@ -16,6 +24,7 @@ import {
   CheckCircle2,
   ArrowRight,
   BookOpen,
+  TestTube,
 } from "lucide-react";
 
 export default function UserDashboard() {
@@ -26,7 +35,16 @@ export default function UserDashboard() {
     getQuizStatus,
     getQuizResult,
     getNextAction,
+    setWorkforceGroup,
+    resetProgress,
   } = useProgress();
+
+  const workforceGroups: WorkforceGroup[] = ["all_staff", "clinical", "administrative", "management", "it"];
+
+  const handleWorkforceChange = (value: WorkforceGroup) => {
+    setWorkforceGroup(value);
+    resetProgress(); // Reset progress when switching groups for demo
+  };
 
   const materials = currentWorkforceGroup
     ? getMaterialsForWorkforceGroup(currentWorkforceGroup)
@@ -78,7 +96,7 @@ export default function UserDashboard() {
           </p>
         </div>
 
-        {/* User Info Card */}
+        {/* User Info Card with Demo Selector */}
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-3">
@@ -97,6 +115,31 @@ export default function UserDashboard() {
                 Organization:
               </span>
               <span className="text-sm font-medium">Demo Healthcare Inc.</span>
+            </div>
+          </div>
+          
+          {/* Demo Workforce Selector */}
+          <div className="mt-4 pt-4 border-t border-border">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <TestTube className="h-4 w-4" />
+                <span>Demo Mode - Switch Workforce:</span>
+              </div>
+              <Select
+                value={currentWorkforceGroup || undefined}
+                onValueChange={(value) => handleWorkforceChange(value as WorkforceGroup)}
+              >
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Select group" />
+                </SelectTrigger>
+                <SelectContent>
+                  {workforceGroups.map((group) => (
+                    <SelectItem key={group} value={group}>
+                      {WORKFORCE_GROUP_LABELS[group]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>
