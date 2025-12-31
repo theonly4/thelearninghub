@@ -105,6 +105,7 @@ interface Answer {
   questionId: string;
   selectedOption: string;
   timeSpent: number;
+  isCorrect: boolean;
 }
 
 export default function QuizPage() {
@@ -115,18 +116,22 @@ export default function QuizPage() {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [hasAnswered, setHasAnswered] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [questionStartTime] = useState(Date.now());
 
   const quiz = mockQuiz; // In real app, fetch based on quizId
   const question = quiz.questions[currentQuestion];
   const progress = ((currentQuestion + 1) / quiz.questions.length) * 100;
+  
+  const isCorrect = selectedOption === question.correctAnswer;
 
   const handleOptionSelect = (optionId: string) => {
+    if (hasAnswered) return; // Prevent changing answer after submission
     setSelectedOption(optionId);
   };
 
-  const handleNext = () => {
+  const handleSubmitAnswer = () => {
     if (!selectedOption) {
       toast({
         title: "Please select an answer",
@@ -135,18 +140,22 @@ export default function QuizPage() {
       });
       return;
     }
-
+    setHasAnswered(true);
+    
     const answer: Answer = {
       questionId: question.id,
       selectedOption,
       timeSpent: Math.floor((Date.now() - questionStartTime) / 1000),
+      isCorrect: selectedOption === question.correctAnswer,
     };
-
     setAnswers([...answers, answer]);
+  };
 
+  const handleNext = () => {
     if (currentQuestion < quiz.questions.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
       setSelectedOption(null);
+      setHasAnswered(false);
     } else {
       setShowResults(true);
     }
@@ -159,6 +168,7 @@ export default function QuizPage() {
         (a) => a.questionId === quiz.questions[currentQuestion - 1].id
       );
       setSelectedOption(prevAnswer?.selectedOption || null);
+      setHasAnswered(!!prevAnswer);
     }
   };
 
@@ -348,33 +358,97 @@ export default function QuizPage() {
 
             {/* Options */}
             <div className="space-y-3">
-              {question.options.map((option) => (
-                <button
-                  key={option.id}
-                  onClick={() => handleOptionSelect(option.id)}
-                  className={cn(
-                    "w-full rounded-lg border p-4 text-left transition-all duration-200",
-                    selectedOption === option.id
-                      ? "border-accent bg-accent/5 ring-2 ring-accent/20"
-                      : "border-border hover:border-accent/50 hover:bg-muted/50"
-                  )}
-                >
-                  <div className="flex items-start gap-3">
-                    <span
-                      className={cn(
-                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-medium",
-                        selectedOption === option.id
-                          ? "bg-accent text-white"
-                          : "bg-muted text-muted-foreground"
-                      )}
-                    >
-                      {option.label}
-                    </span>
-                    <span className="pt-0.5">{option.text}</span>
-                  </div>
-                </button>
-              ))}
+              {question.options.map((option) => {
+                const isThisCorrect = option.id === question.correctAnswer;
+                const isThisSelected = selectedOption === option.id;
+                
+                return (
+                  <button
+                    key={option.id}
+                    onClick={() => handleOptionSelect(option.id)}
+                    disabled={hasAnswered}
+                    className={cn(
+                      "w-full rounded-lg border p-4 text-left transition-all duration-200",
+                      !hasAnswered && isThisSelected && "border-accent bg-accent/5 ring-2 ring-accent/20",
+                      !hasAnswered && !isThisSelected && "border-border hover:border-accent/50 hover:bg-muted/50",
+                      hasAnswered && isThisCorrect && "border-success bg-success/10 ring-2 ring-success/20",
+                      hasAnswered && isThisSelected && !isThisCorrect && "border-destructive bg-destructive/10 ring-2 ring-destructive/20",
+                      hasAnswered && !isThisCorrect && !isThisSelected && "border-border opacity-50",
+                      hasAnswered && "cursor-default"
+                    )}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span
+                        className={cn(
+                          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-medium",
+                          !hasAnswered && isThisSelected && "bg-accent text-white",
+                          !hasAnswered && !isThisSelected && "bg-muted text-muted-foreground",
+                          hasAnswered && isThisCorrect && "bg-success text-white",
+                          hasAnswered && isThisSelected && !isThisCorrect && "bg-destructive text-white",
+                          hasAnswered && !isThisCorrect && !isThisSelected && "bg-muted text-muted-foreground"
+                        )}
+                      >
+                        {hasAnswered && isThisCorrect ? (
+                          <CheckCircle2 className="h-4 w-4" />
+                        ) : hasAnswered && isThisSelected && !isThisCorrect ? (
+                          <AlertCircle className="h-4 w-4" />
+                        ) : (
+                          option.label
+                        )}
+                      </span>
+                      <span className="pt-0.5">{option.text}</span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
+
+            {/* Feedback after answering */}
+            {hasAnswered && (
+              <div className={cn(
+                "mt-6 rounded-lg border p-4",
+                isCorrect 
+                  ? "border-success/30 bg-success/5" 
+                  : "border-destructive/30 bg-destructive/5"
+              )}>
+                <div className="flex items-start gap-3">
+                  <div className={cn(
+                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                    isCorrect ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"
+                  )}>
+                    {isCorrect ? (
+                      <CheckCircle2 className="h-5 w-5" />
+                    ) : (
+                      <AlertCircle className="h-5 w-5" />
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <p className={cn(
+                      "font-semibold",
+                      isCorrect ? "text-success" : "text-destructive"
+                    )}>
+                      {isCorrect ? "Correct!" : "Incorrect"}
+                    </p>
+                    {!isCorrect && (
+                      <p className="text-sm text-muted-foreground">
+                        <span className="font-medium">Correct answer:</span>{" "}
+                        {question.options.find((o) => o.id === question.correctAnswer)?.text}
+                      </p>
+                    )}
+                    <div className="mt-3 rounded-lg bg-muted p-3">
+                      <p className="text-xs font-medium mb-1">
+                        <HipaaLink section={question.hipaaSection}>
+                          {question.hipaaSection}
+                        </HipaaLink>
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {question.rationale}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Navigation */}
@@ -392,16 +466,22 @@ export default function QuizPage() {
               <Clock className="h-4 w-4" />
               <span>Take your time</span>
             </div>
-            <Button onClick={handleNext} className="gap-2">
-              {currentQuestion === quiz.questions.length - 1 ? (
-                "Submit Quiz"
-              ) : (
-                <>
-                  Next
-                  <ArrowRight className="h-4 w-4" />
-                </>
-              )}
-            </Button>
+            {!hasAnswered ? (
+              <Button onClick={handleSubmitAnswer} className="gap-2">
+                Submit Answer
+              </Button>
+            ) : (
+              <Button onClick={handleNext} className="gap-2">
+                {currentQuestion === quiz.questions.length - 1 ? (
+                  "View Results"
+                ) : (
+                  <>
+                    Next Question
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
 
