@@ -10,6 +10,7 @@ import DemoPage from "./pages/DemoPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import UserDashboard from "./pages/UserDashboard";
 import QuizPage from "./pages/QuizPage";
+import QuizzesPage from "./pages/QuizzesPage";
 import TrainingMaterialsPage from "./pages/TrainingMaterialsPage";
 import TrainingMaterialPage from "./pages/TrainingMaterialPage";
 import UsersPage from "./pages/admin/UsersPage";
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/users" element={<UsersPage />} />
             <Route path="/dashboard" element={<UserDashboard />} />
+            <Route path="/dashboard/quizzes" element={<QuizzesPage />} />
             <Route path="/dashboard/quiz/:quizId" element={<QuizPage />} />
             <Route path="/dashboard/training" element={<TrainingMaterialsPage />} />
             <Route path="/dashboard/training/:materialId" element={<TrainingMaterialPage />} />
