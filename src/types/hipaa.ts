@@ -10,6 +10,10 @@ export type WorkforceGroup =
 
 export type UserRole = 'org_admin' | 'workforce_user';
 
+export type UserStatus = 'pending_assignment' | 'active' | 'suspended';
+
+export type QuizStatus = 'locked' | 'unlocked' | 'in_progress' | 'passed' | 'failed';
+
 export interface Organization {
   id: string;
   name: string;
@@ -25,11 +29,61 @@ export interface User {
   first_name: string;
   last_name: string;
   role: UserRole;
-  workforce_group: WorkforceGroup;
+  workforce_group: WorkforceGroup | null;
+  status: UserStatus;
   mfa_enabled: boolean;
   is_contractor: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface TrainingMaterial {
+  id: string;
+  workforce_groups: WorkforceGroup[];
+  sequence_number: number;
+  title: string;
+  description: string;
+  content: TrainingSection[];
+  hipaa_citations: string[];
+  estimated_minutes: number;
+  version: number;
+}
+
+export interface TrainingSection {
+  title: string;
+  content: string;
+  hipaa_citations: string[];
+}
+
+export interface UserTrainingProgress {
+  user_id: string;
+  material_id: string;
+  completed_at: string;
+  version_at_completion: number;
+}
+
+export interface Quiz {
+  id: string;
+  workforce_groups: WorkforceGroup[];
+  sequence_number: number;
+  version: number;
+  title: string;
+  description: string;
+  questions: QuizQuestion[];
+  hipaa_citations: string[];
+  passing_score: number;
+  effective_date: string;
+}
+
+export interface QuizProgress {
+  user_id: string;
+  quiz_id: string;
+  sequence_number: number;
+  status: QuizStatus;
+  best_score?: number;
+  attempts: number;
+  last_attempt_at?: string;
+  passed_at?: string;
 }
 
 export interface KnowledgeVersion {
@@ -151,6 +205,15 @@ export interface AuditLog {
   created_at: string;
 }
 
+// Control Matrix Types
+export interface ControlMapping {
+  control_id: string;
+  control_name: string;
+  hipaa_section: string;
+  description: string;
+  implementation_notes: string;
+}
+
 // UI Helper Types
 export const WORKFORCE_GROUP_LABELS: Record<WorkforceGroup, string> = {
   all_staff: 'All Staff',
@@ -166,4 +229,18 @@ export const WORKFORCE_GROUP_DESCRIPTIONS: Record<WorkforceGroup, string> = {
   administrative: 'Administrative and billing personnel handling PHI',
   management: 'Leadership responsible for organizational compliance',
   it: 'Information technology and security professionals',
+};
+
+export const USER_STATUS_LABELS: Record<UserStatus, string> = {
+  pending_assignment: 'Pending Assignment',
+  active: 'Active',
+  suspended: 'Suspended',
+};
+
+export const QUIZ_STATUS_LABELS: Record<QuizStatus, string> = {
+  locked: 'Locked',
+  unlocked: 'Available',
+  in_progress: 'In Progress',
+  passed: 'Passed',
+  failed: 'Needs Review',
 };
