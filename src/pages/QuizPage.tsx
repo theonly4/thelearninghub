@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { WorkforceGroupBadge } from "@/components/WorkforceGroupBadge";
+import { HipaaLink, HIPAA_PARTS } from "@/components/HipaaLink";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
@@ -261,8 +262,10 @@ export default function QuizPage() {
                           </p>
                         )}
                         <div className="mt-2 rounded-lg bg-muted p-3">
-                          <p className="text-xs font-medium text-accent mb-1">
-                            {q.hipaaSection}
+                          <p className="text-xs font-medium mb-1">
+                            <HipaaLink section={q.hipaaSection}>
+                              {q.hipaaSection}
+                            </HipaaLink>
                           </p>
                           <p className="text-sm text-muted-foreground">
                             {q.rationale}
@@ -406,9 +409,13 @@ export default function QuizPage() {
         <div className="rounded-lg border border-accent/20 bg-accent/5 p-4">
           <p className="text-xs text-muted-foreground">
             <span className="font-medium text-accent">Training Notice:</span>{" "}
-            This quiz content is mapped to 45 CFR Part 164 and is designed to 
-            demonstrate workforce knowledge per §164.530(b)(1). Your responses 
-            are recorded for audit purposes.
+            This quiz content is mapped to{" "}
+            <a href={HIPAA_PARTS.part160.url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">45 CFR Part 160</a>,{" "}
+            <a href={HIPAA_PARTS.part162.url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">162</a>, and{" "}
+            <a href={HIPAA_PARTS.part164.url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">164</a>{" "}
+            and is designed to demonstrate workforce knowledge per{" "}
+            <HipaaLink section="45 CFR §164.530(b)(1)" showIcon={false}>§164.530(b)(1)</HipaaLink>. 
+            Your responses are recorded for audit purposes.
           </p>
         </div>
       </div>
