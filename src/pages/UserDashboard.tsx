@@ -42,8 +42,7 @@ export default function UserDashboard() {
   const workforceGroups: WorkforceGroup[] = ["all_staff", "clinical", "administrative", "management", "it"];
 
   const handleWorkforceChange = (value: WorkforceGroup) => {
-    setWorkforceGroup(value);
-    resetProgress(); // Reset progress when switching groups for demo
+    resetProgress(value); // Reset progress and set new workforce group in one call
   };
 
   const materials = currentWorkforceGroup
