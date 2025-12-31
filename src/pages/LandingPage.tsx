@@ -4,6 +4,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { FeatureCard } from "@/components/FeatureCard";
 import { WorkforceGroupBadge } from "@/components/WorkforceGroupBadge";
+import { HipaaLink, HIPAA_PARTS } from "@/components/HipaaLink";
 import { 
   Shield, 
   Users, 
@@ -16,7 +17,8 @@ import {
   Award,
   Clock,
   Building2,
-  Scale
+  Scale,
+  ExternalLink
 } from "lucide-react";
 import { WorkforceGroup } from "@/types/hipaa";
 
@@ -54,11 +56,13 @@ const features = [
 ];
 
 const complianceFeatures = [
-  "45 CFR §164.530(b)(1) - Workforce Training Requirements",
-  "45 CFR §164.308(a)(5) - Security Awareness and Training",
-  "45 CFR §164.530(j) - Documentation and 6-Year Retention",
-  "45 CFR §164.312(b) - Audit Controls and Logging",
-  "45 CFR §164.312(d) - Person/Entity Authentication (MFA)",
+  { section: "45 CFR §160.103", label: "HIPAA Definitions and Applicability" },
+  { section: "45 CFR §162.1002", label: "Administrative Transaction Standards" },
+  { section: "45 CFR §164.530(b)(1)", label: "Workforce Training Requirements" },
+  { section: "45 CFR §164.308(a)(5)", label: "Security Awareness and Training" },
+  { section: "45 CFR §164.530(j)", label: "Documentation and 6-Year Retention" },
+  { section: "45 CFR §164.312(b)", label: "Audit Controls and Logging" },
+  { section: "45 CFR §164.312(d)", label: "Person/Entity Authentication (MFA)" },
 ];
 
 const workforceGroups: WorkforceGroup[] = [
@@ -119,7 +123,7 @@ export default function LandingPage() {
             </div>
             <div className="rounded-xl border border-border bg-card p-6 text-center">
               <div className="text-3xl font-bold text-accent">45 CFR</div>
-              <div className="mt-1 text-sm text-muted-foreground">Full Compliance Mapping</div>
+              <div className="mt-1 text-sm text-muted-foreground">Parts 160, 162 & 164</div>
             </div>
           </div>
         </div>
@@ -153,7 +157,10 @@ export default function LandingPage() {
               Enterprise Compliance Features
             </h2>
             <p className="text-lg text-muted-foreground">
-              Every feature maps to specific HIPAA controls in 45 CFR Part 164.
+              Every feature maps to specific HIPAA controls in{" "}
+              <a href={HIPAA_PARTS.part160.url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">45 CFR Part 160</a>,{" "}
+              <a href={HIPAA_PARTS.part162.url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">162</a>, and{" "}
+              <a href={HIPAA_PARTS.part164.url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">164</a>.
             </p>
           </div>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -180,17 +187,44 @@ export default function LandingPage() {
                 Regulatory Alignment
               </div>
               <h2 className="mb-4 text-3xl font-bold tracking-tight md:text-4xl">
-                Built on 45 CFR Part 164
+                Built on 45 CFR Parts 160, 162 & 164
               </h2>
               <p className="mb-6 text-lg text-muted-foreground">
-                Every platform control is mapped to specific HIPAA regulations. 
+                Every platform control is mapped to specific HIPAA regulations across all three parts. 
                 Our Control-to-HIPAA Citation Matrix ensures complete audit defensibility.
               </p>
+              
+              {/* HIPAA Parts Links */}
+              <div className="mb-6 grid gap-3 sm:grid-cols-3">
+                {Object.values(HIPAA_PARTS).map((part) => (
+                  <a
+                    key={part.title}
+                    href={part.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group rounded-lg border border-border bg-card p-3 transition-all hover:border-accent/50 hover:bg-accent/5"
+                  >
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-accent">
+                      {part.title.replace("45 CFR ", "")}
+                      <ExternalLink className="h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100" />
+                    </div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">
+                      {part.description}
+                    </div>
+                  </a>
+                ))}
+              </div>
+
               <ul className="space-y-3">
                 {complianceFeatures.map((feature) => (
-                  <li key={feature} className="flex items-start gap-3">
+                  <li key={feature.section} className="flex items-start gap-3">
                     <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
-                    <span className="text-sm">{feature}</span>
+                    <span className="text-sm">
+                      <HipaaLink section={feature.section} showIcon={false}>
+                        {feature.section}
+                      </HipaaLink>
+                      {" - "}{feature.label}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -228,7 +262,10 @@ export default function LandingPage() {
                   <h3 className="font-semibold">Mandatory MFA</h3>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Person/Entity Authentication per 45 CFR §164.312(d). 
+                  Person/Entity Authentication per{" "}
+                  <HipaaLink section="45 CFR §164.312(d)" showIcon={false}>
+                    §164.312(d)
+                  </HipaaLink>. 
                   All users require multi-factor authentication.
                 </p>
               </div>

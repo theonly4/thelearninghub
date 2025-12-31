@@ -1,5 +1,7 @@
 import { Logo } from "@/components/Logo";
+import { HipaaLink, HIPAA_PARTS } from "@/components/HipaaLink";
 import { Link } from "react-router-dom";
+import { ExternalLink } from "lucide-react";
 
 const footerLinks = {
   product: [
@@ -9,10 +11,10 @@ const footerLinks = {
     { label: "Roadmap", href: "#roadmap" },
   ],
   compliance: [
-    { label: "HIPAA Overview", href: "#hipaa" },
-    { label: "45 CFR Part 164", href: "#cfr" },
-    { label: "OCR Guidance", href: "#ocr" },
-    { label: "Audit Support", href: "#audit" },
+    { label: "45 CFR Part 160", href: HIPAA_PARTS.part160.url, external: true },
+    { label: "45 CFR Part 162", href: HIPAA_PARTS.part162.url, external: true },
+    { label: "45 CFR Part 164", href: HIPAA_PARTS.part164.url, external: true },
+    { label: "OCR Guidance", href: "https://www.hhs.gov/hipaa/for-professionals/index.html", external: true },
   ],
   company: [
     { label: "About", href: "#about" },
@@ -69,9 +71,12 @@ export function Footer() {
                 <li key={link.label}>
                   <a
                     href={link.href}
-                    className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                    target={link.external ? "_blank" : undefined}
+                    rel={link.external ? "noopener noreferrer" : undefined}
+                    className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
                   >
                     {link.label}
+                    {link.external && <ExternalLink className="h-3 w-3" />}
                   </a>
                 </li>
               ))}
@@ -102,7 +107,10 @@ export function Footer() {
             or transmit Protected Health Information (PHI). The platform provider is not 
             a Business Associate. All AI-generated content is for training guidance only 
             and does not constitute legal advice. System designed to be defensible in 
-            OCR HIPAA audits per 45 CFR Part 164.
+            OCR HIPAA audits per{" "}
+            <a href={HIPAA_PARTS.part160.url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">45 CFR Part 160</a>,{" "}
+            <a href={HIPAA_PARTS.part162.url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">162</a>, and{" "}
+            <a href={HIPAA_PARTS.part164.url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">164</a>.
           </p>
         </div>
       </div>
