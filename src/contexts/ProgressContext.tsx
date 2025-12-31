@@ -35,7 +35,7 @@ interface ProgressContextType {
   getNextAction: () => { type: 'material' | 'quiz' | 'complete'; id?: string; message: string };
   isMaterialComplete: (materialId: string) => boolean;
   getQuizResult: (quizId: string) => QuizResult | undefined;
-  resetProgress: () => void;
+  resetProgress: (newWorkforceGroup?: WorkforceGroup) => void;
 }
 
 const ProgressContext = createContext<ProgressContextType | undefined>(undefined);
@@ -195,12 +195,12 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     return state.quizResults.find(r => r.quizId === quizId);
   };
 
-  const resetProgress = () => {
-    setState({
+  const resetProgress = (newWorkforceGroup?: WorkforceGroup) => {
+    setState(prev => ({
       completedMaterials: [],
       quizResults: [],
-      currentWorkforceGroup: state.currentWorkforceGroup,
-    });
+      currentWorkforceGroup: newWorkforceGroup ?? prev.currentWorkforceGroup,
+    }));
   };
 
   return (
