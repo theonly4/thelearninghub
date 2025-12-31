@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatCard } from "@/components/StatCard";
 import { WorkforceGroupBadge } from "@/components/WorkforceGroupBadge";
@@ -10,7 +11,8 @@ import {
   TrendingUp,
   Clock,
   CheckCircle2,
-  ArrowRight
+  ArrowRight,
+  UserPlus
 } from "lucide-react";
 import { WorkforceGroup, WORKFORCE_GROUP_LABELS } from "@/types/hipaa";
 
@@ -22,6 +24,7 @@ const stats = {
   complianceRate: 70,
   certificatesIssued: 156,
   riskAreasIdentified: 12,
+  pendingAssignment: 5,
 };
 
 const recentActivity = [
@@ -29,6 +32,7 @@ const recentActivity = [
   { user: "Michael Chen", action: "Started IT Security Quiz", time: "3 hours ago", status: "pending" },
   { user: "Emily Davis", action: "Certificate Generated", time: "5 hours ago", status: "success" },
   { user: "James Wilson", action: "Quiz Expired", time: "1 day ago", status: "warning" },
+  { user: "New User", action: "Awaiting Workforce Assignment", time: "Just now", status: "warning" },
 ];
 
 const workforceBreakdown: { group: WorkforceGroup; count: number; compliance: number }[] = [
@@ -58,6 +62,33 @@ export default function AdminDashboard() {
             Generate Report
           </Button>
         </div>
+
+        {/* Pending Assignments Alert */}
+        {stats.pendingAssignment > 0 && (
+          <Link to="/admin/users" className="block">
+            <div className="rounded-xl border-2 border-warning/50 bg-warning/5 p-4 hover:bg-warning/10 transition-colors">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-full bg-warning/20 p-2">
+                    <UserPlus className="h-5 w-5 text-warning" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-warning">
+                      {stats.pendingAssignment} users awaiting workforce assignment
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Users cannot access training until assigned a workforce group
+                    </p>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" className="gap-2">
+                  Assign Now
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </Link>
+        )}
 
         {/* Stats Grid */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -175,10 +206,12 @@ export default function AdminDashboard() {
         <div className="rounded-xl border border-border bg-card p-5">
           <h2 className="mb-4 font-semibold">Quick Actions</h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Button variant="outline" className="h-auto flex-col gap-2 py-4">
-              <Users className="h-5 w-5" />
-              <span>Add User</span>
-            </Button>
+            <Link to="/admin/users">
+              <Button variant="outline" className="h-auto w-full flex-col gap-2 py-4">
+                <Users className="h-5 w-5" />
+                <span>Manage Users</span>
+              </Button>
+            </Link>
             <Button variant="outline" className="h-auto flex-col gap-2 py-4">
               <FileText className="h-5 w-5" />
               <span>Assign Quiz</span>
