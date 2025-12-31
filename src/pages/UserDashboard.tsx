@@ -220,7 +220,7 @@ export default function UserDashboard() {
           />
           <StatCard
             title="Average Score"
-            value={completedQuizzes > 0 ? `${Math.round(avgScore)}%` : "—"}
+            value={completedQuizzes > 0 ? `${Math.round(avgScore)}%` : "-"}
             icon={Award}
           />
         </div>
