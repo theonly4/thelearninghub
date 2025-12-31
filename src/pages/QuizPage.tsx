@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { WorkforceGroupBadge } from "@/components/WorkforceGroupBadge";
-import { HipaaLink, HIPAA_PARTS } from "@/components/HipaaLink";
+import { HipaaLink } from "@/components/HipaaLink";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { useProgress } from "@/contexts/ProgressContext";
+import { getQuizById } from "@/data/quizzes";
 import {
   ArrowLeft,
   ArrowRight,
@@ -13,6 +15,7 @@ import {
   CheckCircle2,
   AlertCircle,
   BookOpen,
+  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
