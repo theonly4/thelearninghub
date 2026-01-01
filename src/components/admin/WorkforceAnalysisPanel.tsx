@@ -1,14 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Brain, AlertTriangle, CheckCircle2, Users, User, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { Loader2, Brain, AlertTriangle, CheckCircle2, Users, User, ChevronDown, ChevronUp, Info } from "lucide-react";
 import { WorkforceGroup, WORKFORCE_GROUP_LABELS } from "@/types/hipaa";
 import { WorkforceGroupBadge } from "@/components/WorkforceGroupBadge";
 import { toast } from "sonner";
-import { HipaaLink } from "@/components/HipaaLink";
 
 interface RiskArea {
   topic: string;
@@ -47,14 +46,70 @@ interface AnalysisResult {
   error?: string;
 }
 
-// Mock employees for demo (in production, fetch from database)
-const mockEmployees = [
-  { id: "user-1", name: "Sarah Johnson", workforceGroup: "clinical" as WorkforceGroup },
-  { id: "user-2", name: "Michael Chen", workforceGroup: "it" as WorkforceGroup },
-  { id: "user-3", name: "Emily Davis", workforceGroup: "administrative" as WorkforceGroup },
-  { id: "user-4", name: "James Wilson", workforceGroup: "management" as WorkforceGroup },
-  { id: "user-5", name: "Lisa Brown", workforceGroup: "all_staff" as WorkforceGroup },
-];
+interface Employee {
+  id: string;
+  name: string;
+  workforceGroup: WorkforceGroup;
+}
+
+// Demo analysis result for demonstration purposes
+const demoAnalysisResult: AnalysisResult = {
+  success: true,
+  analyzedAt: new Date().toISOString(),
+  organizationSummary: {
+    highestRiskTopics: ["§164.308 - Administrative Safeguards", "§164.530 - Administrative Requirements"],
+    overallComplianceRisk: "medium",
+    priorityActions: [
+      "Schedule refresher training on administrative safeguards for IT and Administrative staff",
+      "Review breach notification procedures with all workforce groups",
+      "Conduct targeted training on minimum necessary standard for Clinical staff"
+    ]
+  },
+  analyses: [
+    {
+      userId: "demo-1",
+      userName: "Sarah Johnson",
+      email: "sarah.johnson@example.com",
+      workforceGroup: "clinical",
+      totalQuizAttempts: 3,
+      totalWrongAnswers: 8,
+      weaknessesByTopic: {
+        "§164.502 - Minimum Necessary": 3,
+        "§164.524 - Access Rights": 2,
+        "§164.530 - Administrative Requirements": 3
+      },
+      aiAnalysis: {
+        riskAreas: [
+          { topic: "§164.502 - Minimum Necessary Standard", errorRate: 40, severity: "medium", recommendation: "Review minimum necessary requirements for clinical disclosures per §164.502(b)" },
+          { topic: "§164.530 - Administrative Requirements", errorRate: 35, severity: "medium", recommendation: "Complete training module on administrative requirements and documentation" }
+        ],
+        overallAssessment: "Employee shows moderate understanding of HIPAA requirements with specific gaps in minimum necessary standard application.",
+        remediation: ["Assign Minimum Necessary training module", "Schedule 1:1 review of clinical disclosure scenarios"]
+      }
+    },
+    {
+      userId: "demo-2",
+      userName: "Michael Chen",
+      email: "michael.chen@example.com",
+      workforceGroup: "it",
+      totalQuizAttempts: 2,
+      totalWrongAnswers: 12,
+      weaknessesByTopic: {
+        "§164.308 - Administrative Safeguards": 5,
+        "§164.312 - Technical Safeguards": 4,
+        "§164.314 - Organizational Requirements": 3
+      },
+      aiAnalysis: {
+        riskAreas: [
+          { topic: "§164.308 - Administrative Safeguards", errorRate: 55, severity: "high", recommendation: "Immediate review of security management process and risk analysis requirements" },
+          { topic: "§164.312 - Technical Safeguards", errorRate: 45, severity: "medium", recommendation: "Complete access control and audit control training modules" }
+        ],
+        overallAssessment: "Critical gaps identified in understanding of administrative and technical safeguards. Priority remediation required.",
+        remediation: ["Assign Security Rule training immediately", "Review technical safeguards implementation with IT manager", "Complete risk analysis simulation exercise"]
+      }
+    }
+  ]
+};
 
 export function WorkforceAnalysisPanel() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -63,10 +118,51 @@ export function WorkforceAnalysisPanel() {
   const [selectedGroup, setSelectedGroup] = useState<WorkforceGroup | "">("");
   const [selectedEmployee, setSelectedEmployee] = useState<string>("");
   const [expandedEmployee, setExpandedEmployee] = useState<string | null>(null);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [isDemo, setIsDemo] = useState(false);
+
+  // Fetch real employees from database on mount
+  useEffect(() => {
+    async function fetchData() {
+      // Try to get organization and employees
+      const { data: orgs } = await supabase.from("organizations").select("id").limit(1);
+      
+      if (orgs && orgs.length > 0) {
+        setOrganizationId(orgs[0].id);
+        
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("user_id, first_name, last_name, workforce_group")
+          .eq("organization_id", orgs[0].id);
+        
+        if (profiles && profiles.length > 0) {
+          setEmployees(profiles.map(p => ({
+            id: p.user_id,
+            name: `${p.first_name} ${p.last_name}`,
+            workforceGroup: (p.workforce_group || "all_staff") as WorkforceGroup
+          })));
+        }
+      }
+    }
+    fetchData();
+  }, []);
 
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
     setAnalysisResult(null);
+    setIsDemo(false);
+
+    // If no real data exists, show demo results
+    if (!organizationId) {
+      // Simulate AI processing delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      setAnalysisResult(demoAnalysisResult);
+      setIsDemo(true);
+      setIsAnalyzing(false);
+      toast.success("Demo analysis complete! (No real employee data available)");
+      return;
+    }
 
     try {
       const requestBody: {
@@ -75,7 +171,7 @@ export function WorkforceAnalysisPanel() {
         workforceGroup?: string;
         userId?: string;
       } = {
-        organizationId: "demo-org-id", // In production, get from auth context
+        organizationId,
       };
 
       if (analysisType === "all") {
@@ -223,7 +319,10 @@ export function WorkforceAnalysisPanel() {
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
                 <SelectContent>
-                  {mockEmployees.map((emp) => (
+                  {(employees.length > 0 ? employees : [
+                    { id: "demo-1", name: "Sarah Johnson", workforceGroup: "clinical" as WorkforceGroup },
+                    { id: "demo-2", name: "Michael Chen", workforceGroup: "it" as WorkforceGroup },
+                  ]).map((emp) => (
                     <SelectItem key={emp.id} value={emp.id}>
                       {emp.name}
                     </SelectItem>
