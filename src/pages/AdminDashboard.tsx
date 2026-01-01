@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatCard } from "@/components/StatCard";
 import { WorkforceGroupBadge } from "@/components/WorkforceGroupBadge";
+import { WorkforceAnalysisPanel } from "@/components/admin/WorkforceAnalysisPanel";
 import { Button } from "@/components/ui/button";
 import { 
   Users, 
@@ -201,6 +202,9 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
+
+        {/* AI Workforce Analysis */}
+        <WorkforceAnalysisPanel />
 
         {/* Quick Actions */}
         <div className="rounded-xl border border-border bg-card p-5">

@@ -1,1 +1,4 @@
 project_id = "yzuvyvtspdjmewuakpkn"
+
+[functions.analyze-workforce]
+verify_jwt = true
