@@ -17,6 +17,13 @@ import UsersPage from "./pages/admin/UsersPage";
 import PendingSetupPage from "./pages/PendingSetupPage";
 import NotFound from "./pages/NotFound";
 
+// Platform Owner Pages
+import PlatformDashboard from "./pages/platform/PlatformDashboard";
+import QuestionBankPage from "./pages/platform/QuestionBankPage";
+import TrainingMaterialsManagerPage from "./pages/platform/TrainingMaterialsManagerPage";
+import ContentReleasesPage from "./pages/platform/ContentReleasesPage";
+import OrganizationsPage from "./pages/platform/OrganizationsPage";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -38,6 +45,14 @@ const App = () => (
             <Route path="/dashboard/training" element={<TrainingMaterialsPage />} />
             <Route path="/dashboard/training/:materialId" element={<TrainingMaterialPage />} />
             <Route path="/pending-setup" element={<PendingSetupPage />} />
+            
+            {/* Platform Owner Routes */}
+            <Route path="/platform" element={<PlatformDashboard />} />
+            <Route path="/platform/questions" element={<QuestionBankPage />} />
+            <Route path="/platform/materials" element={<TrainingMaterialsManagerPage />} />
+            <Route path="/platform/releases" element={<ContentReleasesPage />} />
+            <Route path="/platform/organizations" element={<OrganizationsPage />} />
+            
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
