@@ -115,6 +115,47 @@ export type Database = {
           },
         ]
       }
+      content_releases: {
+        Row: {
+          content_id: string
+          content_type: string
+          created_at: string
+          id: string
+          notes: string | null
+          organization_id: string
+          released_at: string
+          released_by: string
+        }
+        Insert: {
+          content_id: string
+          content_type: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          organization_id: string
+          released_at?: string
+          released_by: string
+        }
+        Update: {
+          content_id?: string
+          content_type?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          released_at?: string
+          released_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_releases_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           created_at: string

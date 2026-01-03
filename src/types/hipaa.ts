@@ -8,7 +8,7 @@ export type WorkforceGroup =
   | 'management'
   | 'it';
 
-export type UserRole = 'org_admin' | 'workforce_user';
+export type UserRole = 'org_admin' | 'workforce_user' | 'platform_owner';
 
 export type UserStatus = 'pending_assignment' | 'active' | 'suspended';
 
