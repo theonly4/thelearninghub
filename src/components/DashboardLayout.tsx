@@ -27,7 +27,6 @@ const adminNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/admin" },
   { icon: Users, label: "Users", href: "/admin/users" },
   { icon: FileText, label: "Quiz Assignments", href: "/admin/assignments" },
-  { icon: BookOpen, label: "Knowledge Base", href: "/admin/knowledge" },
   { icon: Award, label: "Certificates", href: "/admin/certificates" },
   { icon: BarChart3, label: "Reports", href: "/admin/reports" },
   { icon: HelpCircle, label: "How To Guide", href: "/admin/help" },
