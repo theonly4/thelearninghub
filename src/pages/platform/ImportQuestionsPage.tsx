@@ -103,6 +103,7 @@ export default function ImportQuestionsPage() {
       toast.info("Processing 600 questions... This may take a minute.");
 
       const response = await supabase.functions.invoke("import-csv-questions", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
         body: { csv_content: csvContent },
       });
 

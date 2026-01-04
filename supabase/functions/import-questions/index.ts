@@ -3,8 +3,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
+
+const MASTER_QUIZ_TITLE = "Master Question Bank";
+
+type SupabaseClient = ReturnType<typeof createClient>;
 
 interface QuestionImport {
   question_number: number;
@@ -29,6 +34,45 @@ interface ImportRequest {
   create_topics: boolean;
 }
 
+async function ensureMasterQuizId(supabaseClient: SupabaseClient): Promise<string> {
+  const { data: existing } = await supabaseClient
+    .from("quizzes")
+    .select("id")
+    .eq("title", MASTER_QUIZ_TITLE)
+    .maybeSingle();
+
+  if (existing?.id) return existing.id;
+
+  const today = new Date().toISOString().split("T")[0];
+
+  const { data: created, error } = await supabaseClient
+    .from("quizzes")
+    .insert({
+      title: MASTER_QUIZ_TITLE,
+      description: "Imported question bank (JSON).",
+      sequence_number: 1,
+      workforce_groups: [
+        "all_staff",
+        "clinical",
+        "administrative",
+        "management",
+        "it",
+      ],
+      passing_score: 80,
+      version: 1,
+      effective_date: today,
+      hipaa_citations: [],
+    })
+    .select("id")
+    .single();
+
+  if (error || !created) {
+    throw new Error(error?.message || "Failed to create master quiz");
+  }
+
+  return created.id;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -36,8 +80,9 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Missing authorization" }), {
@@ -46,23 +91,23 @@ serve(async (req) => {
       });
     }
 
-    // Create client with user's auth
-    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
-    const userClient = createClient(supabaseUrl, supabaseServiceKey.replace(supabaseServiceKey, authHeader.replace("Bearer ", "")));
-    
-    // Verify user is platform owner
-    const { data: { user }, error: authError } = await createClient(
-      supabaseUrl,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    ).auth.getUser();
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const {
+      data: { user },
+      error: authError,
+    } = await authClient.auth.getUser();
 
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      return new Response(JSON.stringify({ error: authError?.message || "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
 
     // Check platform owner role
     const { data: roleData } = await supabaseClient
@@ -73,10 +118,13 @@ serve(async (req) => {
       .single();
 
     if (!roleData) {
-      return new Response(JSON.stringify({ error: "Only platform owners can import questions" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: "Only platform owners can import questions" }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     const body: ImportRequest = await req.json();
@@ -89,6 +137,8 @@ serve(async (req) => {
       });
     }
 
+    const targetQuizId = quiz_id || (await ensureMasterQuizId(supabaseClient));
+
     const results = {
       imported: 0,
       skipped: 0,
@@ -98,10 +148,13 @@ serve(async (req) => {
 
     // Process topics first if create_topics is true
     const topicMap = new Map<string, string>();
-    
+
     if (create_topics) {
-      const uniqueTopics = new Map<string, { rule_name: string; topic_name: string; description: string }>();
-      
+      const uniqueTopics = new Map<
+        string,
+        { rule_name: string; topic_name: string; description: string }
+      >();
+
       for (const q of questions) {
         if (q.hipaa_topic_name && q.hipaa_rule) {
           const key = `${q.hipaa_rule}|${q.hipaa_topic_name}`;
@@ -116,13 +169,12 @@ serve(async (req) => {
       }
 
       for (const [key, topic] of uniqueTopics) {
-        // Check if topic exists
         const { data: existing } = await supabaseClient
           .from("hipaa_topics")
           .select("id")
           .eq("rule_name", topic.rule_name)
           .eq("topic_name", topic.topic_name)
-          .single();
+          .maybeSingle();
 
         if (existing) {
           topicMap.set(key, existing.id);
@@ -134,7 +186,9 @@ serve(async (req) => {
             .single();
 
           if (topicError) {
-            results.errors.push(`Failed to create topic ${topic.topic_name}: ${topicError.message}`);
+            results.errors.push(
+              `Failed to create topic ${topic.topic_name}: ${topicError.message}`,
+            );
           } else if (newTopic) {
             topicMap.set(key, newTopic.id);
             results.topics_created++;
@@ -142,7 +196,6 @@ serve(async (req) => {
         }
       }
     } else {
-      // Load existing topics
       const { data: existingTopics } = await supabaseClient
         .from("hipaa_topics")
         .select("id, rule_name, topic_name");
@@ -154,16 +207,16 @@ serve(async (req) => {
       }
     }
 
-    // Import questions
     for (const q of questions) {
       try {
-        // Clean correct answer to just the letter
         let correctAnswer = q.correct_answer.trim().toUpperCase();
         if (correctAnswer.length > 1) {
           correctAnswer = correctAnswer.charAt(0);
         }
-        if (!["A", "B", "C", "D"].includes(correctAnswer)) {
-          results.errors.push(`Question ${q.question_number}: Invalid correct answer "${q.correct_answer}"`);
+        if (!/[ABCD]/.test(correctAnswer)) {
+          results.errors.push(
+            `Question ${q.question_number}: Invalid correct answer "${q.correct_answer}"`,
+          );
           results.skipped++;
           continue;
         }
@@ -172,7 +225,7 @@ serve(async (req) => {
         const hipaaTopicId = topicMap.get(topicKey) || null;
 
         const questionData = {
-          quiz_id: quiz_id || null,
+          quiz_id: targetQuizId,
           question_number: q.question_number,
           question_text: q.question_text.trim(),
           scenario: q.scenario?.trim() || null,
