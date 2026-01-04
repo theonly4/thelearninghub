@@ -27,6 +27,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -37,11 +45,14 @@ import {
   BookOpen,
   CheckCircle2,
   Calendar,
-  Package
+  Package,
+  Eye,
+  X
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { WORKFORCE_GROUP_LABELS, WorkforceGroup } from "@/types/hipaa";
 
 interface Organization {
   id: string;
@@ -67,6 +78,7 @@ interface PackageRelease {
   released_at: string;
   notes: string | null;
   package_name?: string;
+  package_description?: string;
 }
 
 interface Quiz {
@@ -81,6 +93,14 @@ interface TrainingMaterial {
   sequence_number: number;
 }
 
+interface PackageQuestion {
+  id: string;
+  question_id: string;
+  question_text: string;
+  question_number: number;
+  hipaa_section: string;
+}
+
 export default function ContentReleasesPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [releases, setReleases] = useState<ContentRelease[]>([]);
@@ -90,6 +110,12 @@ export default function ContentReleasesPage() {
   const [loading, setLoading] = useState(true);
   const [isReleaseDialogOpen, setIsReleaseDialogOpen] = useState(false);
   const [selectedOrg, setSelectedOrg] = useState<string | null>(null);
+  
+  // Package viewer state
+  const [selectedPackageRelease, setSelectedPackageRelease] = useState<PackageRelease | null>(null);
+  const [packageQuestions, setPackageQuestions] = useState<PackageQuestion[]>([]);
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
+  const [packageViewerOpen, setPackageViewerOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -168,6 +194,44 @@ export default function ContentReleasesPage() {
 
   function getOrgPackageCount(orgId: string) {
     return packageReleases.filter((r) => r.organization_id === orgId).length;
+  }
+
+  async function handleViewPackage(release: PackageRelease) {
+    setSelectedPackageRelease(release);
+    setPackageViewerOpen(true);
+    setLoadingQuestions(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from("package_questions")
+        .select(`
+          id,
+          question_id,
+          quiz_questions (
+            question_text,
+            question_number,
+            hipaa_section
+          )
+        `)
+        .eq("package_id", release.package_id);
+      
+      if (error) throw error;
+      
+      const formattedQuestions: PackageQuestion[] = (data || []).map((pq: any) => ({
+        id: pq.id,
+        question_id: pq.question_id,
+        question_text: pq.quiz_questions?.question_text || "Unknown question",
+        question_number: pq.quiz_questions?.question_number || 0,
+        hipaa_section: pq.quiz_questions?.hipaa_section || "Unknown",
+      })).sort((a, b) => a.question_number - b.question_number);
+      
+      setPackageQuestions(formattedQuestions);
+    } catch (error) {
+      console.error("Error fetching package questions:", error);
+      toast.error("Failed to load package questions");
+    } finally {
+      setLoadingQuestions(false);
+    }
   }
 
   return (
@@ -279,6 +343,7 @@ export default function ContentReleasesPage() {
                   <TableHead>Details</TableHead>
                   <TableHead>Released</TableHead>
                   <TableHead>Notes</TableHead>
+                  <TableHead className="w-16"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -286,7 +351,7 @@ export default function ContentReleasesPage() {
                 {packageReleases
                   .filter((r) => !selectedOrg || r.organization_id === selectedOrg)
                   .map((release) => (
-                    <TableRow key={`pkg-${release.id}`}>
+                    <TableRow key={`pkg-${release.id}`} className="cursor-pointer hover:bg-muted/50">
                       <TableCell className="font-medium">
                         {release.package_name}
                       </TableCell>
@@ -315,6 +380,15 @@ export default function ContentReleasesPage() {
                         <span className="text-sm text-muted-foreground line-clamp-1">
                           {release.notes || "—"}
                         </span>
+                      </TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleViewPackage(release)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -350,12 +424,13 @@ export default function ContentReleasesPage() {
                           {release.notes || "—"}
                         </span>
                       </TableCell>
+                      <TableCell></TableCell>
                     </TableRow>
                   ))}
                 {releases.filter((r) => !selectedOrg || r.organization_id === selectedOrg).length === 0 &&
                   packageReleases.filter((r) => !selectedOrg || r.organization_id === selectedOrg).length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No releases found.
                     </TableCell>
                   </TableRow>
@@ -365,6 +440,72 @@ export default function ContentReleasesPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Package Questions Viewer Sheet */}
+      <Sheet open={packageViewerOpen} onOpenChange={setPackageViewerOpen}>
+        <SheetContent className="sm:max-w-xl">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-primary" />
+              {selectedPackageRelease?.package_name}
+            </SheetTitle>
+            <SheetDescription>
+              {selectedPackageRelease && (
+                <div className="flex flex-wrap gap-2 mt-1">
+                  <Badge variant="secondary">
+                    {WORKFORCE_GROUP_LABELS[selectedPackageRelease.workforce_group as WorkforceGroup] || selectedPackageRelease.workforce_group}
+                  </Badge>
+                  <Badge variant="outline">{selectedPackageRelease.training_year}</Badge>
+                  <Badge variant="outline">
+                    {getOrgName(selectedPackageRelease.organization_id)}
+                  </Badge>
+                </div>
+              )}
+            </SheetDescription>
+          </SheetHeader>
+          
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="font-medium text-sm text-muted-foreground">
+                Questions in Package
+              </h4>
+              <Badge variant="secondary">{packageQuestions.length} questions</Badge>
+            </div>
+            
+            <ScrollArea className="h-[calc(100vh-220px)]">
+              {loadingQuestions ? (
+                <div className="py-8 text-center text-muted-foreground">
+                  Loading questions...
+                </div>
+              ) : packageQuestions.length === 0 ? (
+                <div className="py-8 text-center text-muted-foreground">
+                  No questions found in this package.
+                </div>
+              ) : (
+                <div className="space-y-3 pr-4">
+                  {packageQuestions.map((q, index) => (
+                    <Card key={q.id} className="p-3">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-medium flex items-center justify-center">
+                          {index + 1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm">{q.question_text}</p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <Badge variant="outline" className="text-xs">
+                              {q.hipaa_section}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+        </SheetContent>
+      </Sheet>
     </PlatformOwnerLayout>
   );
 }
