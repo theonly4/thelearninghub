@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { PlatformOwnerLayout } from "@/components/PlatformOwnerLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,11 +7,21 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Upload, FileJson, CheckCircle, AlertCircle, Loader2, Download } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Upload, FileJson, CheckCircle, AlertCircle, Loader2, Download, FileImage, Wand2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface ImportResult {
+  imported: number;
+  skipped: number;
+  errors: string[];
+  topics_created: number;
+}
+
+interface ExtractionResult {
+  extracted: number;
   imported: number;
   skipped: number;
   errors: string[];
@@ -40,6 +50,13 @@ export default function ImportQuestionsPage() {
   const [createTopics, setCreateTopics] = useState(true);
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
+  
+  // Image extraction state
+  const [extracting, setExtracting] = useState(false);
+  const [extractionProgress, setExtractionProgress] = useState(0);
+  const [extractionResults, setExtractionResults] = useState<ExtractionResult[]>([]);
+  const [totalStats, setTotalStats] = useState({ imported: 0, skipped: 0, topics_created: 0, errors: 0 });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -51,6 +68,100 @@ export default function ImportQuestionsPage() {
       setJsonInput(content);
     };
     reader.readAsText(file);
+  };
+
+  const handleImageFilesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const imageFiles = Array.from(files).filter(f => 
+      f.type.startsWith("image/") || f.name.endsWith(".jpg") || f.name.endsWith(".png") || f.name.endsWith(".jpeg")
+    );
+
+    if (imageFiles.length === 0) {
+      toast.error("Please select image files (JPG, PNG)");
+      return;
+    }
+
+    // Sort files by name to maintain order
+    imageFiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+    setExtracting(true);
+    setExtractionProgress(0);
+    setExtractionResults([]);
+    setTotalStats({ imported: 0, skipped: 0, topics_created: 0, errors: 0 });
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast.error("You must be logged in to extract questions");
+      setExtracting(false);
+      return;
+    }
+
+    let totalImported = 0;
+    let totalSkipped = 0;
+    let totalTopics = 0;
+    let totalErrors = 0;
+
+    for (let i = 0; i < imageFiles.length; i++) {
+      const file = imageFiles[i];
+      setExtractionProgress(Math.round(((i + 1) / imageFiles.length) * 100));
+
+      try {
+        // Convert file to base64
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            // Remove data URL prefix
+            const base64Data = result.split(",")[1];
+            resolve(base64Data);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        // Call extraction API
+        const response = await supabase.functions.invoke("extract-questions", {
+          body: {
+            image_base64: base64,
+            page_number: i + 1,
+          },
+        });
+
+        if (response.error) {
+          throw new Error(response.error.message);
+        }
+
+        const result = response.data as ExtractionResult;
+        setExtractionResults(prev => [...prev, result]);
+
+        totalImported += result.imported;
+        totalSkipped += result.skipped;
+        totalTopics += result.topics_created;
+        totalErrors += result.errors.length;
+
+        setTotalStats({
+          imported: totalImported,
+          skipped: totalSkipped,
+          topics_created: totalTopics,
+          errors: totalErrors,
+        });
+
+      } catch (error) {
+        console.error(`Error processing page ${i + 1}:`, error);
+        totalErrors++;
+        setTotalStats(prev => ({ ...prev, errors: prev.errors + 1 }));
+      }
+    }
+
+    setExtracting(false);
+    
+    if (totalImported > 0) {
+      toast.success(`Successfully imported ${totalImported} questions from ${imageFiles.length} pages`);
+    } else {
+      toast.error("No questions were imported. Check the errors below.");
+    }
   };
 
   const handleImport = async () => {
@@ -125,157 +236,266 @@ export default function ImportQuestionsPage() {
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Import Questions</h2>
           <p className="text-muted-foreground">
-            Bulk import questions from JSON format into the question bank.
+            Bulk import questions into the master question bank.
           </p>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Import Form */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Upload className="h-5 w-5" />
-                Import Data
-              </CardTitle>
-              <CardDescription>
-                Upload a JSON file or paste JSON data containing questions to import.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-4">
-                <Button variant="outline" asChild>
-                  <label className="cursor-pointer">
-                    <FileJson className="h-4 w-4 mr-2" />
-                    Upload JSON File
+        <Tabs defaultValue="images" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 max-w-md">
+            <TabsTrigger value="images" className="gap-2">
+              <Wand2 className="h-4 w-4" />
+              AI Extraction
+            </TabsTrigger>
+            <TabsTrigger value="json" className="gap-2">
+              <FileJson className="h-4 w-4" />
+              JSON Import
+            </TabsTrigger>
+          </TabsList>
+
+          {/* AI Image Extraction Tab */}
+          <TabsContent value="images" className="mt-6">
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileImage className="h-5 w-5" />
+                    Extract from Page Images
+                  </CardTitle>
+                  <CardDescription>
+                    Upload screenshots or images of your question table pages. AI will automatically extract and import all questions.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
+                    <FileImage className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Select all page images from your document (JPG, PNG format)
+                    </p>
+                    <Button
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={extracting}
+                    >
+                      {extracting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-4 w-4 mr-2" />
+                          Select Page Images
+                        </>
+                      )}
+                    </Button>
                     <input
+                      ref={fileInputRef}
                       type="file"
-                      accept=".json"
+                      accept="image/*"
+                      multiple
                       className="hidden"
-                      onChange={handleFileUpload}
+                      onChange={handleImageFilesUpload}
                     />
-                  </label>
-                </Button>
-                <Button variant="ghost" size="sm" onClick={downloadSampleTemplate}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Template
-                </Button>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="json-input">JSON Data</Label>
-                <Textarea
-                  id="json-input"
-                  placeholder='[{"question_number": 1, "scenario": "...", ...}]'
-                  value={jsonInput}
-                  onChange={(e) => setJsonInput(e.target.value)}
-                  className="font-mono text-sm min-h-[300px]"
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="create-topics"
-                  checked={createTopics}
-                  onCheckedChange={setCreateTopics}
-                />
-                <Label htmlFor="create-topics">
-                  Auto-create HIPAA topics from question data
-                </Label>
-              </div>
-
-              <Button
-                onClick={handleImport}
-                disabled={importing || !jsonInput.trim()}
-                className="w-full"
-              >
-                {importing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Importing...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Import Questions
-                  </>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Results / Instructions */}
-          <div className="space-y-6">
-            {result && (
-              <Alert variant={result.errors.length > 0 ? "default" : "default"}>
-                <CheckCircle className="h-4 w-4" />
-                <AlertTitle>Import Complete</AlertTitle>
-                <AlertDescription>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    <Badge variant="default">{result.imported} imported</Badge>
-                    {result.skipped > 0 && (
-                      <Badge variant="destructive">{result.skipped} skipped</Badge>
-                    )}
-                    {result.topics_created > 0 && (
-                      <Badge variant="secondary">{result.topics_created} topics created</Badge>
-                    )}
                   </div>
-                  {result.errors.length > 0 && (
-                    <div className="mt-3 space-y-1">
-                      <p className="font-medium text-sm">Errors:</p>
-                      <ul className="text-sm space-y-1 max-h-[200px] overflow-y-auto">
-                        {result.errors.slice(0, 10).map((err, i) => (
-                          <li key={i} className="text-destructive">{err}</li>
-                        ))}
-                        {result.errors.length > 10 && (
-                          <li className="text-muted-foreground">
-                            ... and {result.errors.length - 10} more errors
-                          </li>
-                        )}
-                      </ul>
+
+                  {extracting && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span>Processing pages...</span>
+                        <span>{extractionProgress}%</span>
+                      </div>
+                      <Progress value={extractionProgress} className="h-2" />
                     </div>
                   )}
-                </AlertDescription>
-              </Alert>
-            )}
 
-            <Card>
-              <CardHeader>
-                <CardTitle>JSON Format</CardTitle>
-                <CardDescription>
-                  Each question should have the following fields:
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <pre className="text-xs bg-muted p-4 rounded-lg overflow-x-auto">
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>How to prepare images</AlertTitle>
+                    <AlertDescription className="text-sm space-y-2">
+                      <p>1. Open your Word document</p>
+                      <p>2. Save each page as an image (File → Export → Save as Image), or take screenshots</p>
+                      <p>3. Upload all page images here</p>
+                    </AlertDescription>
+                  </Alert>
+                </CardContent>
+              </Card>
+
+              <div className="space-y-6">
+                {(totalStats.imported > 0 || totalStats.errors > 0) && (
+                  <Alert variant={totalStats.errors > 0 ? "default" : "default"}>
+                    <CheckCircle className="h-4 w-4" />
+                    <AlertTitle>Extraction {extracting ? "Progress" : "Complete"}</AlertTitle>
+                    <AlertDescription>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <Badge variant="default">{totalStats.imported} imported</Badge>
+                        {totalStats.skipped > 0 && (
+                          <Badge variant="destructive">{totalStats.skipped} skipped</Badge>
+                        )}
+                        {totalStats.topics_created > 0 && (
+                          <Badge variant="secondary">{totalStats.topics_created} topics created</Badge>
+                        )}
+                        {totalStats.errors > 0 && (
+                          <Badge variant="outline">{totalStats.errors} errors</Badge>
+                        )}
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {extractionResults.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Extraction Log</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="max-h-[300px] overflow-y-auto space-y-2 text-sm">
+                        {extractionResults.map((result, i) => (
+                          <div key={i} className="flex items-center gap-2 text-muted-foreground">
+                            {result.imported > 0 ? (
+                              <CheckCircle className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <AlertCircle className="h-4 w-4 text-yellow-500" />
+                            )}
+                            <span>
+                              Page {i + 1}: {result.extracted} extracted, {result.imported} imported
+                              {result.errors.length > 0 && ` (${result.errors.length} errors)`}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* JSON Import Tab */}
+          <TabsContent value="json" className="mt-6">
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Upload className="h-5 w-5" />
+                    Import from JSON
+                  </CardTitle>
+                  <CardDescription>
+                    Upload a JSON file or paste JSON data containing questions.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <Button variant="outline" asChild>
+                      <label className="cursor-pointer">
+                        <FileJson className="h-4 w-4 mr-2" />
+                        Upload JSON File
+                        <input
+                          type="file"
+                          accept=".json"
+                          className="hidden"
+                          onChange={handleFileUpload}
+                        />
+                      </label>
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={downloadSampleTemplate}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Template
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="json-input">JSON Data</Label>
+                    <Textarea
+                      id="json-input"
+                      placeholder='[{"question_number": 1, "scenario": "...", ...}]'
+                      value={jsonInput}
+                      onChange={(e) => setJsonInput(e.target.value)}
+                      className="font-mono text-sm min-h-[300px]"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="create-topics"
+                      checked={createTopics}
+                      onCheckedChange={setCreateTopics}
+                    />
+                    <Label htmlFor="create-topics">
+                      Auto-create HIPAA topics from question data
+                    </Label>
+                  </div>
+
+                  <Button
+                    onClick={handleImport}
+                    disabled={importing || !jsonInput.trim()}
+                    className="w-full"
+                  >
+                    {importing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Importing...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Import Questions
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <div className="space-y-6">
+                {result && (
+                  <Alert variant={result.errors.length > 0 ? "default" : "default"}>
+                    <CheckCircle className="h-4 w-4" />
+                    <AlertTitle>Import Complete</AlertTitle>
+                    <AlertDescription>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <Badge variant="default">{result.imported} imported</Badge>
+                        {result.skipped > 0 && (
+                          <Badge variant="destructive">{result.skipped} skipped</Badge>
+                        )}
+                        {result.topics_created > 0 && (
+                          <Badge variant="secondary">{result.topics_created} topics created</Badge>
+                        )}
+                      </div>
+                      {result.errors.length > 0 && (
+                        <div className="mt-3 space-y-1">
+                          <p className="font-medium text-sm">Errors:</p>
+                          <ul className="text-sm space-y-1 max-h-[200px] overflow-y-auto">
+                            {result.errors.slice(0, 10).map((err, i) => (
+                              <li key={i} className="text-destructive">{err}</li>
+                            ))}
+                            {result.errors.length > 10 && (
+                              <li className="text-muted-foreground">
+                                ... and {result.errors.length - 10} more errors
+                              </li>
+                            )}
+                          </ul>
+                        </div>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>JSON Format</CardTitle>
+                    <CardDescription>
+                      Each question should have the following fields:
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <pre className="text-xs bg-muted p-4 rounded-lg overflow-x-auto">
 {JSON.stringify(sampleQuestion, null, 2)}
-                </pre>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Required Fields</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="text-sm space-y-2">
-                  <li><code className="bg-muted px-1 rounded">question_number</code> - Sequential number</li>
-                  <li><code className="bg-muted px-1 rounded">question_text</code> - The question itself</li>
-                  <li><code className="bg-muted px-1 rounded">option_a/b/c/d</code> - Four answer options</li>
-                  <li><code className="bg-muted px-1 rounded">correct_answer</code> - Letter A, B, C, or D</li>
-                  <li><code className="bg-muted px-1 rounded">rationale</code> - Explanation of correct answer</li>
-                  <li><code className="bg-muted px-1 rounded">hipaa_section</code> - HIPAA citation reference</li>
-                </ul>
-                <p className="text-sm text-muted-foreground mt-4">
-                  Optional: <code className="bg-muted px-1 rounded">scenario</code>, 
-                  <code className="bg-muted px-1 rounded">workforce_group</code>, 
-                  <code className="bg-muted px-1 rounded">hipaa_rule</code>, 
-                  <code className="bg-muted px-1 rounded">hipaa_topic_name</code>, 
-                  <code className="bg-muted px-1 rounded">topic_description</code>
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+                    </pre>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </PlatformOwnerLayout>
   );
