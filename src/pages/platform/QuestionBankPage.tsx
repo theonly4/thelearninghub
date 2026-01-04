@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { PlatformOwnerLayout } from "@/components/PlatformOwnerLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,8 @@ import {
   ChevronLeft,
   ChevronRight,
   FileQuestion,
-  BookOpen
+  BookOpen,
+  Upload
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { WORKFORCE_GROUP_LABELS, type WorkforceGroup } from "@/types/hipaa";
@@ -192,6 +194,12 @@ export default function QuestionBankPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link to="/platform/import">
+                <Upload className="h-4 w-4 mr-2" />
+                Bulk Import
+              </Link>
+            </Button>
             <Dialog open={isTopicDialogOpen} onOpenChange={setIsTopicDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline">
