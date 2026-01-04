@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { PlatformOwnerLayout } from "@/components/PlatformOwnerLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { usePageMeta } from "@/hooks/usePageMeta";
 import { Package, Plus, Building2, Calendar, Send, Eye, Shuffle, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { WORKFORCE_GROUP_LABELS, WorkforceGroup } from "@/types/hipaa";
@@ -66,6 +68,15 @@ const WORKFORCE_GROUPS: WorkforceGroup[] = ["all_staff", "clinical", "administra
 
 export default function PackageManagerPage() {
   const { toast } = useToast();
+  const navigate = useNavigate();
+
+  usePageMeta({
+    title: "Question Packages | Platform Owner",
+    description:
+      "Create and manage 25-question HIPAA training question packages by workforce group, and release them to organizations.",
+    canonicalPath: "/platform/packages",
+  });
+
   const [packages, setPackages] = useState<QuestionPackage[]>([]);
   const [packageQuestions, setPackageQuestions] = useState<Record<string, PackageQuestion[]>>({});
   const [releases, setReleases] = useState<PackageRelease[]>([]);
@@ -93,7 +104,24 @@ export default function PackageManagerPage() {
   const [viewingPackage, setViewingPackage] = useState<QuestionPackage | null>(null);
 
   useEffect(() => {
-    fetchData();
+    const ensureAuthAndLoad = async () => {
+      const { data } = await supabase.auth.getUser();
+
+      if (!data.user) {
+        toast({
+          title: "Sign in required",
+          description: "Please sign in to manage question packages.",
+          variant: "destructive",
+        });
+        navigate("/login", { replace: true });
+        return;
+      }
+
+      await fetchData();
+    };
+
+    void ensureAuthAndLoad();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchData = async () => {
@@ -162,44 +190,60 @@ export default function PackageManagerPage() {
       toast({
         title: "Validation Error",
         description: "Please select a workforce group and enter a package name.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
 
-    // Fetch used question IDs for this workforce group
-    const { data: existingPackages } = await supabase
-      .from("question_packages")
-      .select("id")
-      .eq("workforce_group", selectedWorkforceGroup);
-    
-    let usedQuestionIds: string[] = [];
-    if (existingPackages && existingPackages.length > 0) {
-      const { data: usedQuestions } = await supabase
-        .from("package_questions")
-        .select("question_id")
-        .in("package_id", existingPackages.map(p => p.id));
-      usedQuestionIds = usedQuestions?.map(q => q.question_id) || [];
-    }
-
-    const availableQuestions = questions.filter(q => 
-      q.workforce_groups.includes(selectedWorkforceGroup) && 
-      !usedQuestionIds.includes(q.id)
-    );
-
-    if (availableQuestions.length < 25) {
-      toast({
-        title: "Not Enough Questions",
-        description: `Only ${availableQuestions.length} questions available for ${WORKFORCE_GROUP_LABELS[selectedWorkforceGroup]}. Need 25.`,
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setCreating(true);
     try {
       const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error("Not authenticated");
+      if (!userData.user) {
+        toast({
+          title: "Sign in required",
+          description: "Please sign in to create question packages.",
+          variant: "destructive",
+        });
+        navigate("/login", { replace: true });
+        return;
+      }
+
+      // Fetch used question IDs for this workforce group
+      const { data: existingPackages, error: existingPackagesError } = await supabase
+        .from("question_packages")
+        .select("id")
+        .eq("workforce_group", selectedWorkforceGroup);
+
+      if (existingPackagesError) throw existingPackagesError;
+
+      let usedQuestionIds: string[] = [];
+      if (existingPackages && existingPackages.length > 0) {
+        const { data: usedQuestions, error: usedQuestionsError } = await supabase
+          .from("package_questions")
+          .select("question_id")
+          .in(
+            "package_id",
+            existingPackages.map((p) => p.id)
+          );
+
+        if (usedQuestionsError) throw usedQuestionsError;
+
+        usedQuestionIds = usedQuestions?.map((q) => q.question_id) || [];
+      }
+
+      const availableQuestions = questions.filter(
+        (q) => q.workforce_groups.includes(selectedWorkforceGroup) && !usedQuestionIds.includes(q.id)
+      );
+
+      if (availableQuestions.length < 25) {
+        toast({
+          title: "Not Enough Questions",
+          description: `Only ${availableQuestions.length} questions available for ${WORKFORCE_GROUP_LABELS[selectedWorkforceGroup]}. Need 25.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setCreating(true);
 
       // Randomly select 25 questions
       const shuffled = [...availableQuestions].sort(() => Math.random() - 0.5);
@@ -215,7 +259,7 @@ export default function PackageManagerPage() {
           workforce_group: selectedWorkforceGroup,
           sequence_number: sequenceNumber,
           description: packageDescription.trim() || null,
-          created_by: userData.user.id
+          created_by: userData.user.id,
         })
         .select()
         .single();
@@ -223,9 +267,9 @@ export default function PackageManagerPage() {
       if (packageError) throw packageError;
 
       // Insert the questions into the package
-      const packageQuestionsToInsert = selectedQuestions.map(q => ({
+      const packageQuestionsToInsert = selectedQuestions.map((q) => ({
         package_id: newPackage.id,
-        question_id: q.id
+        question_id: q.id,
       }));
 
       const { error: questionsError } = await supabase
@@ -236,7 +280,7 @@ export default function PackageManagerPage() {
 
       toast({
         title: "Package Created",
-        description: `Created "${packageName}" with 25 randomly selected questions.`
+        description: `Created "${packageName}" with 25 randomly selected questions.`,
       });
 
       setCreateDialogOpen(false);
@@ -249,7 +293,7 @@ export default function PackageManagerPage() {
       toast({
         title: "Error",
         description: error.message || "Failed to create package.",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setCreating(false);
