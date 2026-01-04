@@ -13,9 +13,10 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Calendar, FileText, Send, Search, Filter, CheckCircle2 } from "lucide-react";
+import { Building2, Calendar, FileText, Send, Search, Filter, CheckCircle2, Package } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
+import { WORKFORCE_GROUP_LABELS, WorkforceGroup } from "@/types/hipaa";
 
 interface Organization {
   id: string;
@@ -45,6 +46,18 @@ interface QuestionRelease {
   released_at: string;
   notes: string | null;
   question?: QuizQuestion;
+  source_type: "individual" | "package";
+  package_name?: string;
+}
+
+interface PackageRelease {
+  id: string;
+  package_id: string;
+  organization_id: string;
+  workforce_group: string;
+  training_year: number;
+  released_at: string;
+  notes: string | null;
 }
 
 export default function QuestionDistributionPage() {
@@ -74,17 +87,62 @@ export default function QuestionDistributionPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [orgsRes, questionsRes, quizzesRes, releasesRes] = await Promise.all([
+      const [orgsRes, questionsRes, quizzesRes, releasesRes, packageReleasesRes] = await Promise.all([
         supabase.from("organizations").select("*").neq("slug", "platform-owner"),
         supabase.from("quiz_questions").select("*").order("quiz_id").order("question_number"),
         supabase.from("quizzes").select("id, title").order("sequence_number"),
-        supabase.from("question_releases").select("*").order("released_at", { ascending: false })
+        supabase.from("question_releases").select("*").order("released_at", { ascending: false }),
+        supabase
+          .from("package_releases")
+          .select("id, package_id, organization_id, workforce_group, training_year, released_at, notes, question_packages(name)")
+          .order("released_at", { ascending: false })
       ]);
 
       if (orgsRes.data) setOrganizations(orgsRes.data);
       if (questionsRes.data) setQuestions(questionsRes.data as QuizQuestion[]);
       if (quizzesRes.data) setQuizzes(quizzesRes.data);
-      if (releasesRes.data) setReleases(releasesRes.data);
+      
+      // Process individual question releases
+      const individualReleases: QuestionRelease[] = (releasesRes.data || []).map(r => ({
+        ...r,
+        source_type: "individual" as const
+      }));
+      
+      // Process package releases - get all questions from each package
+      const packageReleaseData = packageReleasesRes.data || [];
+      const packageQuestionReleases: QuestionRelease[] = [];
+      
+      for (const pkgRelease of packageReleaseData) {
+        const packageName = (pkgRelease as any).question_packages?.name || "Unknown Package";
+        
+        // Get questions in this package
+        const { data: pkgQuestions } = await supabase
+          .from("package_questions")
+          .select("question_id")
+          .eq("package_id", pkgRelease.package_id);
+        
+        if (pkgQuestions) {
+          for (const pq of pkgQuestions) {
+            packageQuestionReleases.push({
+              id: `${pkgRelease.id}-${pq.question_id}`,
+              question_id: pq.question_id,
+              organization_id: pkgRelease.organization_id,
+              released_by: "",
+              released_at: pkgRelease.released_at,
+              notes: pkgRelease.notes,
+              source_type: "package",
+              package_name: packageName
+            });
+          }
+        }
+      }
+      
+      // Combine and sort by release date
+      const allReleases = [...individualReleases, ...packageQuestionReleases].sort(
+        (a, b) => new Date(b.released_at).getTime() - new Date(a.released_at).getTime()
+      );
+      
+      setReleases(allReleases);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -414,6 +472,7 @@ export default function QuestionDistributionPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Question</TableHead>
+                    <TableHead>Source</TableHead>
                     <TableHead>Organization</TableHead>
                     <TableHead>Released</TableHead>
                     <TableHead>Notes</TableHead>
@@ -437,6 +496,16 @@ export default function QuestionDistributionPage() {
                           </div>
                         </TableCell>
                         <TableCell>
+                          {release.source_type === "package" ? (
+                            <Badge variant="secondary" className="gap-1">
+                              <Package className="h-3 w-3" />
+                              {release.package_name}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline">Individual</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
                           <div className="flex items-center gap-2">
                             <Building2 className="h-4 w-4 text-muted-foreground" />
                             {getOrgName(release.organization_id)}
@@ -445,7 +514,7 @@ export default function QuestionDistributionPage() {
                         <TableCell>
                           <div className="flex items-center gap-2 text-sm">
                             <Calendar className="h-4 w-4 text-muted-foreground" />
-                            {format(new Date(release.released_at), "MMM d, yyyy 'at' h:mm a")}
+                            {format(new Date(release.released_at), "MMM d, yyyy")}
                           </div>
                         </TableCell>
                         <TableCell className="max-w-xs truncate">
