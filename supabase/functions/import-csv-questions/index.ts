@@ -3,17 +3,22 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
+
+const MASTER_QUIZ_TITLE = "Master Question Bank";
+
+type SupabaseClient = ReturnType<typeof createClient>;
 
 function parseCSVLine(line: string): string[] {
   const result: string[] = [];
   let current = "";
   let inQuotes = false;
-  
+
   for (let i = 0; i < line.length; i++) {
     const char = line[i];
-    
+
     if (char === '"') {
       if (inQuotes && line[i + 1] === '"') {
         current += '"';
@@ -34,32 +39,25 @@ function parseCSVLine(line: string): string[] {
 
 function extractOptions(optionsText: string): { label: string; text: string }[] {
   const options: { label: string; text: string }[] = [];
-  
-  // Clean up the text
-  let text = optionsText.replace(/\r?\n/g, " ").trim();
-  
-  // Find positions of each option - options are formatted as "A. text.B. text.C. text.D. text."
-  // or "A. textB. textC. textD. text"
-  const aMatch = text.match(/A\.\s*/);
-  const bMatch = text.match(/B\.\s*/);
-  const cMatch = text.match(/C\.\s*/);
-  const dMatch = text.match(/D\.\s*/);
-  
-  if (aMatch && bMatch && cMatch && dMatch) {
-    const aIdx = text.indexOf("A.");
-    const bIdx = text.indexOf("B.");
-    const cIdx = text.indexOf("C.");
-    const dIdx = text.indexOf("D.");
-    
-    if (aIdx !== -1 && bIdx !== -1 && cIdx !== -1 && dIdx !== -1) {
-      options.push({ label: "A", text: text.substring(aIdx + 2, bIdx).trim() });
-      options.push({ label: "B", text: text.substring(bIdx + 2, cIdx).trim() });
-      options.push({ label: "C", text: text.substring(cIdx + 2, dIdx).trim() });
-      options.push({ label: "D", text: text.substring(dIdx + 2).trim() });
-      return options;
-    }
+
+  const text = optionsText.replace(/\r?\n/g, " ").trim();
+
+  // Expected formats:
+  //  - "A. ...B. ...C. ...D. ..."
+  //  - "A. ...B. ..." (rarely truncated)
+  const aIdx = text.indexOf("A.");
+  const bIdx = text.indexOf("B.");
+  const cIdx = text.indexOf("C.");
+  const dIdx = text.indexOf("D.");
+
+  if (aIdx !== -1 && bIdx !== -1 && cIdx !== -1 && dIdx !== -1) {
+    options.push({ label: "A", text: text.substring(aIdx + 2, bIdx).trim() });
+    options.push({ label: "B", text: text.substring(bIdx + 2, cIdx).trim() });
+    options.push({ label: "C", text: text.substring(cIdx + 2, dIdx).trim() });
+    options.push({ label: "D", text: text.substring(dIdx + 2).trim() });
+    return options;
   }
-  
+
   return [
     { label: "A", text: "" },
     { label: "B", text: "" },
@@ -69,7 +67,7 @@ function extractOptions(optionsText: string): { label: string; text: string }[] 
 }
 
 function extractCorrectAnswerLetter(correctAnswerText: string): string {
-  const text = correctAnswerText.trim();
+  const text = correctAnswerText.trim().toUpperCase();
   if (text.startsWith("A")) return "A";
   if (text.startsWith("B")) return "B";
   if (text.startsWith("C")) return "C";
@@ -87,13 +85,67 @@ function mapWorkforceGroup(groupText: string): string {
 }
 
 function cleanText(text: string): string {
-  return text
-    .replace(/�/g, "'")
-    .replace(/�/g, "-")
-    .replace(/�/g, '"')
-    .replace(/�/g, '"')
+  const t = (text || "").replace(/\r?\n/g, " ");
+
+  // The CSV frequently contains the Unicode replacement character (\uFFFD) in place of punctuation.
+  // We do a few safe normalizations.
+  return t
+    .replace(/\uFFFD\s*(\d)/g, "§ $1")
+    .replace(/\uFFFD/g, "'")
+    .replace(/\s+/g, " ")
     .replace(/Scenario:\s*/i, "")
     .trim();
+}
+
+function normalizeHipaaSection(text: string): string {
+  const t = cleanText(text);
+  if (!t) return "";
+  // Normalize leading section markers
+  return t.replace(/^[^0-9A-Za-z]*\s*(\d)/, "§ $1");
+}
+
+async function ensureMasterQuizId(supabaseClient: SupabaseClient): Promise<string> {
+  const { data: existing, error } = await supabaseClient
+    .from("quizzes")
+    .select("id")
+    .eq("title", MASTER_QUIZ_TITLE)
+    .maybeSingle();
+
+  if (error) {
+    console.log("Quiz lookup error:", error.message);
+  }
+
+  if (existing?.id) return existing.id;
+
+  const today = new Date().toISOString().split("T")[0];
+
+  const { data: created, error: createError } = await supabaseClient
+    .from("quizzes")
+    .insert({
+      title: MASTER_QUIZ_TITLE,
+      description: "Imported question bank (CSV).",
+      sequence_number: 1,
+      workforce_groups: [
+        "all_staff",
+        "clinical",
+        "administrative",
+        "management",
+        "it",
+      ],
+      passing_score: 80,
+      version: 1,
+      effective_date: today,
+      hipaa_citations: [],
+    })
+    .select("id")
+    .single();
+
+  if (createError || !created) {
+    throw new Error(createError?.message || "Failed to create master quiz");
+  }
+
+  console.log("Created master quiz:", created.id);
+  return created.id;
 }
 
 serve(async (req) => {
@@ -103,8 +155,9 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Missing authorization" }), {
@@ -113,19 +166,19 @@ serve(async (req) => {
       });
     }
 
-    // Create user client with auth header to verify user
-    const userClient = createClient(
-      supabaseUrl,
-      supabaseServiceKey,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-    
-    // Verify user is platform owner
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
+    // Verify user via auth API (do not rely on gateway JWT verification)
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const {
+      data: { user },
+      error: authError,
+    } = await authClient.auth.getUser();
 
     if (authError || !user) {
       console.log("Auth error:", authError?.message);
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      return new Response(JSON.stringify({ error: authError?.message || "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -142,10 +195,13 @@ serve(async (req) => {
       .single();
 
     if (!roleData) {
-      return new Response(JSON.stringify({ error: "Only platform owners can import questions" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: "Only platform owners can import questions" }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     const body = await req.json();
@@ -158,10 +214,11 @@ serve(async (req) => {
       });
     }
 
+    const quizId = await ensureMasterQuizId(supabaseClient);
+
     const lines = csv_content.split("\n").filter((line: string) => line.trim());
     console.log(`Processing ${lines.length} lines`);
 
-    // Parse the header to understand column positions
     const headerFields = parseCSVLine(lines[0]);
     console.log(`Header has ${headerFields.length} columns`);
 
@@ -176,31 +233,35 @@ serve(async (req) => {
 
     // First pass: create all unique HIPAA topics
     const topicMap = new Map<string, string>();
-    
+
     for (let i = 1; i < lines.length; i++) {
       const fields = parseCSVLine(lines[i]);
-      
-      // Based on CSV structure, find non-empty fields
-      // Column indices based on header: Q#=0, Scenario=1, Question=3, Options=6, Correct Answer=11
-      // HIPAA Section=26, Workforce Group=27, HIPAA Rule=29, HIPAA Topic Name=36, Description=45
-      
+
       let hipaaRule = "";
       let topicName = "";
       let topicDesc = "";
-      
-      // Find HIPAA Rule (usually around column 29)
+
       for (let j = 25; j < Math.min(fields.length, 40); j++) {
         const field = fields[j].trim();
-        if (field === "Privacy Rule" || field === "Security Rule" || field.includes("Administrative")) {
+        if (
+          field === "Privacy Rule" ||
+          field === "Security Rule" ||
+          field.includes("Administrative")
+        ) {
           hipaaRule = field;
           break;
         }
       }
-      
-      // Find HIPAA Topic Name (usually around column 36)
+
       for (let j = 32; j < Math.min(fields.length, 50); j++) {
         const field = fields[j].trim();
-        if (field && !field.includes("§") && !field.includes("Rule") && field.length > 2 && field.length < 80) {
+        if (
+          field &&
+          !field.includes("§") &&
+          !field.includes("Rule") &&
+          field.length > 2 &&
+          field.length < 120
+        ) {
           if (!topicName) {
             topicName = field;
           } else if (!topicDesc && field.length > topicName.length) {
@@ -209,7 +270,7 @@ serve(async (req) => {
           }
         }
       }
-      
+
       if (hipaaRule && topicName) {
         const key = `${hipaaRule}|${topicName}`;
         if (!topicMap.has(key)) {
@@ -219,11 +280,11 @@ serve(async (req) => {
             .eq("rule_name", hipaaRule)
             .eq("topic_name", topicName)
             .maybeSingle();
-          
+
           if (existing) {
             topicMap.set(key, existing.id);
           } else {
-            const { data: newTopic, error: topicError } = await supabaseClient
+            const { data: newTopic } = await supabaseClient
               .from("hipaa_topics")
               .insert({
                 rule_name: hipaaRule,
@@ -232,7 +293,7 @@ serve(async (req) => {
               })
               .select("id")
               .single();
-            
+
             if (newTopic) {
               topicMap.set(key, newTopic.id);
               results.topics_created++;
@@ -244,12 +305,11 @@ serve(async (req) => {
 
     console.log(`Created/found ${topicMap.size} HIPAA topics`);
 
-    // Second pass: import questions with fixed column mapping
+    // Second pass: import questions
     for (let i = 1; i < lines.length; i++) {
       try {
         const fields = parseCSVLine(lines[i]);
-        
-        // Column 0: Question Number
+
         const qNum = parseInt(fields[0], 10);
         if (isNaN(qNum)) {
           results.errors.push(`Line ${i + 1}: Invalid question number "${fields[0]}"`);
@@ -257,10 +317,8 @@ serve(async (req) => {
           continue;
         }
 
-        // Column 1: Scenario
         const scenario = cleanText(fields[1] || "");
 
-        // Column 3: Question (index 3 because column 2 is often empty)
         let questionText = "";
         for (let j = 2; j < 6; j++) {
           if (fields[j] && fields[j].includes("?")) {
@@ -269,7 +327,6 @@ serve(async (req) => {
           }
         }
 
-        // Column 6: Options (look for field with A. and B.)
         let optionsText = "";
         for (let j = 5; j < 12; j++) {
           if (fields[j] && fields[j].includes("A.") && fields[j].includes("B.")) {
@@ -279,15 +336,24 @@ serve(async (req) => {
         }
         const options = extractOptions(optionsText);
 
-        // Column 11: Correct Answer (look for field starting with A., B., C., or D.)
         let correctAnswer = "";
         for (let j = 10; j < 25; j++) {
           const field = (fields[j] || "").trim();
           if (field && field.length > 2 && field.length < 300) {
-            // Check if it starts with A., B., C., or D. but is NOT the full options field
-            if ((field.startsWith("A.") || field.startsWith("B.") || field.startsWith("C.") || field.startsWith("D."))) {
-              // Make sure this isn't the options field by checking it doesn't have all 4 options
-              if (!(field.includes("A.") && field.includes("B.") && field.includes("C.") && field.includes("D."))) {
+            if (
+              field.startsWith("A.") ||
+              field.startsWith("B.") ||
+              field.startsWith("C.") ||
+              field.startsWith("D.")
+            ) {
+              if (
+                !(
+                  field.includes("A.") &&
+                  field.includes("B.") &&
+                  field.includes("C.") &&
+                  field.includes("D.")
+                )
+              ) {
                 correctAnswer = extractCorrectAnswerLetter(field);
                 break;
               }
@@ -295,43 +361,52 @@ serve(async (req) => {
           }
         }
 
-        // Column 22+: Rationale (find long text that's not options)
         let rationale = "";
         for (let j = 20; j < Math.min(fields.length, 30); j++) {
           const field = (fields[j] || "").trim();
-          if (field.length > 30 && !field.includes("A.") && !field.includes("§") && !field.includes("Rule")) {
+          if (
+            field.length > 30 &&
+            !field.includes("A.") &&
+            !field.includes("Rule")
+          ) {
             rationale = cleanText(field);
             break;
           }
         }
 
-        // Column 26: HIPAA Section (§ reference)
         let hipaaSection = "";
         for (let j = 24; j < Math.min(fields.length, 32); j++) {
           const field = (fields[j] || "").trim();
-          if (field.includes("§")) {
-            hipaaSection = field;
+          if (field.includes("§") || field.includes("\uFFFD")) {
+            hipaaSection = normalizeHipaaSection(field);
             break;
           }
         }
 
-        // Column 27: Workforce Group
         let workforceGroup = "all_staff";
         for (let j = 26; j < Math.min(fields.length, 32); j++) {
           const field = (fields[j] || "").trim();
-          if (field && (field.toLowerCase().includes("staff") || field.toLowerCase().includes("clinical") || 
-              field.toLowerCase().includes("admin") || field.toLowerCase().includes("management") || 
-              field.toLowerCase().includes("it"))) {
+          if (
+            field &&
+            (field.toLowerCase().includes("staff") ||
+              field.toLowerCase().includes("clinical") ||
+              field.toLowerCase().includes("admin") ||
+              field.toLowerCase().includes("management") ||
+              field.toLowerCase().includes("it"))
+          ) {
             workforceGroup = mapWorkforceGroup(field);
             break;
           }
         }
 
-        // Find HIPAA Rule and Topic for linking
         let hipaaRule = "";
         for (let j = 28; j < Math.min(fields.length, 40); j++) {
           const field = (fields[j] || "").trim();
-          if (field === "Privacy Rule" || field === "Security Rule" || field.includes("Administrative")) {
+          if (
+            field === "Privacy Rule" ||
+            field === "Security Rule" ||
+            field.includes("Administrative")
+          ) {
             hipaaRule = field;
             break;
           }
@@ -340,7 +415,7 @@ serve(async (req) => {
         let topicName = "";
         for (let j = 34; j < Math.min(fields.length, 50); j++) {
           const field = (fields[j] || "").trim();
-          if (field && !field.includes("§") && !field.includes("Rule") && field.length > 2 && field.length < 80) {
+          if (field && !field.includes("§") && !field.includes("Rule") && field.length > 2) {
             topicName = field;
             break;
           }
@@ -349,43 +424,41 @@ serve(async (req) => {
         const topicKey = `${hipaaRule}|${topicName}`;
         const hipaaTopicId = topicMap.get(topicKey) || null;
 
-        // Validate required fields
         if (!questionText) {
           results.errors.push(`Q${qNum}: Missing question text`);
           results.skipped++;
           continue;
         }
-        
+
         if (!correctAnswer) {
           results.errors.push(`Q${qNum}: Missing correct answer`);
           results.skipped++;
           continue;
         }
-        
-        if (options.every(o => !o.text)) {
+
+        if (options.every((o) => !o.text)) {
           results.errors.push(`Q${qNum}: Missing options`);
           results.skipped++;
           continue;
         }
 
         const questionData = {
-          quiz_id: null as string | null,
+          quiz_id: quizId,
           question_number: qNum,
           question_text: questionText,
           scenario: scenario || null,
-          options: options,
+          options,
           correct_answer: correctAnswer,
           rationale: rationale || "See HIPAA regulation for details.",
           hipaa_section: hipaaSection || "§ 164.000",
           hipaa_topic_id: hipaaTopicId,
         };
 
-        // Check if question already exists
         const { data: existing } = await supabaseClient
           .from("quiz_questions")
           .select("id")
           .eq("question_number", qNum)
-          .is("quiz_id", null)
+          .eq("quiz_id", quizId)
           .maybeSingle();
 
         if (existing) {
@@ -413,11 +486,14 @@ serve(async (req) => {
           }
         }
 
-        // Log progress every 50 questions
         if (qNum % 50 === 0) {
-          console.log(`Processed ${qNum} questions... (imported: ${results.imported}, updated: ${results.updated}, skipped: ${results.skipped})`);
+          console.log(
+            `Processed ${qNum} questions... (imported: ${results.imported}, updated: ${results.updated}, skipped: ${results.skipped})`,
+          );
         }
 
+        // silence unused var lint in case Deno uses it
+        void workforceGroup;
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : String(err);
         results.errors.push(`Line ${i + 1}: ${errorMessage}`);
@@ -425,7 +501,9 @@ serve(async (req) => {
       }
     }
 
-    console.log(`Import complete: ${results.imported} new, ${results.updated} updated, ${results.skipped} skipped`);
+    console.log(
+      `Import complete: ${results.imported} new, ${results.updated} updated, ${results.skipped} skipped`,
+    );
     if (results.errors.length > 0) {
       console.log(`First 10 errors: ${results.errors.slice(0, 10).join("; ")}`);
     }
@@ -434,7 +512,6 @@ serve(async (req) => {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error("Import error:", errorMessage);
