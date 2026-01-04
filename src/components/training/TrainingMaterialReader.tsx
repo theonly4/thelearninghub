@@ -21,7 +21,36 @@ import {
   Scale,
   FileWarning,
   Lightbulb,
+  ArrowRight,
+  ArrowDown,
+  Info,
+  Zap,
+  BookOpen,
+  FileText,
+  Eye,
+  ShieldCheck,
+  UserCheck,
+  Database,
+  Network,
+  Workflow,
 } from "lucide-react";
+
+interface DiagramNode {
+  label: string;
+  description?: string;
+}
+
+interface ProcessStep {
+  step: number;
+  title: string;
+  description: string;
+}
+
+interface InfoCard {
+  title: string;
+  items: string[];
+  variant?: "default" | "warning" | "success" | "info";
+}
 
 interface ContentSection {
   title: string;
@@ -29,6 +58,25 @@ interface ContentSection {
   hipaa_citations?: string[];
   key_points?: string[];
   icon?: string;
+  diagram?: {
+    type: "flow" | "hierarchy" | "comparison" | "process";
+    title: string;
+    nodes?: DiagramNode[];
+    left?: { title: string; items: string[] };
+    right?: { title: string; items: string[] };
+    steps?: ProcessStep[];
+  };
+  info_cards?: InfoCard[];
+  callout?: {
+    type: "warning" | "tip" | "example" | "remember";
+    title: string;
+    content: string;
+  };
+  stats?: {
+    value: string;
+    label: string;
+    description?: string;
+  }[];
 }
 
 interface TrainingMaterialReaderProps {
@@ -53,7 +101,242 @@ const iconMap: Record<string, React.ElementType> = {
   bell: Bell,
   scale: Scale,
   "file-warning": FileWarning,
+  workflow: Workflow,
+  database: Database,
+  network: Network,
+  "shield-check": ShieldCheck,
+  "user-check": UserCheck,
+  eye: Eye,
+  "file-text": FileText,
+  "book-open": BookOpen,
 };
+
+function FlowDiagram({ title, nodes }: { title: string; nodes: DiagramNode[] }) {
+  return (
+    <div className="my-6 p-4 rounded-xl border border-border bg-gradient-to-br from-accent/5 to-accent/10">
+      <h4 className="text-sm font-semibold text-accent mb-4 flex items-center gap-2">
+        <Workflow className="h-4 w-4" />
+        {title}
+      </h4>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {nodes.map((node, idx) => (
+          <div key={idx} className="flex items-center gap-2">
+            <div className="bg-card border border-border rounded-lg px-4 py-3 text-center shadow-sm min-w-[120px]">
+              <p className="font-medium text-sm">{node.label}</p>
+              {node.description && (
+                <p className="text-xs text-muted-foreground mt-1">{node.description}</p>
+              )}
+            </div>
+            {idx < nodes.length - 1 && (
+              <ArrowRight className="h-5 w-5 text-accent shrink-0" />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function HierarchyDiagram({ title, nodes }: { title: string; nodes: DiagramNode[] }) {
+  return (
+    <div className="my-6 p-4 rounded-xl border border-border bg-gradient-to-br from-primary/5 to-primary/10">
+      <h4 className="text-sm font-semibold text-primary mb-4 flex items-center gap-2">
+        <Network className="h-4 w-4" />
+        {title}
+      </h4>
+      <div className="flex flex-col items-center gap-3">
+        {nodes.map((node, idx) => (
+          <div key={idx} className="flex flex-col items-center">
+            <div className={cn(
+              "bg-card border rounded-lg px-4 py-3 text-center shadow-sm",
+              idx === 0 ? "border-primary bg-primary/10 min-w-[200px]" : "border-border min-w-[160px]"
+            )}>
+              <p className={cn("font-medium text-sm", idx === 0 && "text-primary")}>{node.label}</p>
+              {node.description && (
+                <p className="text-xs text-muted-foreground mt-1">{node.description}</p>
+              )}
+            </div>
+            {idx < nodes.length - 1 && (
+              <ArrowDown className="h-5 w-5 text-muted-foreground my-1" />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ComparisonDiagram({ 
+  title, 
+  left, 
+  right 
+}: { 
+  title: string; 
+  left: { title: string; items: string[] }; 
+  right: { title: string; items: string[] };
+}) {
+  return (
+    <div className="my-6 p-4 rounded-xl border border-border bg-muted/30">
+      <h4 className="text-sm font-semibold mb-4 flex items-center gap-2">
+        <Scale className="h-4 w-4 text-accent" />
+        {title}
+      </h4>
+      <div className="grid md:grid-cols-2 gap-4">
+        <div className="bg-card border border-border rounded-lg p-4">
+          <h5 className="font-medium text-sm text-primary mb-3">{left.title}</h5>
+          <ul className="space-y-2">
+            {left.items.map((item, idx) => (
+              <li key={idx} className="flex items-start gap-2 text-sm">
+                <CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="bg-card border border-border rounded-lg p-4">
+          <h5 className="font-medium text-sm text-accent mb-3">{right.title}</h5>
+          <ul className="space-y-2">
+            {right.items.map((item, idx) => (
+              <li key={idx} className="flex items-start gap-2 text-sm">
+                <CheckCircle2 className="h-4 w-4 text-accent shrink-0 mt-0.5" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProcessDiagram({ title, steps }: { title: string; steps: ProcessStep[] }) {
+  return (
+    <div className="my-6 p-4 rounded-xl border border-border bg-gradient-to-br from-success/5 to-success/10">
+      <h4 className="text-sm font-semibold text-success mb-4 flex items-center gap-2">
+        <ClipboardCheck className="h-4 w-4" />
+        {title}
+      </h4>
+      <div className="space-y-3">
+        {steps.map((step, idx) => (
+          <div key={idx} className="flex gap-4">
+            <div className="flex flex-col items-center">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-success text-success-foreground font-bold text-sm">
+                {step.step}
+              </div>
+              {idx < steps.length - 1 && (
+                <div className="w-0.5 h-full bg-success/30 my-1" />
+              )}
+            </div>
+            <div className="flex-1 pb-4">
+              <h5 className="font-medium text-sm">{step.title}</h5>
+              <p className="text-sm text-muted-foreground mt-1">{step.description}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function InfoCards({ cards }: { cards: InfoCard[] }) {
+  const variantStyles = {
+    default: "border-border bg-card",
+    warning: "border-warning/30 bg-warning/5",
+    success: "border-success/30 bg-success/5",
+    info: "border-info/30 bg-info/5",
+  };
+
+  const iconStyles = {
+    default: "text-foreground",
+    warning: "text-warning",
+    success: "text-success",
+    info: "text-info",
+  };
+
+  return (
+    <div className="my-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {cards.map((card, idx) => (
+        <div 
+          key={idx} 
+          className={cn(
+            "rounded-lg border p-4",
+            variantStyles[card.variant || "default"]
+          )}
+        >
+          <h5 className={cn(
+            "font-medium text-sm mb-3 flex items-center gap-2",
+            iconStyles[card.variant || "default"]
+          )}>
+            <FileText className="h-4 w-4" />
+            {card.title}
+          </h5>
+          <ul className="space-y-1.5">
+            {card.items.map((item, itemIdx) => (
+              <li key={itemIdx} className="flex items-start gap-2 text-xs">
+                <span className="text-muted-foreground">•</span>
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Callout({ type, title, content }: { type: string; title: string; content: string }) {
+  const styles = {
+    warning: {
+      bg: "bg-warning/10 border-warning/30",
+      icon: AlertTriangle,
+      iconColor: "text-warning",
+    },
+    tip: {
+      bg: "bg-success/10 border-success/30",
+      icon: Lightbulb,
+      iconColor: "text-success",
+    },
+    example: {
+      bg: "bg-info/10 border-info/30",
+      icon: BookOpen,
+      iconColor: "text-info",
+    },
+    remember: {
+      bg: "bg-accent/10 border-accent/30",
+      icon: Zap,
+      iconColor: "text-accent",
+    },
+  };
+
+  const style = styles[type as keyof typeof styles] || styles.tip;
+  const IconComp = style.icon;
+
+  return (
+    <div className={cn("my-6 rounded-lg border p-4", style.bg)}>
+      <div className={cn("flex items-center gap-2 mb-2 font-medium", style.iconColor)}>
+        <IconComp className="h-4 w-4" />
+        {title}
+      </div>
+      <p className="text-sm text-foreground/90">{content}</p>
+    </div>
+  );
+}
+
+function StatsDisplay({ stats }: { stats: { value: string; label: string; description?: string }[] }) {
+  return (
+    <div className="my-6 grid gap-4 grid-cols-2 md:grid-cols-4">
+      {stats.map((stat, idx) => (
+        <div key={idx} className="bg-card border border-border rounded-lg p-4 text-center">
+          <p className="text-2xl font-bold text-accent">{stat.value}</p>
+          <p className="text-sm font-medium">{stat.label}</p>
+          {stat.description && (
+            <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function TrainingMaterialReader({
   title,
@@ -145,6 +428,11 @@ export function TrainingMaterialReader({
           </div>
         </div>
 
+        {/* Stats Display */}
+        {currentSection.stats && currentSection.stats.length > 0 && (
+          <StatsDisplay stats={currentSection.stats} />
+        )}
+
         {/* Main Content */}
         <div className="prose prose-sm max-w-none dark:prose-invert">
           {currentSection.content.split("\n\n").map((paragraph, idx) => (
@@ -158,6 +446,42 @@ export function TrainingMaterialReader({
             </p>
           ))}
         </div>
+
+        {/* Diagram */}
+        {currentSection.diagram && (
+          <>
+            {currentSection.diagram.type === "flow" && currentSection.diagram.nodes && (
+              <FlowDiagram title={currentSection.diagram.title} nodes={currentSection.diagram.nodes} />
+            )}
+            {currentSection.diagram.type === "hierarchy" && currentSection.diagram.nodes && (
+              <HierarchyDiagram title={currentSection.diagram.title} nodes={currentSection.diagram.nodes} />
+            )}
+            {currentSection.diagram.type === "comparison" && currentSection.diagram.left && currentSection.diagram.right && (
+              <ComparisonDiagram 
+                title={currentSection.diagram.title} 
+                left={currentSection.diagram.left} 
+                right={currentSection.diagram.right} 
+              />
+            )}
+            {currentSection.diagram.type === "process" && currentSection.diagram.steps && (
+              <ProcessDiagram title={currentSection.diagram.title} steps={currentSection.diagram.steps} />
+            )}
+          </>
+        )}
+
+        {/* Info Cards */}
+        {currentSection.info_cards && currentSection.info_cards.length > 0 && (
+          <InfoCards cards={currentSection.info_cards} />
+        )}
+
+        {/* Callout */}
+        {currentSection.callout && (
+          <Callout 
+            type={currentSection.callout.type} 
+            title={currentSection.callout.title} 
+            content={currentSection.callout.content} 
+          />
+        )}
 
         {/* Key Points Callout */}
         {currentSection.key_points && currentSection.key_points.length > 0 && (
