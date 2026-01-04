@@ -594,6 +594,51 @@ export type Database = {
         }
         Relationships: []
       }
+      training_assignments: {
+        Row: {
+          assigned_at: string
+          assigned_by: string
+          assigned_to: string
+          completed_at: string | null
+          created_at: string
+          due_date: string
+          id: string
+          notes: string | null
+          organization_id: string
+          status: string
+          updated_at: string
+          workforce_group: Database["public"]["Enums"]["workforce_group"]
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by: string
+          assigned_to: string
+          completed_at?: string | null
+          created_at?: string
+          due_date: string
+          id?: string
+          notes?: string | null
+          organization_id: string
+          status?: string
+          updated_at?: string
+          workforce_group: Database["public"]["Enums"]["workforce_group"]
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string
+          assigned_to?: string
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          status?: string
+          updated_at?: string
+          workforce_group?: Database["public"]["Enums"]["workforce_group"]
+        }
+        Relationships: []
+      }
       training_materials: {
         Row: {
           content: Json
