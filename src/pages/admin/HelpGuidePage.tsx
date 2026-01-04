@@ -15,6 +15,19 @@ import {
   Shield
 } from "lucide-react";
 
+// Import guide images
+import guideSidebarUsers from "@/assets/guide-sidebar-users.png";
+import guideAddUserButton from "@/assets/guide-add-user-button.png";
+import guideEditButton from "@/assets/guide-edit-button.png";
+import guideRunAnalysisButton from "@/assets/guide-run-analysis-button.png";
+
+const GuideImage = ({ src, alt }: { src: string; alt: string }) => (
+  <div className="my-4 rounded-lg border overflow-hidden bg-muted/30">
+    <img src={src} alt={alt} className="w-full max-w-md mx-auto" />
+    <p className="text-xs text-muted-foreground text-center py-2 bg-muted/50">{alt}</p>
+  </div>
+);
+
 export default function AdminHelpGuidePage() {
   return (
     <DashboardLayout userName="Admin">
@@ -79,9 +92,15 @@ export default function AdminHelpGuidePage() {
               <div className="space-y-4 text-sm">
                 <div>
                   <h4 className="font-medium mb-2">Adding New Employees</h4>
-                  <ol className="space-y-2 text-muted-foreground">
-                    <li>1. Go to <strong>Users</strong> in the left menu</li>
-                    <li>2. Click the <strong>Add User</strong> button</li>
+                  <ol className="space-y-3 text-muted-foreground">
+                    <li className="flex flex-col gap-2">
+                      <span>1. Go to <strong>Users</strong> in the left menu</span>
+                      <GuideImage src={guideSidebarUsers} alt="Find Users in the left sidebar menu" />
+                    </li>
+                    <li className="flex flex-col gap-2">
+                      <span>2. Click the <strong>Add User</strong> button</span>
+                      <GuideImage src={guideAddUserButton} alt="Click the Add User button in the top right" />
+                    </li>
                     <li>3. Enter the employee's email address, first name, and last name</li>
                     <li>4. Select their workforce group (for example: Clinical Staff, Administrative Staff)</li>
                     <li>5. Click <strong>Send Invitation</strong></li>
@@ -145,10 +164,13 @@ export default function AdminHelpGuidePage() {
 
                 <div>
                   <h4 className="font-medium mb-2">Changing an Employee's Group</h4>
-                  <ol className="space-y-2 text-muted-foreground">
+                  <ol className="space-y-3 text-muted-foreground">
                     <li>1. Go to <strong>Users</strong> in the left menu</li>
                     <li>2. Find the employee you want to update</li>
-                    <li>3. Click the <strong>Edit</strong> button</li>
+                    <li className="flex flex-col gap-2">
+                      <span>3. Click the <strong>Edit</strong> button</span>
+                      <GuideImage src={guideEditButton} alt="Click the Edit button to modify employee details" />
+                    </li>
                     <li>4. Select a new workforce group</li>
                     <li>5. Click <strong>Save Changes</strong></li>
                   </ol>
@@ -226,10 +248,13 @@ export default function AdminHelpGuidePage() {
                 
                 <div>
                   <h4 className="font-medium mb-2">Running an Analysis</h4>
-                  <ol className="space-y-2 text-muted-foreground">
+                  <ol className="space-y-3 text-muted-foreground">
                     <li>1. Go to your <strong>Dashboard</strong></li>
                     <li>2. Find the <strong>Workforce Analysis</strong> section</li>
-                    <li>3. Click <strong>Run Analysis</strong></li>
+                    <li className="flex flex-col gap-2">
+                      <span>3. Click <strong>Run Analysis</strong></span>
+                      <GuideImage src={guideRunAnalysisButton} alt="Click Run Analysis to start the AI-powered review" />
+                    </li>
                     <li>4. Wait for the AI to process your data (this may take a few moments)</li>
                     <li>5. Review the findings and recommendations</li>
                   </ol>
