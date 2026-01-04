@@ -41,7 +41,9 @@ import {
   ChevronRight,
   FileQuestion,
   BookOpen,
-  Upload
+  Upload,
+  Eye,
+  Play
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { WORKFORCE_GROUP_LABELS, type WorkforceGroup } from "@/types/hipaa";
@@ -89,6 +91,10 @@ export default function QuestionBankPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isTopicDialogOpen, setIsTopicDialogOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<QuizQuestion | null>(null);
+  const [previewQuizId, setPreviewQuizId] = useState<string | null>(null);
+  const [previewQuestionIndex, setPreviewQuestionIndex] = useState(0);
+  const [previewSelectedAnswer, setPreviewSelectedAnswer] = useState<string | null>(null);
+  const [previewShowFeedback, setPreviewShowFeedback] = useState(false);
   
   const questionsPerPage = 10;
 
@@ -165,6 +171,37 @@ export default function QuestionBankPage() {
     return quiz?.workforce_groups || [];
   };
 
+  const getPreviewQuizQuestions = () => {
+    if (!previewQuizId) return [];
+    return questions.filter((q) => q.quiz_id === previewQuizId);
+  };
+
+  const previewQuizQuestions = getPreviewQuizQuestions();
+  const currentPreviewQuestion = previewQuizQuestions[previewQuestionIndex];
+
+  function handlePreviewAnswer(answer: string) {
+    setPreviewSelectedAnswer(answer);
+    setPreviewShowFeedback(true);
+  }
+
+  function handlePreviewNext() {
+    if (previewQuestionIndex < previewQuizQuestions.length - 1) {
+      setPreviewQuestionIndex(previewQuestionIndex + 1);
+      setPreviewSelectedAnswer(null);
+      setPreviewShowFeedback(false);
+    } else {
+      toast.success("Quiz preview complete! This is where an employee would see their results.");
+      setPreviewQuizId(null);
+    }
+  }
+
+  function openQuizPreview(quizId: string) {
+    setPreviewQuizId(quizId);
+    setPreviewQuestionIndex(0);
+    setPreviewSelectedAnswer(null);
+    setPreviewShowFeedback(false);
+  }
+
   async function handleDeleteQuestion(questionId: string) {
     if (!confirm("Are you sure you want to delete this question?")) return;
 
@@ -196,6 +233,19 @@ export default function QuestionBankPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            <Select onValueChange={(value) => openQuizPreview(value)}>
+              <SelectTrigger className="w-48">
+                <Play className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Preview Quiz" />
+              </SelectTrigger>
+              <SelectContent>
+                {quizzes.map((quiz) => (
+                  <SelectItem key={quiz.id} value={quiz.id}>
+                    {quiz.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button variant="outline" asChild>
               <Link to="/platform/import">
                 <Upload className="h-4 w-4 mr-2" />
@@ -486,6 +536,110 @@ export default function QuestionBankPage() {
                   fetchData();
                 }}
               />
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Quiz Preview Dialog */}
+        <Dialog open={!!previewQuizId} onOpenChange={(open) => !open && setPreviewQuizId(null)}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <div className="flex items-center gap-2">
+                <Eye className="h-5 w-5 text-accent" />
+                <DialogTitle>Employee Quiz Preview</DialogTitle>
+              </div>
+              <DialogDescription>
+                This is how "{getQuizTitle(previewQuizId || "")}" appears to employees taking the quiz.
+              </DialogDescription>
+            </DialogHeader>
+
+            {currentPreviewQuestion && (
+              <div className="space-y-6 py-4">
+                {/* Progress */}
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Question {previewQuestionIndex + 1} of {previewQuizQuestions.length}
+                  </span>
+                  <Badge variant="outline">
+                    {Math.round(((previewQuestionIndex + 1) / previewQuizQuestions.length) * 100)}% complete
+                  </Badge>
+                </div>
+
+                {/* Scenario */}
+                {currentPreviewQuestion.scenario && (
+                  <div className="bg-muted/50 rounded-lg p-4 border border-border">
+                    <p className="text-sm font-medium text-muted-foreground mb-2">Scenario</p>
+                    <p className="text-foreground">{currentPreviewQuestion.scenario}</p>
+                  </div>
+                )}
+
+                {/* Question */}
+                <div>
+                  <h3 className="text-lg font-medium">{currentPreviewQuestion.question_text}</h3>
+                </div>
+
+                {/* Options */}
+                <div className="space-y-3">
+                  {currentPreviewQuestion.options.map((option) => {
+                    const isSelected = previewSelectedAnswer === option.label;
+                    const isCorrect = option.label === currentPreviewQuestion.correct_answer;
+                    const showCorrectness = previewShowFeedback;
+
+                    return (
+                      <button
+                        key={option.label}
+                        onClick={() => !previewShowFeedback && handlePreviewAnswer(option.label)}
+                        disabled={previewShowFeedback}
+                        className={`w-full text-left p-4 rounded-lg border transition-colors ${
+                          showCorrectness && isCorrect
+                            ? "border-success bg-success/10"
+                            : showCorrectness && isSelected && !isCorrect
+                            ? "border-destructive bg-destructive/10"
+                            : isSelected
+                            ? "border-accent bg-accent/10"
+                            : "border-border hover:border-accent/50 hover:bg-muted/50"
+                        }`}
+                      >
+                        <span className="font-medium mr-2">{option.label}.</span>
+                        {option.text}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Feedback (shown after answering) */}
+                {previewShowFeedback && (
+                  <div className="space-y-4">
+                    <div className={`rounded-lg p-4 ${
+                      previewSelectedAnswer === currentPreviewQuestion.correct_answer
+                        ? "bg-success/10 border border-success/30"
+                        : "bg-destructive/10 border border-destructive/30"
+                    }`}>
+                      <p className="font-medium mb-2">
+                        {previewSelectedAnswer === currentPreviewQuestion.correct_answer
+                          ? "Correct!"
+                          : `Incorrect. The correct answer is ${currentPreviewQuestion.correct_answer}.`}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{currentPreviewQuestion.rationale}</p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">HIPAA Reference:</span>
+                      <HipaaLink section={currentPreviewQuestion.hipaa_section} />
+                    </div>
+
+                    <Button onClick={handlePreviewNext} className="w-full">
+                      {previewQuestionIndex < previewQuizQuestions.length - 1 ? "Next Question" : "Finish Preview"}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!currentPreviewQuestion && previewQuizId && (
+              <div className="py-8 text-center text-muted-foreground">
+                No questions found for this quiz.
+              </div>
             )}
           </DialogContent>
         </Dialog>

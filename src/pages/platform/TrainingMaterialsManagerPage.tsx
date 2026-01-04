@@ -38,8 +38,11 @@ import {
   Trash2,
   BookOpen,
   Clock,
-  FileText
+  FileText,
+  Eye,
+  X
 } from "lucide-react";
+import { TrainingMaterialReader } from "@/components/training/TrainingMaterialReader";
 import { supabase } from "@/integrations/supabase/client";
 import { WORKFORCE_GROUP_LABELS, type WorkforceGroup } from "@/types/hipaa";
 import { HipaaLink } from "@/components/HipaaLink";
@@ -71,6 +74,8 @@ export default function TrainingMaterialsManagerPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<TrainingMaterial | null>(null);
+  const [previewMaterial, setPreviewMaterial] = useState<TrainingMaterial | null>(null);
+  const [previewSectionIndex, setPreviewSectionIndex] = useState(0);
 
   useEffect(() => {
     fetchMaterials();
@@ -280,6 +285,17 @@ export default function TrainingMaterialsManagerPage() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            onClick={() => {
+                              setPreviewMaterial(material);
+                              setPreviewSectionIndex(0);
+                            }}
+                            title="Preview as Employee"
+                          >
+                            <Eye className="h-4 w-4 text-accent" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => setEditingMaterial(material)}
                           >
                             <Edit2 className="h-4 w-4" />
@@ -310,6 +326,36 @@ export default function TrainingMaterialsManagerPage() {
                 onSuccess={() => {
                   setEditingMaterial(null);
                   fetchMaterials();
+                }}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Preview Dialog */}
+        <Dialog open={!!previewMaterial} onOpenChange={(open) => !open && setPreviewMaterial(null)}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Eye className="h-5 w-5 text-accent" />
+                    Employee Preview
+                  </DialogTitle>
+                  <DialogDescription>
+                    This is how "{previewMaterial?.title}" appears to employees.
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+            {previewMaterial && previewMaterial.content && (
+              <TrainingMaterialReader
+                title={previewMaterial.title}
+                sections={previewMaterial.content as any}
+                currentSectionIndex={previewSectionIndex}
+                onSectionChange={setPreviewSectionIndex}
+                onComplete={() => {
+                  toast.success("Preview complete - this is where an employee would mark the material as finished.");
                 }}
               />
             )}
