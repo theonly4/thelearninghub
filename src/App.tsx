@@ -27,6 +27,10 @@ import OrganizationsPage from "./pages/platform/OrganizationsPage";
 import SeedQuestionsPage from "./pages/platform/SeedQuestionsPage";
 import QuestionDistributionPage from "./pages/platform/QuestionDistributionPage";
 import PackageManagerPage from "./pages/platform/PackageManagerPage";
+import PlatformHelpGuidePage from "./pages/platform/HelpGuidePage";
+
+// Admin Pages
+import AdminHelpGuidePage from "./pages/admin/HelpGuidePage";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +47,7 @@ const App = () => (
             <Route path="/demo" element={<DemoPage />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/users" element={<UsersPage />} />
+            <Route path="/admin/help" element={<AdminHelpGuidePage />} />
             <Route path="/dashboard" element={<UserDashboard />} />
             <Route path="/dashboard/quizzes" element={<QuizzesPage />} />
             <Route path="/dashboard/quiz/:quizId" element={<QuizPage />} />
@@ -60,6 +65,7 @@ const App = () => (
             <Route path="/platform/organizations" element={<OrganizationsPage />} />
             <Route path="/platform/distribution" element={<QuestionDistributionPage />} />
             <Route path="/platform/packages" element={<PackageManagerPage />} />
+            <Route path="/platform/help" element={<PlatformHelpGuidePage />} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
