@@ -731,6 +731,27 @@ function QuestionForm({ question, quizzes, hipaaTopics, onSuccess }: QuestionFor
           </div>
         </div>
 
+        {/* Workforce Groups (inherited from Quiz) */}
+        {formData.quiz_id && (
+          <div className="space-y-2">
+            <Label>Workforce Groups</Label>
+            <div className="flex flex-wrap gap-2 p-3 border rounded-md bg-muted/50">
+              {quizzes.find(q => q.id === formData.quiz_id)?.workforce_groups?.length ? (
+                quizzes.find(q => q.id === formData.quiz_id)?.workforce_groups.map((group) => (
+                  <Badge key={group} variant="secondary">
+                    {WORKFORCE_GROUP_LABELS[group]}
+                  </Badge>
+                ))
+              ) : (
+                <span className="text-sm text-muted-foreground">No workforce groups assigned to this quiz</span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Workforce groups are inherited from the selected quiz.
+            </p>
+          </div>
+        )}
+
         <div className="space-y-2">
           <Label htmlFor="scenario">Scenario (Optional)</Label>
           <Textarea
