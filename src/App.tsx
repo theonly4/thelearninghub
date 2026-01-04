@@ -26,6 +26,7 @@ import ContentReleasesPage from "./pages/platform/ContentReleasesPage";
 import OrganizationsPage from "./pages/platform/OrganizationsPage";
 import SeedQuestionsPage from "./pages/platform/SeedQuestionsPage";
 import QuestionDistributionPage from "./pages/platform/QuestionDistributionPage";
+import PackageManagerPage from "./pages/platform/PackageManagerPage";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,7 @@ const App = () => (
             <Route path="/platform/releases" element={<ContentReleasesPage />} />
             <Route path="/platform/organizations" element={<OrganizationsPage />} />
             <Route path="/platform/distribution" element={<QuestionDistributionPage />} />
+            <Route path="/platform/packages" element={<PackageManagerPage />} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
