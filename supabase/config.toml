@@ -2,3 +2,9 @@ project_id = "yzuvyvtspdjmewuakpkn"
 
 [functions.analyze-workforce]
 verify_jwt = true
+
+[functions.import-questions]
+verify_jwt = true
+
+[functions.extract-questions]
+verify_jwt = true
