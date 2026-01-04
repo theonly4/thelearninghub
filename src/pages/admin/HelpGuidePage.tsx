@@ -12,7 +12,8 @@ import {
   Settings,
   CheckCircle2,
   AlertCircle,
-  Shield
+  Shield,
+  CalendarClock
 } from "lucide-react";
 
 // Import guide images
@@ -62,10 +63,14 @@ export default function AdminHelpGuidePage() {
               </li>
               <li className="flex items-start gap-3">
                 <Badge variant="outline" className="mt-0.5">3</Badge>
-                <span><strong>Monitor Progress</strong> - Track who has completed their training</span>
+                <span><strong>Assign Training with Deadline</strong> - Set a completion deadline for each workforce group</span>
               </li>
               <li className="flex items-start gap-3">
                 <Badge variant="outline" className="mt-0.5">4</Badge>
+                <span><strong>Monitor Progress</strong> - Track who has completed their training and meet deadlines</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <Badge variant="outline" className="mt-0.5">5</Badge>
                 <span><strong>Review Reports</strong> - Analyze workforce compliance and identify gaps</span>
               </li>
             </ol>
@@ -318,6 +323,70 @@ export default function AdminHelpGuidePage() {
             </AccordionContent>
           </AccordionItem>
 
+          {/* Assign Training */}
+          <AccordionItem value="assign-training" className="border rounded-lg px-4">
+            <AccordionTrigger className="hover:no-underline">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <CalendarClock className="h-5 w-5 text-primary" />
+                </div>
+                <div className="text-left">
+                  <p className="font-medium">How to Assign Training with Deadlines</p>
+                  <p className="text-sm text-muted-foreground font-normal">Set completion deadlines for workforce groups</p>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pt-4 pb-6">
+              <div className="space-y-4 text-sm">
+                <div>
+                  <h4 className="font-medium mb-2">What is Training Assignment?</h4>
+                  <p className="text-muted-foreground">
+                    Training assignment allows you to officially assign training materials and quizzes to employees by workforce group, with a specific completion deadline. Employees will see their deadline prominently displayed and receive alerts as the deadline approaches.
+                  </p>
+                </div>
+                
+                <div>
+                  <h4 className="font-medium mb-2">Assigning Training to a Workforce Group</h4>
+                  <ol className="space-y-3 text-muted-foreground">
+                    <li>1. Go to <strong>Users</strong> in the left menu</li>
+                    <li>2. Click the <strong>Assign Training</strong> button at the top right</li>
+                    <li>3. Select the <strong>Workforce Group</strong> you want to assign training to</li>
+                    <li>4. Choose a <strong>Completion Deadline</strong> using the date picker</li>
+                    <li>5. Add any optional notes or instructions for employees</li>
+                    <li>6. Review the assignment preview showing number of employees and materials</li>
+                    <li>7. Click <strong>Assign Training</strong></li>
+                  </ol>
+                </div>
+
+                <div>
+                  <h4 className="font-medium mb-2">What Employees See</h4>
+                  <ul className="space-y-2 text-muted-foreground">
+                    <li><strong>Deadline Banner</strong> - A prominent display showing the completion deadline</li>
+                    <li><strong>Days Remaining</strong> - A countdown to the deadline</li>
+                    <li><strong>Overdue Warning</strong> - Red alert if the deadline has passed</li>
+                    <li><strong>Progress Tracker</strong> - Visual progress through training materials</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 className="font-medium mb-2">After Assignment</h4>
+                  <p className="text-muted-foreground">
+                    Once training is assigned, employees must complete all training materials before the quiz is unlocked. When they finish the materials, the quiz becomes available automatically. Passing the quiz generates their compliance certificate.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-muted rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-warning mt-0.5" />
+                    <p className="text-muted-foreground">
+                      <strong>Tip:</strong> Set reasonable deadlines that give employees enough time to complete all materials. Consider workload and scheduling when choosing dates.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
           {/* Training Materials */}
           <AccordionItem value="training-materials" className="border rounded-lg px-4">
             <AccordionTrigger className="hover:no-underline">
@@ -336,25 +405,36 @@ export default function AdminHelpGuidePage() {
                 <div>
                   <h4 className="font-medium mb-2">What Training Materials are Available?</h4>
                   <p className="text-muted-foreground">
-                    Training materials are educational content provided by the platform that explain HIPAA rules, best practices, and compliance requirements. These are customized for each workforce group.
+                    Training materials are educational content provided by the platform that explain HIPAA rules, best practices, and compliance requirements. These are customized for each workforce group and include key points, HIPAA citations (linked to official sources), and structured sections.
                   </p>
                 </div>
                 
                 <div>
                   <h4 className="font-medium mb-2">How Employees Use Training Materials</h4>
                   <ol className="space-y-2 text-muted-foreground">
-                    <li>1. Employees log in to their training dashboard</li>
-                    <li>2. They read through the assigned training materials</li>
-                    <li>3. After reading, they mark the material as complete</li>
-                    <li>4. Once all materials are read, they can take the quiz</li>
+                    <li>1. Employees log in and see their assigned training with deadline</li>
+                    <li>2. They work through each training material section by section</li>
+                    <li>3. Key points highlight the most important takeaways</li>
+                    <li>4. HIPAA citations link to the official regulations for reference</li>
+                    <li>5. After completing all sections, they mark the material complete</li>
+                    <li>6. Once all materials are complete, the quiz is automatically unlocked</li>
                   </ol>
                 </div>
 
                 <div>
                   <h4 className="font-medium mb-2">Viewing Available Content</h4>
                   <p className="text-muted-foreground">
-                    Go to <strong>Training Materials</strong> to see what content has been made available to your organization. You can review the materials yourself to understand what your employees are learning.
+                    Go to <strong>Knowledge Base</strong> to see what content has been made available to your organization. You can review the materials yourself to understand what your employees are learning.
                   </p>
+                </div>
+
+                <div className="p-3 bg-muted rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <Shield className="h-4 w-4 text-info mt-0.5" />
+                    <p className="text-muted-foreground">
+                      <strong>Note:</strong> All HIPAA section references are automatically linked to the Cornell Law Legal Information Institute, allowing employees to read the full regulatory text for deeper understanding.
+                    </p>
+                  </div>
                 </div>
               </div>
             </AccordionContent>
