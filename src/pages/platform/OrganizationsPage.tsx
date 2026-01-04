@@ -19,7 +19,8 @@ import {
   TrendingUp,
   FileQuestion,
   BookOpen,
-  ExternalLink
+  ExternalLink,
+  Package
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -38,6 +39,7 @@ interface OrgStats {
   userCount: number;
   quizReleases: number;
   materialReleases: number;
+  packageReleases: number;
 }
 
 export default function OrganizationsPage() {
@@ -53,10 +55,11 @@ export default function OrganizationsPage() {
   async function fetchData() {
     setLoading(true);
     try {
-      const [orgsRes, profilesRes, releasesRes] = await Promise.all([
+      const [orgsRes, profilesRes, releasesRes, packageReleasesRes] = await Promise.all([
         supabase.from("organizations").select("*").order("name"),
         supabase.from("profiles").select("organization_id"),
         supabase.from("content_releases").select("organization_id, content_type"),
+        supabase.from("package_releases").select("organization_id"),
       ]);
 
       if (orgsRes.error) throw orgsRes.error;
@@ -74,12 +77,17 @@ export default function OrganizationsPage() {
         const releases = (releasesRes.data || []).filter(
           (r) => r.organization_id === org.id
         );
+
+        const pkgReleases = (packageReleasesRes.data || []).filter(
+          (r) => r.organization_id === org.id
+        );
         
         statsMap.set(org.id, {
           orgId: org.id,
           userCount,
           quizReleases: releases.filter((r) => r.content_type === "quiz").length,
           materialReleases: releases.filter((r) => r.content_type === "training_material").length,
+          packageReleases: pkgReleases.length,
         });
       }
       
@@ -175,8 +183,9 @@ export default function OrganizationsPage() {
                 <TableRow>
                   <TableHead>Organization</TableHead>
                   <TableHead>Users</TableHead>
-                  <TableHead>Quizzes Released</TableHead>
-                  <TableHead>Materials Released</TableHead>
+                  <TableHead>Packages</TableHead>
+                  <TableHead>Quizzes</TableHead>
+                  <TableHead>Materials</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="w-24">Actions</TableHead>
                 </TableRow>
@@ -184,13 +193,13 @@ export default function OrganizationsPage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8">
+                    <TableCell colSpan={7} className="text-center py-8">
                       Loading organizations...
                     </TableCell>
                   </TableRow>
                 ) : filteredOrgs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No organizations found.
                     </TableCell>
                   </TableRow>
@@ -209,6 +218,12 @@ export default function OrganizationsPage() {
                           <div className="flex items-center gap-1.5">
                             <Users className="h-4 w-4 text-muted-foreground" />
                             <span>{stats?.userCount || 0}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <Package className="h-4 w-4 text-primary" />
+                            <span>{stats?.packageReleases || 0}</span>
                           </div>
                         </TableCell>
                         <TableCell>

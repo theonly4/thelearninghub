@@ -36,7 +36,8 @@ import {
   FileQuestion,
   BookOpen,
   CheckCircle2,
-  Calendar
+  Calendar,
+  Package
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -57,6 +58,17 @@ interface ContentRelease {
   notes: string | null;
 }
 
+interface PackageRelease {
+  id: string;
+  package_id: string;
+  organization_id: string;
+  workforce_group: string;
+  training_year: number;
+  released_at: string;
+  notes: string | null;
+  package_name?: string;
+}
+
 interface Quiz {
   id: string;
   title: string;
@@ -72,6 +84,7 @@ interface TrainingMaterial {
 export default function ContentReleasesPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [releases, setReleases] = useState<ContentRelease[]>([]);
+  const [packageReleases, setPackageReleases] = useState<PackageRelease[]>([]);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [materials, setMaterials] = useState<TrainingMaterial[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,20 +98,39 @@ export default function ContentReleasesPage() {
   async function fetchData() {
     setLoading(true);
     try {
-      const [orgsRes, releasesRes, quizzesRes, materialsRes] = await Promise.all([
+      const [orgsRes, releasesRes, packageReleasesRes, quizzesRes, materialsRes] = await Promise.all([
         supabase.from("organizations").select("id, name, slug").order("name"),
         supabase.from("content_releases").select("*").order("released_at", { ascending: false }),
+        supabase
+          .from("package_releases")
+          .select("id, package_id, organization_id, workforce_group, training_year, released_at, notes, question_packages(name)")
+          .order("released_at", { ascending: false }),
         supabase.from("quizzes").select("id, title, sequence_number").order("sequence_number"),
         supabase.from("training_materials").select("id, title, sequence_number").order("sequence_number"),
       ]);
 
       if (orgsRes.error) throw orgsRes.error;
       if (releasesRes.error) throw releasesRes.error;
+      if (packageReleasesRes.error) throw packageReleasesRes.error;
       if (quizzesRes.error) throw quizzesRes.error;
       if (materialsRes.error) throw materialsRes.error;
 
       setOrganizations(orgsRes.data || []);
       setReleases((releasesRes.data || []) as ContentRelease[]);
+      
+      // Map package releases with package names
+      const mappedPackageReleases = (packageReleasesRes.data || []).map((pr: any) => ({
+        id: pr.id,
+        package_id: pr.package_id,
+        organization_id: pr.organization_id,
+        workforce_group: pr.workforce_group,
+        training_year: pr.training_year,
+        released_at: pr.released_at,
+        notes: pr.notes,
+        package_name: pr.question_packages?.name || "Unknown Package",
+      }));
+      setPackageReleases(mappedPackageReleases);
+      
       setQuizzes(quizzesRes.data || []);
       setMaterials(materialsRes.data || []);
     } catch (error) {
@@ -121,7 +153,9 @@ export default function ContentReleasesPage() {
   }
 
   function getOrgReleaseCount(orgId: string) {
-    return releases.filter((r) => r.organization_id === orgId).length;
+    const contentCount = releases.filter((r) => r.organization_id === orgId).length;
+    const packageCount = packageReleases.filter((r) => r.organization_id === orgId).length;
+    return contentCount + packageCount;
   }
 
   function getOrgQuizCount(orgId: string) {
@@ -130,6 +164,10 @@ export default function ContentReleasesPage() {
 
   function getOrgMaterialCount(orgId: string) {
     return releases.filter((r) => r.organization_id === orgId && r.content_type === "training_material").length;
+  }
+
+  function getOrgPackageCount(orgId: string) {
+    return packageReleases.filter((r) => r.organization_id === orgId).length;
   }
 
   return (
@@ -196,7 +234,12 @@ export default function ContentReleasesPage() {
                   <CardDescription>/{org.slug}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <Package className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">{getOrgPackageCount(org.id)}</span>
+                      <span className="text-xs text-muted-foreground">packages</span>
+                    </div>
                     <div className="flex items-center gap-1.5">
                       <FileQuestion className="h-4 w-4 text-info" />
                       <span className="text-sm font-medium">{getOrgQuizCount(org.id)}</span>
@@ -233,29 +276,33 @@ export default function ContentReleasesPage() {
                   <TableHead>Content</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Organization</TableHead>
+                  <TableHead>Details</TableHead>
                   <TableHead>Released</TableHead>
                   <TableHead>Notes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {releases
+                {/* Package Releases */}
+                {packageReleases
                   .filter((r) => !selectedOrg || r.organization_id === selectedOrg)
-                  .slice(0, 20)
                   .map((release) => (
-                    <TableRow key={release.id}>
+                    <TableRow key={`pkg-${release.id}`}>
                       <TableCell className="font-medium">
-                        {getContentTitle(release.content_type, release.content_id)}
+                        {release.package_name}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={release.content_type === "quiz" ? "default" : "secondary"}>
-                          {release.content_type === "quiz" ? (
-                            <><FileQuestion className="h-3 w-3 mr-1" /> Quiz</>
-                          ) : (
-                            <><BookOpen className="h-3 w-3 mr-1" /> Material</>
-                          )}
+                        <Badge variant="outline" className="border-primary text-primary">
+                          <Package className="h-3 w-3 mr-1" /> Package
                         </Badge>
                       </TableCell>
                       <TableCell>{getOrgName(release.organization_id)}</TableCell>
+                      <TableCell>
+                        <div className="text-sm text-muted-foreground">
+                          <span className="capitalize">{release.workforce_group.replace("_", " ")}</span>
+                          <span className="mx-1">•</span>
+                          <span>{release.training_year}</span>
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1.5">
                           <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
@@ -271,9 +318,44 @@ export default function ContentReleasesPage() {
                       </TableCell>
                     </TableRow>
                   ))}
-                {releases.filter((r) => !selectedOrg || r.organization_id === selectedOrg).length === 0 && (
+                {/* Content Releases */}
+                {releases
+                  .filter((r) => !selectedOrg || r.organization_id === selectedOrg)
+                  .map((release) => (
+                    <TableRow key={`content-${release.id}`}>
+                      <TableCell className="font-medium">
+                        {getContentTitle(release.content_type, release.content_id)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={release.content_type === "quiz" ? "default" : "secondary"}>
+                          {release.content_type === "quiz" ? (
+                            <><FileQuestion className="h-3 w-3 mr-1" /> Quiz</>
+                          ) : (
+                            <><BookOpen className="h-3 w-3 mr-1" /> Material</>
+                          )}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{getOrgName(release.organization_id)}</TableCell>
+                      <TableCell>—</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-sm">
+                            {format(new Date(release.released_at), "MMM d, yyyy")}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-muted-foreground line-clamp-1">
+                          {release.notes || "—"}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                {releases.filter((r) => !selectedOrg || r.organization_id === selectedOrg).length === 0 &&
+                  packageReleases.filter((r) => !selectedOrg || r.organization_id === selectedOrg).length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       No releases found.
                     </TableCell>
                   </TableRow>
