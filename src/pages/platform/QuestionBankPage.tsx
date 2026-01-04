@@ -67,6 +67,7 @@ interface QuizQuestion {
   hipaa_section: string;
   hipaa_topic_id: string | null;
   hipaa_topic?: HipaaTopic | null;
+  workforce_groups: WorkforceGroup[];
 }
 
 interface Quiz {
@@ -123,6 +124,7 @@ export default function QuestionBankPage() {
         ...q,
         options: q.options as { label: string; text: string }[],
         hipaa_topic: q.hipaa_topics as HipaaTopic | null,
+        workforce_groups: (q.workforce_groups || []) as WorkforceGroup[],
       }));
 
       setQuestions(typedQuestions);
@@ -639,7 +641,19 @@ function QuestionForm({ question, quizzes, hipaaTopics, onSuccess }: QuestionFor
     rationale: question?.rationale || "",
     hipaa_section: question?.hipaa_section || "",
     hipaa_topic_id: question?.hipaa_topic_id || "",
+    workforce_groups: question?.workforce_groups || [] as WorkforceGroup[],
   });
+
+  const allWorkforceGroups: WorkforceGroup[] = ['all_staff', 'clinical', 'administrative', 'management', 'it'];
+
+  const toggleWorkforceGroup = (group: WorkforceGroup) => {
+    setFormData(prev => ({
+      ...prev,
+      workforce_groups: prev.workforce_groups.includes(group)
+        ? prev.workforce_groups.filter(g => g !== group)
+        : [...prev.workforce_groups, group]
+    }));
+  };
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -664,6 +678,7 @@ function QuestionForm({ question, quizzes, hipaaTopics, onSuccess }: QuestionFor
         rationale: formData.rationale,
         hipaa_section: formData.hipaa_section,
         hipaa_topic_id: formData.hipaa_topic_id || null,
+        workforce_groups: formData.workforce_groups,
       };
 
       if (question) {
@@ -731,26 +746,29 @@ function QuestionForm({ question, quizzes, hipaaTopics, onSuccess }: QuestionFor
           </div>
         </div>
 
-        {/* Workforce Groups (inherited from Quiz) */}
-        {formData.quiz_id && (
-          <div className="space-y-2">
-            <Label>Workforce Groups</Label>
-            <div className="flex flex-wrap gap-2 p-3 border rounded-md bg-muted/50">
-              {quizzes.find(q => q.id === formData.quiz_id)?.workforce_groups?.length ? (
-                quizzes.find(q => q.id === formData.quiz_id)?.workforce_groups.map((group) => (
-                  <Badge key={group} variant="secondary">
-                    {WORKFORCE_GROUP_LABELS[group]}
-                  </Badge>
-                ))
-              ) : (
-                <span className="text-sm text-muted-foreground">No workforce groups assigned to this quiz</span>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Workforce groups are inherited from the selected quiz.
-            </p>
+        {/* Workforce Groups */}
+        <div className="space-y-2">
+          <Label>Workforce Groups</Label>
+          <div className="grid grid-cols-2 gap-2 p-3 border rounded-md">
+            {allWorkforceGroups.map((group) => (
+              <div key={group} className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id={`wg-${group}`}
+                  checked={formData.workforce_groups.includes(group)}
+                  onChange={() => toggleWorkforceGroup(group)}
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                />
+                <label htmlFor={`wg-${group}`} className="text-sm cursor-pointer">
+                  {WORKFORCE_GROUP_LABELS[group]}
+                </label>
+              </div>
+            ))}
           </div>
-        )}
+          <p className="text-xs text-muted-foreground">
+            Select the workforce groups this question applies to. If none selected, the question inherits from the parent quiz.
+          </p>
+        </div>
 
         <div className="space-y-2">
           <Label htmlFor="scenario">Scenario (Optional)</Label>

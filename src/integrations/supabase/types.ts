@@ -338,6 +338,7 @@ export type Database = {
           rationale: string
           scenario: string | null
           updated_at: string
+          workforce_groups: string[]
         }
         Insert: {
           correct_answer: string
@@ -352,6 +353,7 @@ export type Database = {
           rationale: string
           scenario?: string | null
           updated_at?: string
+          workforce_groups?: string[]
         }
         Update: {
           correct_answer?: string
@@ -366,6 +368,7 @@ export type Database = {
           rationale?: string
           scenario?: string | null
           updated_at?: string
+          workforce_groups?: string[]
         }
         Relationships: [
           {
