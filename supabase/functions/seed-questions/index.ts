@@ -56,10 +56,11 @@ function extractOptions(optionsText: string): { label: string; text: string }[] 
   if (markers.length >= 4) {
     const opts: { label: string; text: string }[] = [];
     for (let i = 0; i < 4; i++) {
-      const label = markers[i][1];
+      // Force correct label sequence A, B, C, D regardless of what's in the CSV
+      const expectedLabel = String.fromCharCode(65 + i); // A=65
       const start = (markers[i].index ?? 0) + markers[i][0].length;
       const end = markers[i + 1]?.index ?? text.length;
-      opts.push({ label, text: text.substring(start, end).trim() });
+      opts.push({ label: expectedLabel, text: text.substring(start, end).trim() });
     }
     return opts;
   }
@@ -67,14 +68,17 @@ function extractOptions(optionsText: string): { label: string; text: string }[] 
   const aIdx = text.indexOf("A.");
   const bIdx = text.indexOf("B.");
   const cIdx = text.indexOf("C.");
-  const dIdx = text.indexOf("D.");
+  // Find the LAST occurrence of "C." to handle duplicate C issue (questions 309, 416, 441, 527)
+  const lastCIdx = text.lastIndexOf("C.");
+  // If there's a duplicate C (lastCIdx > cIdx), treat the last C as D
+  const dIdx = lastCIdx > cIdx ? lastCIdx : text.indexOf("D.");
 
-  if (aIdx !== -1 && bIdx !== -1 && cIdx !== -1 && dIdx !== -1) {
+  if (aIdx !== -1 && bIdx !== -1 && cIdx !== -1 && (dIdx !== -1 || lastCIdx > cIdx)) {
     return [
       { label: "A", text: text.substring(aIdx + 2, bIdx).trim() },
       { label: "B", text: text.substring(bIdx + 2, cIdx).trim() },
-      { label: "C", text: text.substring(cIdx + 2, dIdx).trim() },
-      { label: "D", text: text.substring(dIdx + 2).trim() },
+      { label: "C", text: text.substring(cIdx + 2, dIdx !== -1 && dIdx !== cIdx ? dIdx : lastCIdx).trim() },
+      { label: "D", text: text.substring((dIdx !== -1 && dIdx !== cIdx ? dIdx : lastCIdx) + 2).trim() },
     ];
   }
 
