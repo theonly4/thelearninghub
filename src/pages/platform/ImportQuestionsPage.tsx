@@ -9,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, FileJson, CheckCircle, AlertCircle, Loader2, Download, FileImage, Wand2 } from "lucide-react";
+import { Upload, FileJson, CheckCircle, AlertCircle, Loader2, Download, FileImage, Wand2, FileSpreadsheet } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -18,6 +18,8 @@ interface ImportResult {
   skipped: number;
   errors: string[];
   topics_created: number;
+  updated?: number;
+  total?: number;
 }
 
 interface ExtractionResult {
@@ -51,6 +53,11 @@ export default function ImportQuestionsPage() {
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   
+  // CSV import state
+  const [csvImporting, setCsvImporting] = useState(false);
+  const [csvResult, setCsvResult] = useState<ImportResult | null>(null);
+  const csvFileInputRef = useRef<HTMLInputElement>(null);
+  
   // Image extraction state
   const [extracting, setExtracting] = useState(false);
   const [extractionProgress, setExtractionProgress] = useState(0);
@@ -68,6 +75,57 @@ export default function ImportQuestionsPage() {
       setJsonInput(content);
     };
     reader.readAsText(file);
+  };
+
+  const handleCsvImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setCsvImporting(true);
+    setCsvResult(null);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("You must be logged in to import questions");
+        setCsvImporting(false);
+        return;
+      }
+
+      // Read CSV file content
+      const csvContent = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsText(file);
+      });
+
+      toast.info("Processing 600 questions... This may take a minute.");
+
+      const response = await supabase.functions.invoke("import-csv-questions", {
+        body: { csv_content: csvContent },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      setCsvResult(response.data);
+      
+      const data = response.data;
+      if (data.imported > 0 || data.updated > 0) {
+        toast.success(`Successfully imported ${data.imported} new questions and updated ${data.updated || 0} existing questions`);
+      }
+      
+      if (data.errors && data.errors.length > 0) {
+        toast.warning(`${data.skipped} questions were skipped due to errors`);
+      }
+    } catch (error: any) {
+      console.error("CSV Import error:", error);
+      toast.error(`Import failed: ${error.message}`);
+    } finally {
+      setCsvImporting(false);
+    }
   };
 
   const handleImageFilesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -240,8 +298,12 @@ export default function ImportQuestionsPage() {
           </p>
         </div>
 
-        <Tabs defaultValue="images" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 max-w-md">
+        <Tabs defaultValue="csv" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 max-w-lg">
+            <TabsTrigger value="csv" className="gap-2">
+              <FileSpreadsheet className="h-4 w-4" />
+              CSV Import
+            </TabsTrigger>
             <TabsTrigger value="images" className="gap-2">
               <Wand2 className="h-4 w-4" />
               AI Extraction
@@ -251,6 +313,117 @@ export default function ImportQuestionsPage() {
               JSON Import
             </TabsTrigger>
           </TabsList>
+
+          {/* CSV Import Tab */}
+          <TabsContent value="csv" className="mt-6">
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileSpreadsheet className="h-5 w-5" />
+                    Import from CSV
+                  </CardTitle>
+                  <CardDescription>
+                    Upload a CSV file exported from your Excel spreadsheet containing the question table.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
+                    <FileSpreadsheet className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Select your CSV file with all 600 questions
+                    </p>
+                    <Button
+                      variant="default"
+                      onClick={() => csvFileInputRef.current?.click()}
+                      disabled={csvImporting}
+                      size="lg"
+                    >
+                      {csvImporting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Importing Questions...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-4 w-4 mr-2" />
+                          Select CSV File
+                        </>
+                      )}
+                    </Button>
+                    <input
+                      ref={csvFileInputRef}
+                      type="file"
+                      accept=".csv"
+                      className="hidden"
+                      onChange={handleCsvImport}
+                    />
+                  </div>
+
+                  {csvImporting && (
+                    <Alert>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <AlertTitle>Processing...</AlertTitle>
+                      <AlertDescription>
+                        Importing 600 questions and creating HIPAA topics. This may take 1-2 minutes.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </CardContent>
+              </Card>
+
+              <div className="space-y-6">
+                {csvResult && (
+                  <Alert variant={csvResult.errors && csvResult.errors.length > 0 ? "default" : "default"}>
+                    <CheckCircle className="h-4 w-4" />
+                    <AlertTitle>Import Complete</AlertTitle>
+                    <AlertDescription>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <Badge variant="default">{csvResult.imported} imported</Badge>
+                        {csvResult.updated && csvResult.updated > 0 && (
+                          <Badge variant="secondary">{csvResult.updated} updated</Badge>
+                        )}
+                        {csvResult.skipped > 0 && (
+                          <Badge variant="destructive">{csvResult.skipped} skipped</Badge>
+                        )}
+                        {csvResult.topics_created > 0 && (
+                          <Badge variant="outline">{csvResult.topics_created} topics created</Badge>
+                        )}
+                      </div>
+                      {csvResult.errors && csvResult.errors.length > 0 && (
+                        <div className="mt-3 space-y-1">
+                          <p className="font-medium text-sm">Errors:</p>
+                          <ul className="text-sm space-y-1 max-h-[200px] overflow-y-auto">
+                            {csvResult.errors.slice(0, 10).map((err, i) => (
+                              <li key={i} className="text-destructive">{err}</li>
+                            ))}
+                            {csvResult.errors.length > 10 && (
+                              <li className="text-muted-foreground">
+                                ... and {csvResult.errors.length - 10} more errors
+                              </li>
+                            )}
+                          </ul>
+                        </div>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Instructions</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <p>1. Open your Word document with the question table</p>
+                    <p>2. Select the entire table (click inside, then Ctrl+A)</p>
+                    <p>3. Copy and paste into Excel</p>
+                    <p>4. Save as CSV (File → Save As → CSV format)</p>
+                    <p>5. Upload the CSV file here</p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
 
           {/* AI Image Extraction Tab */}
           <TabsContent value="images" className="mt-6">
