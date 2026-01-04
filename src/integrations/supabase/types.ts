@@ -264,6 +264,51 @@ export type Database = {
           },
         ]
       }
+      question_releases: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          organization_id: string
+          question_id: string
+          released_at: string
+          released_by: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          organization_id: string
+          question_id: string
+          released_at?: string
+          released_by: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          question_id?: string
+          released_at?: string
+          released_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "question_releases_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "question_releases_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quiz_attempts: {
         Row: {
           answers: Json

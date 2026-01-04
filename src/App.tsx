@@ -25,6 +25,7 @@ import TrainingMaterialsManagerPage from "./pages/platform/TrainingMaterialsMana
 import ContentReleasesPage from "./pages/platform/ContentReleasesPage";
 import OrganizationsPage from "./pages/platform/OrganizationsPage";
 import SeedQuestionsPage from "./pages/platform/SeedQuestionsPage";
+import QuestionDistributionPage from "./pages/platform/QuestionDistributionPage";
 
 const queryClient = new QueryClient();
 
@@ -56,6 +57,7 @@ const App = () => (
             <Route path="/platform/materials" element={<TrainingMaterialsManagerPage />} />
             <Route path="/platform/releases" element={<ContentReleasesPage />} />
             <Route path="/platform/organizations" element={<OrganizationsPage />} />
+            <Route path="/platform/distribution" element={<QuestionDistributionPage />} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
