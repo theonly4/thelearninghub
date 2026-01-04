@@ -805,14 +805,14 @@ function QuestionForm({ question, quizzes, hipaaTopics, onSuccess }: QuestionFor
         <div className="space-y-2">
           <Label htmlFor="hipaa_topic">HIPAA Topic</Label>
           <Select
-            value={formData.hipaa_topic_id}
-            onValueChange={(value) => setFormData({ ...formData, hipaa_topic_id: value })}
+            value={formData.hipaa_topic_id || "none"}
+            onValueChange={(value) => setFormData({ ...formData, hipaa_topic_id: value === "none" ? "" : value })}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select a topic (optional)" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">No topic</SelectItem>
+              <SelectItem value="none">No topic</SelectItem>
               {hipaaTopics.map((topic) => (
                 <SelectItem key={topic.id} value={topic.id}>
                   {topic.rule_name} - {topic.topic_name}
