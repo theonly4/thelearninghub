@@ -24,6 +24,7 @@ import ImportQuestionsPage from "./pages/platform/ImportQuestionsPage";
 import TrainingMaterialsManagerPage from "./pages/platform/TrainingMaterialsManagerPage";
 import ContentReleasesPage from "./pages/platform/ContentReleasesPage";
 import OrganizationsPage from "./pages/platform/OrganizationsPage";
+import SeedQuestionsPage from "./pages/platform/SeedQuestionsPage";
 
 const queryClient = new QueryClient();
 
@@ -51,6 +52,7 @@ const App = () => (
             <Route path="/platform" element={<PlatformDashboard />} />
             <Route path="/platform/questions" element={<QuestionBankPage />} />
             <Route path="/platform/import" element={<ImportQuestionsPage />} />
+            <Route path="/platform/seed" element={<SeedQuestionsPage />} />
             <Route path="/platform/materials" element={<TrainingMaterialsManagerPage />} />
             <Route path="/platform/releases" element={<ContentReleasesPage />} />
             <Route path="/platform/organizations" element={<OrganizationsPage />} />
