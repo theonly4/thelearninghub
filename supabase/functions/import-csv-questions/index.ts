@@ -136,12 +136,15 @@ serve(async (req) => {
       });
     }
 
-    // Verify user is platform owner
-    const { data: { user }, error: authError } = await createClient(
+    // Create user client with auth header to verify user
+    const userClient = createClient(
       supabaseUrl,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
+      supabaseServiceKey,
       { global: { headers: { Authorization: authHeader } } }
-    ).auth.getUser();
+    );
+    
+    // Verify user is platform owner
+    const { data: { user }, error: authError } = await userClient.auth.getUser();
 
     if (authError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
