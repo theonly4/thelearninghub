@@ -10,7 +10,8 @@ import {
   TrendingUp,
   Clock,
   ArrowRight,
-  CheckCircle2
+  CheckCircle2,
+  Eye
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -111,6 +112,15 @@ export default function PlatformDashboard() {
                   <span className="flex items-center gap-2">
                     <Building2 className="h-4 w-4" />
                     View Organizations
+                  </span>
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button asChild className="w-full justify-between bg-accent/10 border-accent/20 hover:bg-accent/20" variant="outline">
+                <Link to="/employee/training">
+                  <span className="flex items-center gap-2">
+                    <Eye className="h-4 w-4 text-accent" />
+                    Preview as Employee
                   </span>
                   <ArrowRight className="h-4 w-4" />
                 </Link>
