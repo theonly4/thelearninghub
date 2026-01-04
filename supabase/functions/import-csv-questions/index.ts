@@ -6,20 +6,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface ParsedQuestion {
-  question_number: number;
-  scenario: string;
-  question_text: string;
-  options: string;
-  correct_answer: string;
-  rationale: string;
-  hipaa_section: string;
-  workforce_group: string;
-  hipaa_rule: string;
-  hipaa_topic_name: string;
-  topic_description: string;
-}
-
 function parseCSVLine(line: string): string[] {
   const result: string[] = [];
   let current = "";
@@ -52,15 +38,8 @@ function extractOptions(optionsText: string): { label: string; text: string }[] 
   // Clean up the text
   let text = optionsText.replace(/\r?\n/g, " ").trim();
   
-  // Split by option patterns (A. B. C. D.)
-  const patterns = [
-    /A\.\s*/,
-    /B\.\s*/,
-    /C\.\s*/,
-    /D\.\s*/,
-  ];
-  
-  // Find positions of each option
+  // Find positions of each option - options are formatted as "A. text.B. text.C. text.D. text."
+  // or "A. textB. textC. textD. text"
   const aMatch = text.match(/A\.\s*/);
   const bMatch = text.match(/B\.\s*/);
   const cMatch = text.match(/C\.\s*/);
@@ -81,7 +60,6 @@ function extractOptions(optionsText: string): { label: string; text: string }[] 
     }
   }
   
-  // Fallback: return empty array if parsing fails
   return [
     { label: "A", text: "" },
     { label: "B", text: "" },
@@ -91,7 +69,6 @@ function extractOptions(optionsText: string): { label: string; text: string }[] 
 }
 
 function extractCorrectAnswerLetter(correctAnswerText: string): string {
-  // The correct answer column contains the full answer text, starting with the letter
   const text = correctAnswerText.trim();
   if (text.startsWith("A")) return "A";
   if (text.startsWith("B")) return "B";
@@ -147,6 +124,7 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await userClient.auth.getUser();
 
     if (authError || !user) {
+      console.log("Auth error:", authError?.message);
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -183,6 +161,10 @@ serve(async (req) => {
     const lines = csv_content.split("\n").filter((line: string) => line.trim());
     console.log(`Processing ${lines.length} lines`);
 
+    // Parse the header to understand column positions
+    const headerFields = parseCSVLine(lines[0]);
+    console.log(`Header has ${headerFields.length} columns`);
+
     const results = {
       total: lines.length - 1,
       imported: 0,
@@ -198,28 +180,30 @@ serve(async (req) => {
     for (let i = 1; i < lines.length; i++) {
       const fields = parseCSVLine(lines[i]);
       
-      // Find non-empty fields for hipaa_rule and hipaa_topic_name
-      // Based on CSV structure, columns vary due to merged cells
-      // We need to find the actual values
-      const allFields = fields.join("|");
+      // Based on CSV structure, find non-empty fields
+      // Column indices based on header: Q#=0, Scenario=1, Question=3, Options=6, Correct Answer=11
+      // HIPAA Section=26, Workforce Group=27, HIPAA Rule=29, HIPAA Topic Name=36, Description=45
       
-      // Extract HIPAA Rule (Privacy Rule, Security Rule, or Admin Requirement)
       let hipaaRule = "";
-      if (allFields.includes("Privacy Rule")) hipaaRule = "Privacy Rule";
-      else if (allFields.includes("Security Rule")) hipaaRule = "Security Rule";
-      else if (allFields.includes("Admin")) hipaaRule = "Administrative Requirement";
-      
-      // Find HIPAA Topic Name - it's usually after the rule
-      const ruleIndex = fields.findIndex(f => f.includes("Rule") || f.includes("Requirement"));
       let topicName = "";
       let topicDesc = "";
       
-      for (let j = ruleIndex + 1; j < fields.length; j++) {
+      // Find HIPAA Rule (usually around column 29)
+      for (let j = 25; j < Math.min(fields.length, 40); j++) {
         const field = fields[j].trim();
-        if (field && !field.includes("§") && field.length > 2 && field.length < 100) {
+        if (field === "Privacy Rule" || field === "Security Rule" || field.includes("Administrative")) {
+          hipaaRule = field;
+          break;
+        }
+      }
+      
+      // Find HIPAA Topic Name (usually around column 36)
+      for (let j = 32; j < Math.min(fields.length, 50); j++) {
+        const field = fields[j].trim();
+        if (field && !field.includes("§") && !field.includes("Rule") && field.length > 2 && field.length < 80) {
           if (!topicName) {
             topicName = field;
-          } else if (!topicDesc) {
+          } else if (!topicDesc && field.length > topicName.length) {
             topicDesc = field;
             break;
           }
@@ -229,7 +213,6 @@ serve(async (req) => {
       if (hipaaRule && topicName) {
         const key = `${hipaaRule}|${topicName}`;
         if (!topicMap.has(key)) {
-          // Check if exists
           const { data: existing } = await supabaseClient
             .from("hipaa_topics")
             .select("id")
@@ -261,39 +244,34 @@ serve(async (req) => {
 
     console.log(`Created/found ${topicMap.size} HIPAA topics`);
 
-    // Second pass: import questions
+    // Second pass: import questions with fixed column mapping
     for (let i = 1; i < lines.length; i++) {
       try {
         const fields = parseCSVLine(lines[i]);
         
-        // Extract question number
+        // Column 0: Question Number
         const qNum = parseInt(fields[0], 10);
         if (isNaN(qNum)) {
-          results.errors.push(`Line ${i + 1}: Invalid question number`);
+          results.errors.push(`Line ${i + 1}: Invalid question number "${fields[0]}"`);
           results.skipped++;
           continue;
         }
 
-        // Extract scenario (column 1-2, may span multiple)
-        let scenario = cleanText(fields[1] || "");
-        if (fields[2] && !fields[2].includes("?")) {
-          scenario += " " + cleanText(fields[2]);
-        }
+        // Column 1: Scenario
+        const scenario = cleanText(fields[1] || "");
 
-        // Extract question text - look for field with "?"
+        // Column 3: Question (index 3 because column 2 is often empty)
         let questionText = "";
-        let optionsStartIdx = 0;
-        for (let j = 2; j < Math.min(fields.length, 10); j++) {
+        for (let j = 2; j < 6; j++) {
           if (fields[j] && fields[j].includes("?")) {
             questionText = cleanText(fields[j]);
-            optionsStartIdx = j + 1;
             break;
           }
         }
 
-        // Extract options - look for field with "A." and "B."
+        // Column 6: Options (look for field with A. and B.)
         let optionsText = "";
-        for (let j = optionsStartIdx; j < fields.length; j++) {
+        for (let j = 5; j < 12; j++) {
           if (fields[j] && fields[j].includes("A.") && fields[j].includes("B.")) {
             optionsText = fields[j];
             break;
@@ -301,14 +279,15 @@ serve(async (req) => {
         }
         const options = extractOptions(optionsText);
 
-        // Extract correct answer - look for field that starts with letter and matches an option
+        // Column 11: Correct Answer (look for field starting with A., B., C., or D.)
         let correctAnswer = "";
-        for (let j = 0; j < fields.length; j++) {
-          const field = fields[j].trim();
-          if (field && (field.startsWith("A.") || field.startsWith("B.") || field.startsWith("C.") || field.startsWith("D."))) {
-            // Check if this is a standalone correct answer (not the options field)
-            if (!field.includes("A.") || field.indexOf("A.") === 0) {
-              if (field.length < optionsText.length / 2) {
+        for (let j = 10; j < 25; j++) {
+          const field = (fields[j] || "").trim();
+          if (field && field.length > 2 && field.length < 300) {
+            // Check if it starts with A., B., C., or D. but is NOT the full options field
+            if ((field.startsWith("A.") || field.startsWith("B.") || field.startsWith("C.") || field.startsWith("D."))) {
+              // Make sure this isn't the options field by checking it doesn't have all 4 options
+              if (!(field.includes("A.") && field.includes("B.") && field.includes("C.") && field.includes("D."))) {
                 correctAnswer = extractCorrectAnswerLetter(field);
                 break;
               }
@@ -316,66 +295,52 @@ serve(async (req) => {
           }
         }
 
-        // If still not found, look more carefully
-        if (!correctAnswer) {
-          for (let j = 0; j < fields.length; j++) {
-            const field = fields[j].trim();
-            if (field.length > 5 && field.length < 200) {
-              if (field.startsWith("A.") && !field.includes("B.")) {
-                correctAnswer = "A";
-                break;
-              } else if (field.startsWith("B.") && !field.includes("C.")) {
-                correctAnswer = "B";
-                break;
-              } else if (field.startsWith("C.") && !field.includes("D.")) {
-                correctAnswer = "C";
-                break;
-              } else if (field.startsWith("D.") && !field.includes("A.")) {
-                correctAnswer = "D";
-                break;
-              }
-            }
-          }
-        }
-
-        // Extract rationale - usually a longer explanatory text
+        // Column 22+: Rationale (find long text that's not options)
         let rationale = "";
-        for (let j = 0; j < fields.length; j++) {
-          const field = fields[j].trim();
-          if (field.length > 50 && !field.includes("A.") && !field.includes("Scenario") && !field.includes("?")) {
-            if (!field.includes("§") && !field.startsWith("Privacy") && !field.startsWith("Security")) {
-              rationale = cleanText(field);
-              break;
-            }
-          }
-        }
-
-        // Extract HIPAA section (§ reference)
-        let hipaaSection = "";
-        for (const field of fields) {
-          const match = field.match(/§\s*\d+\.\d+(\s*\([a-z0-9]+\))*(\([a-z]+\))*/i);
-          if (match) {
-            hipaaSection = match[0];
+        for (let j = 20; j < Math.min(fields.length, 30); j++) {
+          const field = (fields[j] || "").trim();
+          if (field.length > 30 && !field.includes("A.") && !field.includes("§") && !field.includes("Rule")) {
+            rationale = cleanText(field);
             break;
           }
         }
 
-        // Extract workforce group
-        let workforceGroup = "all_staff";
-        const allText = fields.join(" ");
-        workforceGroup = mapWorkforceGroup(allText);
+        // Column 26: HIPAA Section (§ reference)
+        let hipaaSection = "";
+        for (let j = 24; j < Math.min(fields.length, 32); j++) {
+          const field = (fields[j] || "").trim();
+          if (field.includes("§")) {
+            hipaaSection = field;
+            break;
+          }
+        }
 
-        // Extract HIPAA Rule and Topic
+        // Column 27: Workforce Group
+        let workforceGroup = "all_staff";
+        for (let j = 26; j < Math.min(fields.length, 32); j++) {
+          const field = (fields[j] || "").trim();
+          if (field && (field.toLowerCase().includes("staff") || field.toLowerCase().includes("clinical") || 
+              field.toLowerCase().includes("admin") || field.toLowerCase().includes("management") || 
+              field.toLowerCase().includes("it"))) {
+            workforceGroup = mapWorkforceGroup(field);
+            break;
+          }
+        }
+
+        // Find HIPAA Rule and Topic for linking
         let hipaaRule = "";
-        if (allText.includes("Privacy Rule")) hipaaRule = "Privacy Rule";
-        else if (allText.includes("Security Rule")) hipaaRule = "Security Rule";
-        else if (allText.includes("Admin")) hipaaRule = "Administrative Requirement";
+        for (let j = 28; j < Math.min(fields.length, 40); j++) {
+          const field = (fields[j] || "").trim();
+          if (field === "Privacy Rule" || field === "Security Rule" || field.includes("Administrative")) {
+            hipaaRule = field;
+            break;
+          }
+        }
 
         let topicName = "";
-        const ruleIndex = fields.findIndex(f => f.includes("Rule") || f.includes("Requirement"));
-        for (let j = ruleIndex + 1; j < fields.length; j++) {
-          const field = fields[j].trim();
-          if (field && !field.includes("§") && field.length > 2 && field.length < 100) {
+        for (let j = 34; j < Math.min(fields.length, 50); j++) {
+          const field = (fields[j] || "").trim();
+          if (field && !field.includes("§") && !field.includes("Rule") && field.length > 2 && field.length < 80) {
             topicName = field;
             break;
           }
@@ -384,14 +349,27 @@ serve(async (req) => {
         const topicKey = `${hipaaRule}|${topicName}`;
         const hipaaTopicId = topicMap.get(topicKey) || null;
 
-        if (!questionText || !correctAnswer || options.every(o => !o.text)) {
-          results.errors.push(`Q${qNum}: Missing required fields (question, answer, or options)`);
+        // Validate required fields
+        if (!questionText) {
+          results.errors.push(`Q${qNum}: Missing question text`);
+          results.skipped++;
+          continue;
+        }
+        
+        if (!correctAnswer) {
+          results.errors.push(`Q${qNum}: Missing correct answer`);
+          results.skipped++;
+          continue;
+        }
+        
+        if (options.every(o => !o.text)) {
+          results.errors.push(`Q${qNum}: Missing options`);
           results.skipped++;
           continue;
         }
 
         const questionData = {
-          quiz_id: null,
+          quiz_id: null as string | null,
           question_number: qNum,
           question_text: questionText,
           scenario: scenario || null,
@@ -402,7 +380,7 @@ serve(async (req) => {
           hipaa_topic_id: hipaaTopicId,
         };
 
-        // Check if exists
+        // Check if question already exists
         const { data: existing } = await supabaseClient
           .from("quiz_questions")
           .select("id")
@@ -417,7 +395,7 @@ serve(async (req) => {
             .eq("id", existing.id);
 
           if (updateError) {
-            results.errors.push(`Q${qNum}: ${updateError.message}`);
+            results.errors.push(`Q${qNum}: Update failed - ${updateError.message}`);
             results.skipped++;
           } else {
             results.updated++;
@@ -428,7 +406,7 @@ serve(async (req) => {
             .insert(questionData);
 
           if (insertError) {
-            results.errors.push(`Q${qNum}: ${insertError.message}`);
+            results.errors.push(`Q${qNum}: Insert failed - ${insertError.message}`);
             results.skipped++;
           } else {
             results.imported++;
@@ -437,7 +415,7 @@ serve(async (req) => {
 
         // Log progress every 50 questions
         if (qNum % 50 === 0) {
-          console.log(`Processed ${qNum} questions...`);
+          console.log(`Processed ${qNum} questions... (imported: ${results.imported}, updated: ${results.updated}, skipped: ${results.skipped})`);
         }
 
       } catch (err: unknown) {
@@ -448,6 +426,9 @@ serve(async (req) => {
     }
 
     console.log(`Import complete: ${results.imported} new, ${results.updated} updated, ${results.skipped} skipped`);
+    if (results.errors.length > 0) {
+      console.log(`First 10 errors: ${results.errors.slice(0, 10).join("; ")}`);
+    }
 
     return new Response(JSON.stringify(results), {
       status: 200,
