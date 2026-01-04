@@ -311,7 +311,9 @@ serve(async (req) => {
 
     console.log(`Created/found ${topicMap.size} HIPAA topics`);
 
-    // Second pass: import questions
+    // Second pass: build all questions first
+    const questionsToInsert: Record<string, unknown>[] = [];
+
     for (let i = 1; i < lines.length; i++) {
       try {
         const fields = parseCSVLine(lines[i]);
@@ -327,7 +329,7 @@ serve(async (req) => {
         const scenario = cleanText(getField(fields, headerIndex.scenario));
         const questionText = cleanText(getField(fields, headerIndex.question));
         const optionsText = getField(fields, headerIndex.options);
-        let options = extractOptions(optionsText);
+        const options = extractOptions(optionsText);
 
         const correctAnswerText = cleanText(getField(fields, headerIndex.correct));
         let correctAnswer = extractCorrectAnswerLetter(correctAnswerText);
@@ -347,9 +349,6 @@ serve(async (req) => {
 
         const rationale = cleanText(getField(fields, headerIndex.rationale));
         const hipaaSection = normalizeHipaaSection(getField(fields, headerIndex.hipaaSection));
-
-        const workforceGroupText = cleanText(getField(fields, headerIndex.workforceGroup));
-        const workforceGroup = workforceGroupText ? mapWorkforceGroup(workforceGroupText) : "all_staff";
 
         const hipaaRule = cleanText(getField(fields, headerIndex.hipaaRule));
         const topicName = cleanText(getField(fields, headerIndex.topicName));
@@ -375,7 +374,7 @@ serve(async (req) => {
           continue;
         }
 
-        const questionData = {
+        questionsToInsert.push({
           quiz_id: quizId,
           question_number: qNum,
           question_text: questionText,
@@ -385,47 +384,7 @@ serve(async (req) => {
           rationale: rationale || "See HIPAA regulation for details.",
           hipaa_section: hipaaSection || "§ 164.000",
           hipaa_topic_id: hipaaTopicId,
-        };
-
-        const { data: existing } = await supabaseClient
-          .from("quiz_questions")
-          .select("id")
-          .eq("question_number", qNum)
-          .eq("quiz_id", quizId)
-          .maybeSingle();
-
-        if (existing) {
-          const { error: updateError } = await supabaseClient
-            .from("quiz_questions")
-            .update(questionData)
-            .eq("id", existing.id);
-
-          if (updateError) {
-            results.errors.push(`Q${qNum}: Update failed - ${updateError.message}`);
-            results.skipped++;
-          } else {
-            results.updated++;
-          }
-        } else {
-          const { error: insertError } = await supabaseClient
-            .from("quiz_questions")
-            .insert(questionData);
-
-          if (insertError) {
-            results.errors.push(`Q${qNum}: Insert failed - ${insertError.message}`);
-            results.skipped++;
-          } else {
-            results.imported++;
-          }
-        }
-
-        if (qNum % 50 === 0) {
-          console.log(
-            `Processed ${qNum} questions... (imported: ${results.imported}, updated: ${results.updated}, skipped: ${results.skipped})`,
-          );
-        }
-
-        void workforceGroup;
+        });
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : String(err);
         results.errors.push(`Line ${i + 1}: ${errorMessage}`);
@@ -433,8 +392,29 @@ serve(async (req) => {
       }
     }
 
+    console.log(`Prepared ${questionsToInsert.length} questions for batch insert`);
+
+    // Batch insert in chunks of 100
+    const BATCH_SIZE = 100;
+    for (let i = 0; i < questionsToInsert.length; i += BATCH_SIZE) {
+      const batch = questionsToInsert.slice(i, i + BATCH_SIZE);
+      
+      const { error: insertError } = await supabaseClient
+        .from("quiz_questions")
+        .upsert(batch, { onConflict: "quiz_id,question_number", ignoreDuplicates: false });
+
+      if (insertError) {
+        console.error(`Batch ${i / BATCH_SIZE + 1} error:`, insertError.message);
+        results.errors.push(`Batch insert error: ${insertError.message}`);
+        results.skipped += batch.length;
+      } else {
+        results.imported += batch.length;
+        console.log(`Inserted batch ${Math.floor(i / BATCH_SIZE) + 1} (${batch.length} questions)`);
+      }
+    }
+
     console.log(
-      `Import complete: ${results.imported} new, ${results.updated} updated, ${results.skipped} skipped`,
+      `Import complete: ${results.imported} inserted, ${results.skipped} skipped`,
     );
     if (results.errors.length > 0) {
       console.log(`First 10 errors: ${results.errors.slice(0, 10).join("; ")}`);
