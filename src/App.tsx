@@ -32,6 +32,9 @@ import PlatformHelpGuidePage from "./pages/platform/HelpGuidePage";
 // Admin Pages
 import AdminHelpGuidePage from "./pages/admin/HelpGuidePage";
 
+// Employee Pages
+import EmployeeTrainingPage from "./pages/employee/TrainingPage";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -54,6 +57,9 @@ const App = () => (
             <Route path="/dashboard/training" element={<TrainingMaterialsPage />} />
             <Route path="/dashboard/training/:materialId" element={<TrainingMaterialPage />} />
             <Route path="/pending-setup" element={<PendingSetupPage />} />
+            
+            {/* Employee Training Routes */}
+            <Route path="/employee/training" element={<EmployeeTrainingPage />} />
             
             {/* Platform Owner Routes */}
             <Route path="/platform" element={<PlatformDashboard />} />

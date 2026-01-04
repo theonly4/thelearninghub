@@ -46,7 +46,9 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
+  BookOpen,
 } from "lucide-react";
+import { TrainingAssignmentDialog } from "@/components/admin/TrainingAssignmentDialog";
 import { cn } from "@/lib/utils";
 
 // Mock users data
@@ -130,6 +132,7 @@ export default function UsersPage() {
   const [filterStatus, setFilterStatus] = useState<UserStatus | "all">("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
+  const [isTrainingDialogOpen, setIsTrainingDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   // New user form state
@@ -233,13 +236,22 @@ export default function UsersPage() {
               Manage workforce members and assign training paths
             </p>
           </div>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <UserPlus className="h-4 w-4" />
-                Add User
-              </Button>
-            </DialogTrigger>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              className="gap-2"
+              onClick={() => setIsTrainingDialogOpen(true)}
+            >
+              <BookOpen className="h-4 w-4" />
+              Assign Training
+            </Button>
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2">
+                  <UserPlus className="h-4 w-4" />
+                  Add User
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add New User</DialogTitle>
@@ -330,7 +342,14 @@ export default function UsersPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
+
+        {/* Training Assignment Dialog */}
+        <TrainingAssignmentDialog
+          open={isTrainingDialogOpen}
+          onOpenChange={setIsTrainingDialogOpen}
+        />
 
         {/* Pending Assignment Alert */}
         {pendingCount > 0 && (
