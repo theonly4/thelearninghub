@@ -16,6 +16,7 @@ import {
   Shield,
   GitBranch,
   Package,
+  HelpCircle,
 } from "lucide-react";
 
 interface PlatformOwnerLayoutProps {
@@ -32,6 +33,7 @@ const platformOwnerNavItems = [
   { icon: GitBranch, label: "Question Distribution", href: "/platform/distribution" },
   { icon: Send, label: "Content Releases", href: "/platform/releases" },
   { icon: BarChart3, label: "Analytics", href: "/platform/analytics" },
+  { icon: HelpCircle, label: "How To Guide", href: "/platform/help" },
   { icon: Settings, label: "Settings", href: "/platform/settings" },
 ];
 
