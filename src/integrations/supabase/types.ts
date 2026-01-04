@@ -156,6 +156,33 @@ export type Database = {
           },
         ]
       }
+      hipaa_topics: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          rule_name: string
+          topic_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          rule_name: string
+          topic_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          rule_name?: string
+          topic_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       organizations: {
         Row: {
           created_at: string
@@ -302,6 +329,7 @@ export type Database = {
           correct_answer: string
           created_at: string
           hipaa_section: string
+          hipaa_topic_id: string | null
           id: string
           options: Json
           question_number: number
@@ -315,6 +343,7 @@ export type Database = {
           correct_answer: string
           created_at?: string
           hipaa_section: string
+          hipaa_topic_id?: string | null
           id?: string
           options: Json
           question_number: number
@@ -328,6 +357,7 @@ export type Database = {
           correct_answer?: string
           created_at?: string
           hipaa_section?: string
+          hipaa_topic_id?: string | null
           id?: string
           options?: Json
           question_number?: number
@@ -338,6 +368,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "quiz_questions_hipaa_topic_id_fkey"
+            columns: ["hipaa_topic_id"]
+            isOneToOne: false
+            referencedRelation: "hipaa_topics"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "quiz_questions_quiz_id_fkey"
             columns: ["quiz_id"]
