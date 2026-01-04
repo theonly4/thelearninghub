@@ -17,6 +17,22 @@ import {
   AlertCircle
 } from "lucide-react";
 
+// Import guide images
+import guideSidebarQuestionBank from "@/assets/guide-sidebar-question-bank.png";
+import guideImportCsvButton from "@/assets/guide-import-csv-button.png";
+import guideSidebarPackages from "@/assets/guide-sidebar-packages.png";
+import guideCreatePackageButton from "@/assets/guide-create-package-button.png";
+import guideReleaseButton from "@/assets/guide-release-button.png";
+import guideSidebarOrganizations from "@/assets/guide-sidebar-organizations.png";
+import guideEditButton from "@/assets/guide-edit-button.png";
+
+const GuideImage = ({ src, alt }: { src: string; alt: string }) => (
+  <div className="my-4 rounded-lg border overflow-hidden bg-muted/30">
+    <img src={src} alt={alt} className="w-full max-w-md mx-auto" />
+    <p className="text-xs text-muted-foreground text-center py-2 bg-muted/50">{alt}</p>
+  </div>
+);
+
 export default function HelpGuidePage() {
   return (
     <PlatformOwnerLayout>
@@ -88,9 +104,15 @@ export default function HelpGuidePage() {
                 
                 <div>
                   <h4 className="font-medium mb-2">Step-by-Step Instructions</h4>
-                  <ol className="space-y-2 text-muted-foreground">
-                    <li>1. Go to <strong>Question Bank</strong> in the left menu</li>
-                    <li>2. Click the <strong>Import CSV</strong> button at the top right</li>
+                  <ol className="space-y-3 text-muted-foreground">
+                    <li className="flex flex-col gap-2">
+                      <span>1. Go to <strong>Question Bank</strong> in the left menu</span>
+                      <GuideImage src={guideSidebarQuestionBank} alt="Find Question Bank in the left sidebar menu" />
+                    </li>
+                    <li className="flex flex-col gap-2">
+                      <span>2. Click the <strong>Import CSV</strong> button at the top right</span>
+                      <GuideImage src={guideImportCsvButton} alt="Click the Import CSV button in the top toolbar" />
+                    </li>
                     <li>3. Select your CSV file from your computer</li>
                     <li>4. Review the preview to make sure the data looks correct</li>
                     <li>5. Click <strong>Import Questions</strong> to add them to your question bank</li>
@@ -134,9 +156,15 @@ export default function HelpGuidePage() {
                 
                 <div>
                   <h4 className="font-medium mb-2">Step-by-Step Instructions</h4>
-                  <ol className="space-y-2 text-muted-foreground">
-                    <li>1. Go to <strong>Question Packages</strong> in the left menu</li>
-                    <li>2. Click the <strong>Create Package</strong> button</li>
+                  <ol className="space-y-3 text-muted-foreground">
+                    <li className="flex flex-col gap-2">
+                      <span>1. Go to <strong>Question Packages</strong> in the left menu</span>
+                      <GuideImage src={guideSidebarPackages} alt="Find Question Packages in the left sidebar menu" />
+                    </li>
+                    <li className="flex flex-col gap-2">
+                      <span>2. Click the <strong>Create Package</strong> button</span>
+                      <GuideImage src={guideCreatePackageButton} alt="Click the Create button to make a new package" />
+                    </li>
                     <li>3. Select the <strong>Workforce Group</strong> this package is for</li>
                     <li>4. Enter a name for the package (for example: Clinical Staff - Year 1)</li>
                     <li>5. Add a description if you want (this is optional)</li>
@@ -181,10 +209,13 @@ export default function HelpGuidePage() {
                 
                 <div>
                   <h4 className="font-medium mb-2">Step-by-Step Instructions</h4>
-                  <ol className="space-y-2 text-muted-foreground">
+                  <ol className="space-y-3 text-muted-foreground">
                     <li>1. Go to <strong>Question Packages</strong> in the left menu</li>
                     <li>2. Find the package you want to release</li>
-                    <li>3. Click the <strong>Release</strong> button (paper airplane icon) on that package</li>
+                    <li className="flex flex-col gap-2">
+                      <span>3. Click the <strong>Release</strong> button (paper airplane icon) on that package</span>
+                      <GuideImage src={guideReleaseButton} alt="Click the Release button with the paper airplane icon" />
+                    </li>
                     <li>4. Select the <strong>Organization</strong> you want to release it to</li>
                     <li>5. Enter the <strong>Training Year</strong> (for example: 2025)</li>
                     <li>6. Add any notes about this release (this is optional)</li>
@@ -224,6 +255,7 @@ export default function HelpGuidePage() {
                   <p className="text-muted-foreground">
                     Go to <strong>Organizations</strong> in the left menu to see all your customer organizations. You can see how many users each organization has and how many packages have been released to them.
                   </p>
+                  <GuideImage src={guideSidebarOrganizations} alt="Find Organizations in the left sidebar menu" />
                 </div>
                 
                 <div>
@@ -271,9 +303,12 @@ export default function HelpGuidePage() {
                 
                 <div>
                   <h4 className="font-medium mb-2">Editing a Question</h4>
-                  <ol className="space-y-2 text-muted-foreground">
+                  <ol className="space-y-3 text-muted-foreground">
                     <li>1. Find the question you want to edit</li>
-                    <li>2. Click the <strong>Edit</strong> button (pencil icon)</li>
+                    <li className="flex flex-col gap-2">
+                      <span>2. Click the <strong>Edit</strong> button (pencil icon)</span>
+                      <GuideImage src={guideEditButton} alt="Click the Edit button to modify a question" />
+                    </li>
                     <li>3. Update the question text, answer options, correct answer, rationale, or workforce groups</li>
                     <li>4. Click <strong>Save Changes</strong></li>
                   </ol>
