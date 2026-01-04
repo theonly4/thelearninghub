@@ -39,24 +39,47 @@ function parseCSVLine(line: string): string[] {
 }
 
 function extractOptions(optionsText: string): { label: string; text: string }[] {
-  const options: { label: string; text: string }[] = [];
+  const raw = (optionsText || "").replace(/\r?\n/g, " ").trim();
+  if (!raw) {
+    return [
+      { label: "A", text: "" },
+      { label: "B", text: "" },
+      { label: "C", text: "" },
+      { label: "D", text: "" },
+    ];
+  }
 
-  const text = optionsText.replace(/\r?\n/g, " ").trim();
+  // Robust parsing for common formats:
+  //  - "A. ... B. ... C. ... D. ..."
+  //  - "A) ... B) ..." etc
+  const text = raw.replace(/\s+/g, " ");
+  const markerRe = /(?:^|\s)([A-D])\s*[\.\)\:\-]\s*/g;
+  const markers = Array.from(text.matchAll(markerRe));
 
-  // Expected formats:
-  //  - "A. ...B. ...C. ...D. ..."
-  //  - "A. ...B. ..." (rarely truncated)
+  if (markers.length >= 4) {
+    const opts: { label: string; text: string }[] = [];
+    for (let i = 0; i < 4; i++) {
+      const label = markers[i][1];
+      const start = (markers[i].index ?? 0) + markers[i][0].length;
+      const end = markers[i + 1]?.index ?? text.length;
+      opts.push({ label, text: text.substring(start, end).trim() });
+    }
+    return opts;
+  }
+
+  // Fallback: try the original compact style "A. ...B. ...C. ...D. ..."
   const aIdx = text.indexOf("A.");
   const bIdx = text.indexOf("B.");
   const cIdx = text.indexOf("C.");
   const dIdx = text.indexOf("D.");
 
   if (aIdx !== -1 && bIdx !== -1 && cIdx !== -1 && dIdx !== -1) {
-    options.push({ label: "A", text: text.substring(aIdx + 2, bIdx).trim() });
-    options.push({ label: "B", text: text.substring(bIdx + 2, cIdx).trim() });
-    options.push({ label: "C", text: text.substring(cIdx + 2, dIdx).trim() });
-    options.push({ label: "D", text: text.substring(dIdx + 2).trim() });
-    return options;
+    return [
+      { label: "A", text: text.substring(aIdx + 2, bIdx).trim() },
+      { label: "B", text: text.substring(bIdx + 2, cIdx).trim() },
+      { label: "C", text: text.substring(cIdx + 2, dIdx).trim() },
+      { label: "D", text: text.substring(dIdx + 2).trim() },
+    ];
   }
 
   return [
@@ -67,14 +90,19 @@ function extractOptions(optionsText: string): { label: string; text: string }[] 
   ];
 }
 
+
 function extractCorrectAnswerLetter(correctAnswerText: string): string {
-  const text = correctAnswerText.trim().toUpperCase();
-  if (text.startsWith("A")) return "A";
-  if (text.startsWith("B")) return "B";
-  if (text.startsWith("C")) return "C";
-  if (text.startsWith("D")) return "D";
-  return "";
+  const text = (correctAnswerText || "").trim().toUpperCase();
+  if (!text) return "";
+
+  // Common cases:
+  // - "B. ..."
+  // - "Answer: B"
+  // - "B"
+  const match = text.match(/\b([A-D])\b/);
+  return match?.[1] ?? "";
 }
+
 
 function mapWorkforceGroup(groupText: string): string {
   const text = groupText.toLowerCase();
@@ -105,7 +133,76 @@ function normalizeHipaaSection(text: string): string {
   return t.replace(/^[^0-9A-Za-z]*\s*(\d)/, "§ $1");
 }
 
+type HeaderIndex = {
+  qNum: number;
+  scenario: number;
+  question: number;
+  options: number;
+  correct: number;
+  rationale: number;
+  hipaaSection: number;
+  workforceGroup: number;
+  hipaaRule: number;
+  topicName: number;
+  topicDesc: number;
+};
+
+function findHeaderIndex(headerFields: string[], label: string): number {
+  const target = label.trim().toLowerCase();
+  return headerFields.findIndex((h) => (h || "").trim().toLowerCase() === target);
+}
+
+function buildHeaderIndex(headerFields: string[]): HeaderIndex {
+  const qNum = findHeaderIndex(headerFields, "Q #");
+  const scenario = findHeaderIndex(headerFields, "Scenario");
+  const question = findHeaderIndex(headerFields, "Question");
+  const options = findHeaderIndex(headerFields, "Options");
+  const correct = findHeaderIndex(headerFields, "Correct Answer");
+  const rationale = findHeaderIndex(headerFields, "Rationale");
+  const hipaaSection = findHeaderIndex(headerFields, "HIPAA Section");
+  const workforceGroup = findHeaderIndex(headerFields, "Workforce Group");
+  const hipaaRule = findHeaderIndex(headerFields, "HIPAA Rule");
+  const topicName = findHeaderIndex(headerFields, "HIPAA Topic Name");
+  const topicDesc = headerFields.findIndex((h) =>
+    (h || "").toLowerCase().includes("description of topic"),
+  );
+
+  // Sensible fallbacks based on the known export structure.
+  return {
+    qNum: qNum === -1 ? 0 : qNum,
+    scenario: scenario === -1 ? 1 : scenario,
+    question: question === -1 ? 3 : question,
+    options: options === -1 ? 6 : options,
+    correct: correct === -1 ? 11 : correct,
+    rationale: rationale === -1 ? 23 : rationale,
+    hipaaSection: hipaaSection === -1 ? 28 : hipaaSection,
+    workforceGroup: workforceGroup === -1 ? 29 : workforceGroup,
+    hipaaRule: hipaaRule === -1 ? 31 : hipaaRule,
+    topicName: topicName === -1 ? 39 : topicName,
+    topicDesc: topicDesc === -1 ? 49 : topicDesc,
+  };
+}
+
+function getField(fields: string[], idx: number): string {
+  if (idx < 0) return "";
+  return (fields[idx] ?? "").trim();
+}
+
+function joinRange(fields: string[], start: number, endExclusive: number): string {
+  if (start < 0) return "";
+
+  const safeEnd =
+    endExclusive > start ? Math.min(endExclusive, fields.length) : Math.min(start + 8, fields.length);
+
+  return fields
+    .slice(start, safeEnd)
+    .map((v) => (v || "").trim())
+    .filter(Boolean)
+    .join(" ");
+}
+
 async function ensureMasterQuizId(supabaseClient: SupabaseClient): Promise<string> {
+
   const { data: existing, error } = await supabaseClient
     .from("quizzes")
     .select("id")
@@ -223,6 +320,9 @@ serve(async (req) => {
     const headerFields = parseCSVLine(lines[0]);
     console.log(`Header has ${headerFields.length} columns`);
 
+    const headerIndex = buildHeaderIndex(headerFields);
+    console.log("Detected header indexes:", headerIndex);
+
     const results = {
       total: lines.length - 1,
       imported: 0,
@@ -238,39 +338,9 @@ serve(async (req) => {
     for (let i = 1; i < lines.length; i++) {
       const fields = parseCSVLine(lines[i]);
 
-      let hipaaRule = "";
-      let topicName = "";
-      let topicDesc = "";
-
-      for (let j = 25; j < Math.min(fields.length, 40); j++) {
-        const field = fields[j].trim();
-        if (
-          field === "Privacy Rule" ||
-          field === "Security Rule" ||
-          field.includes("Administrative")
-        ) {
-          hipaaRule = field;
-          break;
-        }
-      }
-
-      for (let j = 32; j < Math.min(fields.length, 50); j++) {
-        const field = fields[j].trim();
-        if (
-          field &&
-          !field.includes("§") &&
-          !field.includes("Rule") &&
-          field.length > 2 &&
-          field.length < 120
-        ) {
-          if (!topicName) {
-            topicName = field;
-          } else if (!topicDesc && field.length > topicName.length) {
-            topicDesc = field;
-            break;
-          }
-        }
-      }
+      const hipaaRule = cleanText(getField(fields, headerIndex.hipaaRule));
+      const topicName = cleanText(getField(fields, headerIndex.topicName));
+      const topicDesc = cleanText(getField(fields, headerIndex.topicDesc));
 
       if (hipaaRule && topicName) {
         const key = `${hipaaRule}|${topicName}`;
@@ -290,7 +360,7 @@ serve(async (req) => {
               .insert({
                 rule_name: hipaaRule,
                 topic_name: topicName,
-                description: cleanText(topicDesc) || topicName,
+                description: topicDesc || topicName,
               })
               .select("id")
               .single();
@@ -304,6 +374,7 @@ serve(async (req) => {
       }
     }
 
+
     console.log(`Created/found ${topicMap.size} HIPAA topics`);
 
     // Second pass: import questions
@@ -311,116 +382,63 @@ serve(async (req) => {
       try {
         const fields = parseCSVLine(lines[i]);
 
-        const qNum = parseInt(fields[0], 10);
+        const qNumRaw = getField(fields, headerIndex.qNum);
+        const qNum = parseInt(qNumRaw, 10);
         if (isNaN(qNum)) {
-          results.errors.push(`Line ${i + 1}: Invalid question number "${fields[0]}"`);
+          results.errors.push(`Line ${i + 1}: Invalid question number "${qNumRaw}"`);
           results.skipped++;
           continue;
         }
 
-        const scenario = cleanText(fields[1] || "");
+        const scenario = cleanText(getField(fields, headerIndex.scenario));
 
-        let questionText = "";
-        for (let j = 2; j < 6; j++) {
-          if (fields[j] && fields[j].includes("?")) {
-            questionText = cleanText(fields[j]);
-            break;
+        const questionText = cleanText(getField(fields, headerIndex.question));
+
+        const optionsRegionText = joinRange(fields, headerIndex.options, headerIndex.correct);
+        let options = extractOptions(optionsRegionText);
+
+        // If options were split into multiple columns without "A." labels, attempt to map the first 4 non-empty cells.
+        if (options.every((o) => !o.text)) {
+          const rawOptionCells = fields
+            .slice(headerIndex.options, Math.min(headerIndex.correct, fields.length))
+            .map((v) => cleanText(v || ""))
+            .filter(Boolean);
+
+          if (rawOptionCells.length >= 4) {
+            options = [
+              { label: "A", text: rawOptionCells[0] },
+              { label: "B", text: rawOptionCells[1] },
+              { label: "C", text: rawOptionCells[2] },
+              { label: "D", text: rawOptionCells[3] },
+            ];
           }
         }
 
-        let optionsText = "";
-        for (let j = 5; j < 12; j++) {
-          if (fields[j] && fields[j].includes("A.") && fields[j].includes("B.")) {
-            optionsText = fields[j];
-            break;
-          }
-        }
-        const options = extractOptions(optionsText);
+        const correctAnswerText = cleanText(getField(fields, headerIndex.correct));
+        let correctAnswer = extractCorrectAnswerLetter(correctAnswerText);
 
-        let correctAnswer = "";
-        for (let j = 10; j < 25; j++) {
-          const field = (fields[j] || "").trim();
-          if (field && field.length > 2 && field.length < 300) {
-            if (
-              field.startsWith("A.") ||
-              field.startsWith("B.") ||
-              field.startsWith("C.") ||
-              field.startsWith("D.")
-            ) {
-              if (
-                !(
-                  field.includes("A.") &&
-                  field.includes("B.") &&
-                  field.includes("C.") &&
-                  field.includes("D.")
-                )
-              ) {
-                correctAnswer = extractCorrectAnswerLetter(field);
-                break;
-              }
-            }
-          }
+        if (!correctAnswer && correctAnswerText) {
+          const normalized = correctAnswerText
+            .toLowerCase()
+            .replace(/^answer\s*[:\-]\s*/i, "")
+            .replace(/^[A-D]\s*[\.\)\:\-]\s*/i, "")
+            .trim();
+
+          const matched = options.find((o) =>
+            normalized && o.text ? o.text.toLowerCase().trim() === normalized : false,
+          );
+          if (matched) correctAnswer = matched.label;
         }
 
-        let rationale = "";
-        for (let j = 20; j < Math.min(fields.length, 30); j++) {
-          const field = (fields[j] || "").trim();
-          if (
-            field.length > 30 &&
-            !field.includes("A.") &&
-            !field.includes("Rule")
-          ) {
-            rationale = cleanText(field);
-            break;
-          }
-        }
+        const rationale = cleanText(joinRange(fields, headerIndex.rationale, headerIndex.hipaaSection));
 
-        let hipaaSection = "";
-        for (let j = 24; j < Math.min(fields.length, 32); j++) {
-          const field = (fields[j] || "").trim();
-          if (field.includes("§") || field.includes("\uFFFD")) {
-            hipaaSection = normalizeHipaaSection(field);
-            break;
-          }
-        }
+        const hipaaSection = normalizeHipaaSection(getField(fields, headerIndex.hipaaSection));
 
-        let workforceGroup = "all_staff";
-        for (let j = 26; j < Math.min(fields.length, 32); j++) {
-          const field = (fields[j] || "").trim();
-          if (
-            field &&
-            (field.toLowerCase().includes("staff") ||
-              field.toLowerCase().includes("clinical") ||
-              field.toLowerCase().includes("admin") ||
-              field.toLowerCase().includes("management") ||
-              field.toLowerCase().includes("it"))
-          ) {
-            workforceGroup = mapWorkforceGroup(field);
-            break;
-          }
-        }
+        const workforceGroupText = cleanText(getField(fields, headerIndex.workforceGroup));
+        const workforceGroup = workforceGroupText ? mapWorkforceGroup(workforceGroupText) : "all_staff";
 
-        let hipaaRule = "";
-        for (let j = 28; j < Math.min(fields.length, 40); j++) {
-          const field = (fields[j] || "").trim();
-          if (
-            field === "Privacy Rule" ||
-            field === "Security Rule" ||
-            field.includes("Administrative")
-          ) {
-            hipaaRule = field;
-            break;
-          }
-        }
-
-        let topicName = "";
-        for (let j = 34; j < Math.min(fields.length, 50); j++) {
-          const field = (fields[j] || "").trim();
-          if (field && !field.includes("§") && !field.includes("Rule") && field.length > 2) {
-            topicName = field;
-            break;
-          }
-        }
+        const hipaaRule = cleanText(getField(fields, headerIndex.hipaaRule));
+        const topicName = cleanText(getField(fields, headerIndex.topicName));
 
         const topicKey = `${hipaaRule}|${topicName}`;
         const hipaaTopicId = topicMap.get(topicKey) || null;
