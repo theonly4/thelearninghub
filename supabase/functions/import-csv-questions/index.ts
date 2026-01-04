@@ -9,7 +9,8 @@ const corsHeaders = {
 
 const MASTER_QUIZ_TITLE = "Master Question Bank";
 
-type SupabaseClient = ReturnType<typeof createClient>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SupabaseClient = any;
 
 function parseCSVLine(line: string): string[] {
   const result: string[] = [];
