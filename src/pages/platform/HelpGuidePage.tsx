@@ -63,15 +63,23 @@ export default function HelpGuidePage() {
               </li>
               <li className="flex items-start gap-3">
                 <Badge variant="outline" className="mt-0.5">2</Badge>
-                <span><strong>Create Packages</strong> - Bundle 25 questions into training packages for each workforce group</span>
+                <span><strong>Create Training Materials</strong> - Add educational content for each workforce group</span>
               </li>
               <li className="flex items-start gap-3">
                 <Badge variant="outline" className="mt-0.5">3</Badge>
-                <span><strong>Add Organization</strong> - Create a new customer organization in the system</span>
+                <span><strong>Create Packages</strong> - Bundle 25 questions into training packages for each workforce group</span>
               </li>
               <li className="flex items-start gap-3">
                 <Badge variant="outline" className="mt-0.5">4</Badge>
-                <span><strong>Release Packages</strong> - Assign question packages to the customer for their training year</span>
+                <span><strong>Add Organization</strong> - Create a new customer organization in the system</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <Badge variant="outline" className="mt-0.5">5</Badge>
+                <span><strong>Release Content</strong> - Assign question packages and training materials to the customer</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <Badge variant="outline" className="mt-0.5">6</Badge>
+                <span><strong>Customer Admin Assigns Training</strong> - The customer admin sets deadlines and assigns training to their employees</span>
               </li>
             </ol>
           </CardContent>
@@ -336,7 +344,7 @@ export default function HelpGuidePage() {
                 </div>
                 <div className="text-left">
                   <p className="font-medium">How to Manage Training Materials</p>
-                  <p className="text-sm text-muted-foreground font-normal">Create and distribute educational content</p>
+                  <p className="text-sm text-muted-foreground font-normal">Create, edit, and distribute educational content</p>
                 </div>
               </div>
             </AccordionTrigger>
@@ -345,27 +353,112 @@ export default function HelpGuidePage() {
                 <div>
                   <h4 className="font-medium mb-2">What are Training Materials?</h4>
                   <p className="text-muted-foreground">
-                    Training materials are educational content that employees read before taking quizzes. They explain HIPAA rules and best practices in plain language.
+                    Training materials are educational content that employees read before taking quizzes. They explain HIPAA rules and best practices in plain language. Each material can contain multiple sections with key points, HIPAA citations, and visual elements.
                   </p>
                 </div>
                 
                 <div>
-                  <h4 className="font-medium mb-2">Managing Training Materials</h4>
+                  <h4 className="font-medium mb-2">Adding New Training Materials</h4>
                   <ol className="space-y-2 text-muted-foreground">
                     <li>1. Go to <strong>Training Materials</strong> in the left menu</li>
-                    <li>2. Click <strong>Add Material</strong> to create new content</li>
-                    <li>3. Enter the title, description, and content sections</li>
-                    <li>4. Select which workforce groups this material is for</li>
-                    <li>5. Add relevant HIPAA citations</li>
-                    <li>6. Click <strong>Save</strong></li>
+                    <li>2. Click <strong>Add Material</strong> at the top right</li>
+                    <li>3. Enter the title and description</li>
+                    <li>4. Set the sequence number (determines display order)</li>
+                    <li>5. Enter the estimated reading time in minutes</li>
+                    <li>6. Add HIPAA citations (comma-separated)</li>
+                    <li>7. Select which workforce groups this material applies to</li>
+                    <li>8. Add content sections with titles and text</li>
+                    <li>9. Click <strong>Create</strong> to save</li>
                   </ol>
+                </div>
+
+                <div>
+                  <h4 className="font-medium mb-2">Editing Existing Materials</h4>
+                  <ol className="space-y-2 text-muted-foreground">
+                    <li>1. Find the material in the Training Materials list</li>
+                    <li>2. Click the <strong>Edit</strong> button (pencil icon)</li>
+                    <li>3. Update any fields as needed</li>
+                    <li>4. Add or remove content sections</li>
+                    <li>5. Click <strong>Save Changes</strong> - the version number will automatically increment</li>
+                  </ol>
+                </div>
+
+                <div>
+                  <h4 className="font-medium mb-2">Content Section Structure</h4>
+                  <p className="text-muted-foreground">Each content section can include:</p>
+                  <ul className="space-y-1 text-muted-foreground list-disc list-inside mt-2">
+                    <li>Section title</li>
+                    <li>Main content text</li>
+                    <li>HIPAA citations (automatically linked to Cornell Law)</li>
+                    <li>Key points for highlighting important takeaways</li>
+                  </ul>
                 </div>
 
                 <div className="p-3 bg-muted rounded-lg">
                   <div className="flex items-start gap-2">
                     <AlertCircle className="h-4 w-4 text-info mt-0.5" />
                     <p className="text-muted-foreground">
-                      <strong>Tip:</strong> Training materials can be released to specific organizations using the Content Releases feature, similar to how you release question packages.
+                      <strong>Tip:</strong> All HIPAA section numbers are automatically hyperlinked to the official Cornell Law Legal Information Institute website, allowing employees to read the full regulatory text.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Training Assignment Workflow */}
+          <AccordionItem value="training-assignment" className="border rounded-lg px-4">
+            <AccordionTrigger className="hover:no-underline">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Users className="h-5 w-5 text-primary" />
+                </div>
+                <div className="text-left">
+                  <p className="font-medium">How Training Assignment Works</p>
+                  <p className="text-sm text-muted-foreground font-normal">Understanding the owner to admin to employee flow</p>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pt-4 pb-6">
+              <div className="space-y-4 text-sm">
+                <div>
+                  <h4 className="font-medium mb-2">The Training Assignment Flow</h4>
+                  <p className="text-muted-foreground">
+                    Training follows a structured path from platform owner to employee:
+                  </p>
+                  <ol className="space-y-2 text-muted-foreground mt-2">
+                    <li><strong>Step 1 - Platform Owner</strong>: Creates training materials and question packages, then releases them to customer organizations</li>
+                    <li><strong>Step 2 - Customer Admin</strong>: Views released content and assigns training to employees by workforce group, setting a completion deadline</li>
+                    <li><strong>Step 3 - Employee</strong>: Receives training assignment with deadline, completes materials at their own pace</li>
+                    <li><strong>Step 4 - Quiz Unlock</strong>: When all materials are complete, the quiz is automatically unlocked</li>
+                    <li><strong>Step 5 - Certification</strong>: Passing the quiz generates a certificate for compliance records</li>
+                  </ol>
+                </div>
+                
+                <div>
+                  <h4 className="font-medium mb-2">What Customer Admins Can Do</h4>
+                  <ul className="space-y-1 text-muted-foreground list-disc list-inside">
+                    <li>View training materials and quizzes released to their organization</li>
+                    <li>Assign training to employees by workforce group</li>
+                    <li>Set completion deadlines for training assignments</li>
+                    <li>Monitor employee progress and completion status</li>
+                    <li>Run workforce analysis to identify training gaps</li>
+                    <li>View and download employee certificates</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 className="font-medium mb-2">Deadline Management</h4>
+                  <p className="text-muted-foreground">
+                    When a customer admin assigns training, they must set a completion deadline. Employees will see this deadline prominently displayed on their dashboard. The system tracks overdue assignments and displays warnings for approaching deadlines.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-muted rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-success mt-0.5" />
+                    <p className="text-muted-foreground">
+                      <strong>Audit Trail:</strong> All training assignments, completions, and quiz attempts are logged with timestamps for compliance documentation per 45 CFR 164.530(j).
                     </p>
                   </div>
                 </div>
