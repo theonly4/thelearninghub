@@ -207,6 +207,93 @@ export type Database = {
         }
         Relationships: []
       }
+      package_questions: {
+        Row: {
+          created_at: string
+          id: string
+          package_id: string
+          question_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          package_id: string
+          question_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          package_id?: string
+          question_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "package_questions_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "question_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "package_questions_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      package_releases: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          organization_id: string
+          package_id: string
+          released_at: string
+          released_by: string
+          training_year: number
+          workforce_group: Database["public"]["Enums"]["workforce_group"]
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          organization_id: string
+          package_id: string
+          released_at?: string
+          released_by: string
+          training_year: number
+          workforce_group: Database["public"]["Enums"]["workforce_group"]
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          package_id?: string
+          released_at?: string
+          released_by?: string
+          training_year?: number
+          workforce_group?: Database["public"]["Enums"]["workforce_group"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "package_releases_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "package_releases_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "question_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -263,6 +350,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      question_packages: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          name: string
+          sequence_number: number
+          updated_at: string
+          workforce_group: Database["public"]["Enums"]["workforce_group"]
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          name: string
+          sequence_number: number
+          updated_at?: string
+          workforce_group: Database["public"]["Enums"]["workforce_group"]
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          name?: string
+          sequence_number?: number
+          updated_at?: string
+          workforce_group?: Database["public"]["Enums"]["workforce_group"]
+        }
+        Relationships: []
       }
       question_releases: {
         Row: {

@@ -15,6 +15,7 @@ import {
   Bell,
   Shield,
   GitBranch,
+  Package,
 } from "lucide-react";
 
 interface PlatformOwnerLayoutProps {
@@ -25,6 +26,7 @@ interface PlatformOwnerLayoutProps {
 const platformOwnerNavItems = [
   { icon: LayoutDashboard, label: "Overview", href: "/platform" },
   { icon: FileQuestion, label: "Question Bank", href: "/platform/questions" },
+  { icon: Package, label: "Question Packages", href: "/platform/packages" },
   { icon: BookOpen, label: "Training Materials", href: "/platform/materials" },
   { icon: Building2, label: "Organizations", href: "/platform/organizations" },
   { icon: GitBranch, label: "Question Distribution", href: "/platform/distribution" },
