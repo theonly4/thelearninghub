@@ -93,13 +93,45 @@ function extractCorrectAnswerLetter(correctAnswerText: string): string {
   return match?.[1] ?? "";
 }
 
-function mapWorkforceGroup(groupText: string): string {
-  const text = groupText.toLowerCase();
-  if (text.includes("clinical")) return "clinical";
-  if (text.includes("admin") || text.includes("billing")) return "administrative";
-  if (text.includes("management") || text.includes("leadership")) return "management";
-  if (text.includes("it") || text.includes("security") || text.includes("technical")) return "it";
-  return "all_staff";
+/**
+ * Parse the Workforce Group CSV value (e.g. "Clinical Staff, Admin/Billing, Management")
+ * into a normalized array like ["clinical", "administrative", "management"].
+ */
+function parseWorkforceGroups(rawValue: string): string[] {
+  if (!rawValue || !rawValue.trim()) return [];
+
+  const text = rawValue.toLowerCase();
+  const groups = new Set<string>();
+
+  // Split by comma to handle multiple groups in one cell
+  const parts = text.split(/,/).map((p) => p.trim());
+
+  for (const part of parts) {
+    if (!part) continue;
+
+    if (part.includes("all staff") || part === "all") {
+      groups.add("all_staff");
+    }
+    if (part.includes("clinical")) {
+      groups.add("clinical");
+    }
+    if (part.includes("admin") || part.includes("billing")) {
+      groups.add("administrative");
+    }
+    if (part.includes("management") || part.includes("leadership")) {
+      groups.add("management");
+    }
+    if (part.includes("it") || part.includes("security") || part.includes("technical")) {
+      groups.add("it");
+    }
+  }
+
+  // If nothing matched, default to all_staff
+  if (groups.size === 0) {
+    groups.add("all_staff");
+  }
+
+  return Array.from(groups);
 }
 
 function cleanText(text: string): string {
@@ -356,6 +388,10 @@ serve(async (req) => {
         const topicKey = `${hipaaRule}|${topicName}`;
         const hipaaTopicId = topicMap.get(topicKey) || null;
 
+        // Parse workforce groups from CSV column
+        const workforceGroupsRaw = getField(fields, headerIndex.workforceGroup);
+        const workforceGroups = parseWorkforceGroups(workforceGroupsRaw);
+
         if (!questionText) {
           results.errors.push(`Q${qNum}: Missing question text`);
           results.skipped++;
@@ -384,6 +420,7 @@ serve(async (req) => {
           rationale: rationale || "See HIPAA regulation for details.",
           hipaa_section: hipaaSection || "§ 164.000",
           hipaa_topic_id: hipaaTopicId,
+          workforce_groups: workforceGroups,
         });
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : String(err);
