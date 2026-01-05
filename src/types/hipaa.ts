@@ -29,7 +29,7 @@ export interface User {
   first_name: string;
   last_name: string;
   role: UserRole;
-  workforce_group: WorkforceGroup | null;
+  workforce_groups: WorkforceGroup[];
   status: UserStatus;
   mfa_enabled: boolean;
   is_contractor: boolean;

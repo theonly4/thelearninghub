@@ -51,7 +51,7 @@ interface Employee {
   first_name: string;
   last_name: string;
   email: string;
-  workforce_group: WorkforceGroup | null;
+  workforce_groups: WorkforceGroup[];
 }
 
 export function TrainingAssignmentDialog({
@@ -94,13 +94,13 @@ export function TrainingAssignmentDialog({
       // Fetch employees in organization
       const { data: employeesData, error: employeesError } = await supabase
         .from("profiles")
-        .select("id, user_id, first_name, last_name, email, workforce_group");
+        .select("id, user_id, first_name, last_name, email, workforce_groups");
 
       if (employeesError) throw employeesError;
       setEmployees(
         (employeesData || []).map((e) => ({
           ...e,
-          workforce_group: e.workforce_group as WorkforceGroup | null,
+          workforce_groups: (e.workforce_groups || []) as WorkforceGroup[],
         }))
       );
     } catch (error) {
@@ -118,7 +118,7 @@ export function TrainingAssignmentDialog({
 
   // Filter employees in selected workforce group
   const filteredEmployees = workforceGroup
-    ? employees.filter((e) => e.workforce_group === workforceGroup)
+    ? employees.filter((e) => e.workforce_groups.includes(workforceGroup))
     : [];
 
   // Calculate total training time

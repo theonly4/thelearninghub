@@ -60,7 +60,7 @@ const mockUsers: User[] = [
     first_name: "John",
     last_name: "Doe",
     role: "workforce_user",
-    workforce_group: "clinical",
+    workforce_groups: ["clinical", "all_staff"],
     status: "active",
     mfa_enabled: true,
     is_contractor: false,
@@ -74,7 +74,7 @@ const mockUsers: User[] = [
     first_name: "Jane",
     last_name: "Smith",
     role: "workforce_user",
-    workforce_group: "administrative",
+    workforce_groups: ["administrative"],
     status: "active",
     mfa_enabled: true,
     is_contractor: false,
@@ -88,7 +88,7 @@ const mockUsers: User[] = [
     first_name: "Bob",
     last_name: "Wilson",
     role: "workforce_user",
-    workforce_group: null,
+    workforce_groups: [],
     status: "pending_assignment",
     mfa_enabled: false,
     is_contractor: true,
@@ -102,7 +102,7 @@ const mockUsers: User[] = [
     first_name: "Sarah",
     last_name: "Johnson",
     role: "org_admin",
-    workforce_group: "management",
+    workforce_groups: ["management", "all_staff"],
     status: "active",
     mfa_enabled: true,
     is_contractor: false,
@@ -116,7 +116,7 @@ const mockUsers: User[] = [
     first_name: "Mike",
     last_name: "Chen",
     role: "workforce_user",
-    workforce_group: "it",
+    workforce_groups: ["it", "all_staff"],
     status: "active",
     mfa_enabled: true,
     is_contractor: false,
@@ -140,9 +140,12 @@ export default function UsersPage() {
     email: "",
     first_name: "",
     last_name: "",
-    workforce_group: "" as WorkforceGroup | "",
+    workforce_groups: [] as WorkforceGroup[],
     is_contractor: false,
   });
+  
+  // Selected workforce groups for assignment dialog
+  const [selectedWorkforceGroups, setSelectedWorkforceGroups] = useState<WorkforceGroup[]>([]);
 
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
@@ -155,10 +158,10 @@ export default function UsersPage() {
   const pendingCount = users.filter((u) => u.status === "pending_assignment").length;
 
   const handleAddUser = () => {
-    if (!newUser.email || !newUser.first_name || !newUser.last_name || !newUser.workforce_group) {
+    if (!newUser.email || !newUser.first_name || !newUser.last_name || newUser.workforce_groups.length === 0) {
       toast({
         title: "Missing Required Fields",
-        description: "Please fill in all required fields including workforce group.",
+        description: "Please fill in all required fields including at least one workforce group.",
         variant: "destructive",
       });
       return;
@@ -171,7 +174,7 @@ export default function UsersPage() {
       first_name: newUser.first_name,
       last_name: newUser.last_name,
       role: "workforce_user",
-      workforce_group: newUser.workforce_group as WorkforceGroup,
+      workforce_groups: newUser.workforce_groups,
       status: "active",
       mfa_enabled: false,
       is_contractor: newUser.is_contractor,
@@ -185,31 +188,32 @@ export default function UsersPage() {
       email: "",
       first_name: "",
       last_name: "",
-      workforce_group: "",
+      workforce_groups: [],
       is_contractor: false,
     });
 
     toast({
       title: "User Added",
-      description: `${newUserData.first_name} ${newUserData.last_name} has been added with workforce group: ${WORKFORCE_GROUP_LABELS[newUserData.workforce_group!]}.`,
+      description: `${newUserData.first_name} ${newUserData.last_name} has been added with ${newUserData.workforce_groups.length} workforce group(s).`,
     });
   };
 
-  const handleAssignWorkforce = (workforceGroup: WorkforceGroup) => {
-    if (!selectedUser) return;
+  const handleAssignWorkforce = (groups: WorkforceGroup[]) => {
+    if (!selectedUser || groups.length === 0) return;
 
     setUsers(
       users.map((u) =>
         u.id === selectedUser.id
-          ? { ...u, workforce_group: workforceGroup, status: "active" as UserStatus }
+          ? { ...u, workforce_groups: groups, status: "active" as UserStatus }
           : u
       )
     );
 
     setIsAssignDialogOpen(false);
+    setSelectedWorkforceGroups([]);
     toast({
-      title: "Workforce Group Assigned",
-      description: `${selectedUser.first_name} ${selectedUser.last_name} has been assigned to ${WORKFORCE_GROUP_LABELS[workforceGroup]}.`,
+      title: "Workforce Groups Assigned",
+      description: `${selectedUser.first_name} ${selectedUser.last_name} has been assigned to ${groups.length} workforce group(s).`,
     });
     setSelectedUser(null);
   };
@@ -297,28 +301,29 @@ export default function UsersPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="workforce_group">Workforce Group *</Label>
-                  <Select
-                    value={newUser.workforce_group}
-                    onValueChange={(value) =>
-                      setNewUser({ ...newUser, workforce_group: value as WorkforceGroup })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select workforce group" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(Object.keys(WORKFORCE_GROUP_LABELS) as WorkforceGroup[]).map(
-                        (group) => (
-                          <SelectItem key={group} value={group}>
-                            {WORKFORCE_GROUP_LABELS[group]}
-                          </SelectItem>
-                        )
-                      )}
-                    </SelectContent>
-                  </Select>
+                  <Label>Workforce Groups *</Label>
+                  <div className="space-y-2 max-h-48 overflow-y-auto border border-border rounded-lg p-3">
+                    {(Object.keys(WORKFORCE_GROUP_LABELS) as WorkforceGroup[]).map((group) => (
+                      <label
+                        key={group}
+                        className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer"
+                      >
+                        <Checkbox
+                          checked={newUser.workforce_groups.includes(group)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setNewUser({ ...newUser, workforce_groups: [...newUser.workforce_groups, group] });
+                            } else {
+                              setNewUser({ ...newUser, workforce_groups: newUser.workforce_groups.filter(g => g !== group) });
+                            }
+                          }}
+                        />
+                        <span className="text-sm">{WORKFORCE_GROUP_LABELS[group]}</span>
+                      </label>
+                    ))}
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    Determines which training materials and quizzes apply to this user.
+                    Select all applicable workforce groups. This determines which training materials and quizzes apply.
                   </p>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -439,8 +444,12 @@ export default function UsersPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    {user.workforce_group ? (
-                      <WorkforceGroupBadge group={user.workforce_group} size="sm" />
+                    {user.workforce_groups.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {user.workforce_groups.map((group) => (
+                          <WorkforceGroupBadge key={group} group={group} size="sm" />
+                        ))}
+                      </div>
                     ) : (
                       <span className="text-sm text-muted-foreground italic">
                         Not assigned
@@ -519,15 +528,18 @@ export default function UsersPage() {
         </div>
       </div>
 
-      {/* Assign Workforce Group Dialog */}
-      <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
+      {/* Assign Workforce Groups Dialog */}
+      <Dialog open={isAssignDialogOpen} onOpenChange={(open) => {
+        setIsAssignDialogOpen(open);
+        if (!open) setSelectedWorkforceGroups([]);
+      }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Assign Workforce Group</DialogTitle>
+            <DialogTitle>Assign Workforce Groups</DialogTitle>
             <DialogDescription>
               {selectedUser && (
                 <>
-                  Assign a workforce group to{" "}
+                  Select one or more workforce groups for{" "}
                   <strong>
                     {selectedUser.first_name} {selectedUser.last_name}
                   </strong>
@@ -536,13 +548,27 @@ export default function UsersPage() {
               )}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 py-4">
+          <div className="space-y-3 py-4 max-h-80 overflow-y-auto">
             {(Object.keys(WORKFORCE_GROUP_LABELS) as WorkforceGroup[]).map((group) => (
-              <button
+              <label
                 key={group}
-                onClick={() => handleAssignWorkforce(group)}
-                className="flex w-full items-center gap-3 rounded-lg border border-border p-4 text-left transition-colors hover:border-accent/50 hover:bg-accent/5"
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-lg border border-border p-4 cursor-pointer transition-colors",
+                  selectedWorkforceGroups.includes(group) 
+                    ? "border-accent/50 bg-accent/5" 
+                    : "hover:border-muted-foreground/30 hover:bg-muted/50"
+                )}
               >
+                <Checkbox
+                  checked={selectedWorkforceGroups.includes(group)}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setSelectedWorkforceGroups([...selectedWorkforceGroups, group]);
+                    } else {
+                      setSelectedWorkforceGroups(selectedWorkforceGroups.filter(g => g !== group));
+                    }
+                  }}
+                />
                 <WorkforceGroupBadge group={group} />
                 <span className="text-sm text-muted-foreground flex-1">
                   {group === "all_staff" && "Core HIPAA training for all workforce members"}
@@ -551,9 +577,23 @@ export default function UsersPage() {
                   {group === "management" && "Leadership and compliance oversight"}
                   {group === "it" && "IT and security professionals"}
                 </span>
-              </button>
+              </label>
             ))}
           </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setIsAssignDialogOpen(false);
+              setSelectedWorkforceGroups([]);
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => handleAssignWorkforce(selectedWorkforceGroups)}
+              disabled={selectedWorkforceGroups.length === 0}
+            >
+              Assign {selectedWorkforceGroups.length > 0 && `(${selectedWorkforceGroups.length})`}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </DashboardLayout>
