@@ -243,6 +243,72 @@ export default function HelpGuidePage() {
             </AccordionContent>
           </AccordionItem>
 
+          {/* Add New Customer */}
+          <AccordionItem value="add-customer" className="border rounded-lg px-4">
+            <AccordionTrigger className="hover:no-underline">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Users className="h-5 w-5 text-primary" />
+                </div>
+                <div className="text-left">
+                  <p className="font-medium">How to Add a New Customer Organization</p>
+                  <p className="text-sm text-muted-foreground font-normal">Create a new customer account and set up their admin</p>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pt-4 pb-6">
+              <div className="space-y-4 text-sm">
+                <div>
+                  <h4 className="font-medium mb-2">Before You Start</h4>
+                  <p className="text-muted-foreground">
+                    You will need the customer's organization name and the email address of the person who will be their admin. The admin will be able to manage their organization's employees, assign training, and view reports.
+                  </p>
+                </div>
+                
+                <div>
+                  <h4 className="font-medium mb-2">Step-by-Step Instructions</h4>
+                  <ol className="space-y-3 text-muted-foreground">
+                    <li className="flex flex-col gap-2">
+                      <span>1. Go to <strong>Organizations</strong> in the left menu</span>
+                      <GuideImage src={guideSidebarOrganizations} alt="Find Organizations in the left sidebar menu" />
+                    </li>
+                    <li>2. Click the <strong>Add Organization</strong> button at the top right of the page</li>
+                    <li>3. Enter the <strong>Organization Name</strong> (for example: "Acme Healthcare")</li>
+                    <li>4. Enter a unique <strong>Slug</strong> - this is a short identifier using only lowercase letters, numbers, and hyphens (for example: "acme-healthcare")</li>
+                    <li>5. Click <strong>Create Organization</strong></li>
+                  </ol>
+                </div>
+
+                <div>
+                  <h4 className="font-medium mb-2">Setting Up the Customer Admin</h4>
+                  <ol className="space-y-2 text-muted-foreground">
+                    <li>1. After creating the organization, the customer admin needs to sign up using their email address</li>
+                    <li>2. Once they sign up, you can assign them to the new organization and give them the <strong>org_admin</strong> role</li>
+                    <li>3. The customer admin can then log in and start adding their employees</li>
+                  </ol>
+                </div>
+
+                <div>
+                  <h4 className="font-medium mb-2">After Creating the Organization</h4>
+                  <ol className="space-y-2 text-muted-foreground">
+                    <li>1. <strong>Release question packages</strong> to the organization for their training year</li>
+                    <li>2. <strong>Release training materials</strong> if you have created any for their workforce groups</li>
+                    <li>3. Notify the customer admin that their account is ready</li>
+                  </ol>
+                </div>
+
+                <div className="p-3 bg-muted rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-info mt-0.5" />
+                    <p className="text-muted-foreground">
+                      <strong>Important:</strong> Employees cannot start training until the customer admin assigns them to a workforce group and assigns training with a due date. Make sure to communicate this to your new customers.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
           {/* Manage Organizations */}
           <AccordionItem value="manage-orgs" className="border rounded-lg px-4">
             <AccordionTrigger className="hover:no-underline">
@@ -252,7 +318,7 @@ export default function HelpGuidePage() {
                 </div>
                 <div className="text-left">
                   <p className="font-medium">How to Manage Customer Organizations</p>
-                  <p className="text-sm text-muted-foreground font-normal">Add and view customer accounts</p>
+                  <p className="text-sm text-muted-foreground font-normal">View existing customer accounts and releases</p>
                 </div>
               </div>
             </AccordionTrigger>
