@@ -7,9 +7,7 @@ import {
   LayoutDashboard,
   Users,
   FileText,
-  Award,
   BarChart3,
-  Settings,
   LogOut,
   ChevronLeft,
   Bell,
@@ -27,18 +25,14 @@ const adminNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/admin" },
   { icon: Users, label: "Users", href: "/admin/users" },
   { icon: FileText, label: "Quiz Assignments", href: "/admin/assignments" },
-  { icon: Award, label: "Certificates", href: "/admin/certificates" },
   { icon: BarChart3, label: "Reports", href: "/admin/reports" },
   { icon: HelpCircle, label: "How To Guide", href: "/admin/help" },
-  { icon: Settings, label: "Settings", href: "/admin/settings" },
 ];
 
 const userNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
   { icon: FileText, label: "My Quizzes", href: "/dashboard/quizzes" },
   { icon: BookOpen, label: "Training Materials", href: "/dashboard/training" },
-  { icon: Award, label: "Certificates", href: "/dashboard/certificates" },
-  { icon: Settings, label: "Settings", href: "/dashboard/settings" },
 ];
 
 export function DashboardLayout({ 
