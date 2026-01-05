@@ -65,13 +65,13 @@ serve(async (req) => {
     // Build query for profiles based on filters
     let profilesQuery = supabase
       .from("profiles")
-      .select("user_id, first_name, last_name, email, workforce_group")
+      .select("user_id, first_name, last_name, email, workforce_groups")
       .eq("organization_id", organizationId);
 
     if (userId) {
       profilesQuery = profilesQuery.eq("user_id", userId);
     } else if (workforceGroup) {
-      profilesQuery = profilesQuery.eq("workforce_group", workforceGroup);
+      profilesQuery = profilesQuery.contains("workforce_groups", [workforceGroup]);
     }
     // If analyzeAll is true, we don't add additional filters
 
@@ -127,11 +127,12 @@ serve(async (req) => {
       
       if (userAttempts.length === 0) {
         // No quiz data for this employee
+        const groups = profile.workforce_groups as string[] | null;
         employeeAnalyses.push({
           userId: profile.user_id,
           userName: `${profile.first_name} ${profile.last_name}`,
           email: profile.email,
-          workforceGroup: profile.workforce_group || "unassigned",
+          workforceGroup: groups?.[0] || "unassigned",
           totalQuizAttempts: 0,
           totalWrongAnswers: 0,
           weaknessesByTopic: {},
@@ -159,11 +160,12 @@ serve(async (req) => {
         }
       }
 
+      const groups = profile.workforce_groups as string[] | null;
       employeeAnalyses.push({
         userId: profile.user_id,
         userName: `${profile.first_name} ${profile.last_name}`,
         email: profile.email,
-        workforceGroup: profile.workforce_group || "unassigned",
+        workforceGroup: groups?.[0] || "unassigned",
         totalQuizAttempts: userAttempts.length,
         totalWrongAnswers,
         weaknessesByTopic,
