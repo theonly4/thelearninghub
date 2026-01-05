@@ -21,6 +21,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -30,15 +31,33 @@ export default function LoginPage() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSessionEmail(session?.user?.email ?? null);
+      if (session?.user?.id) {
+        // Fetch role in a deferred way to avoid deadlock
+        setTimeout(() => fetchUserRole(session.user.id), 0);
+      } else {
+        setUserRole(null);
+      }
     });
 
     // Initialize from existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSessionEmail(session?.user?.email ?? null);
+      if (session?.user?.id) {
+        fetchUserRole(session.user.id);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const fetchUserRole = async (userId: string) => {
+    const { data } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .maybeSingle();
+    setUserRole(data?.role ?? null);
+  };
 
   const navigateByRole = async (userId: string) => {
     // Check MFA status first
@@ -112,6 +131,7 @@ export default function LoginPage() {
       if (error) throw error;
 
       setSessionEmail(null);
+      setUserRole(null);
       toast({
         title: "Signed out",
         description: "You can now sign in or sign up with a different account.",
@@ -191,6 +211,20 @@ export default function LoginPage() {
     }
   };
 
+  const getRoleLabel = () => {
+    if (userRole === "platform_owner") return " (Platform Owner)";
+    if (userRole === "org_admin") return " (Organization Admin)";
+    if (userRole === "workforce_user") return " (Workforce User)";
+    return "";
+  };
+
+  const getContinueButtonLabel = () => {
+    if (userRole === "platform_owner") return "Go to Platform Dashboard";
+    if (userRole === "org_admin") return "Go to Admin Dashboard";
+    if (userRole === "workforce_user") return "Go to Dashboard";
+    return "Continue";
+  };
+
   return (
     <div className="min-h-screen bg-gradient-hero">
       <div className="container flex min-h-screen flex-col px-4 py-8 md:px-6">
@@ -223,13 +257,13 @@ export default function LoginPage() {
               {sessionEmail ? (
                 <div className="space-y-6">
                   <div className="rounded-lg border border-border bg-muted/30 p-4">
-                    <p className="text-sm font-medium">You’re already signed in</p>
+                    <p className="text-sm font-medium">You're already signed in</p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Signed in as{" "}
                       <span className="font-medium text-foreground">
                         {sessionEmail}
                       </span>
-                      . To create your Platform Owner account, sign out first.
+                      {getRoleLabel()}
                     </p>
                   </div>
 
@@ -239,7 +273,7 @@ export default function LoginPage() {
                       onClick={handleContinue}
                       disabled={isLoading}
                     >
-                      Continue
+                      {getContinueButtonLabel()}
                     </Button>
                     <Button
                       type="button"
@@ -250,12 +284,6 @@ export default function LoginPage() {
                       Sign out
                     </Button>
                   </div>
-
-                  <p className="text-xs text-muted-foreground">
-                    After signing out, use <span className="font-medium">Sign up</span>
-                    {" "}
-                    to create the first account (it becomes the Platform Owner).
-                  </p>
                 </div>
               ) : (
                 <>
