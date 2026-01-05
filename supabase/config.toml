@@ -1,7 +1,7 @@
 project_id = "yzuvyvtspdjmewuakpkn"
 
 [functions.analyze-workforce]
-verify_jwt = true
+verify_jwt = false
 
 [functions.import-questions]
 verify_jwt = true

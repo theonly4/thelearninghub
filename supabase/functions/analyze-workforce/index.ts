@@ -58,9 +58,66 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Manual auth (we keep this function protected even if gateway JWT verification is disabled)
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : null;
+
+    if (!token) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.getUser(token);
+    const actorUserId = authData?.user?.id;
+
+    if (authError || !actorUserId) {
+      console.error("Auth error:", authError);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { userId, workforceGroup, analyzeAll, organizationId }: AnalysisRequest = await req.json();
 
-    console.log("Analyze workforce request:", { userId, workforceGroup, analyzeAll, organizationId });
+    if (!organizationId) {
+      return new Response(
+        JSON.stringify({ error: "organizationId is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { data: actorOrgId, error: actorOrgError } = await supabase.rpc("get_user_organization", {
+      _user_id: actorUserId,
+    });
+
+    if (actorOrgError) {
+      console.error("Error resolving actor organization:", actorOrgError);
+      throw new Error("Failed to resolve requesting user's organization");
+    }
+
+    const { data: isOrgAdmin } = await supabase.rpc("has_role", { _user_id: actorUserId, _role: "org_admin" });
+    const { data: isPlatformOwner } = await supabase.rpc("has_role", { _user_id: actorUserId, _role: "platform_owner" });
+
+    if (!isOrgAdmin && !isPlatformOwner) {
+      return new Response(
+        JSON.stringify({ error: "Forbidden" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Org admins may only analyze their own org. Platform owners may analyze any org.
+    if (!isPlatformOwner && actorOrgId !== organizationId) {
+      return new Response(
+        JSON.stringify({ error: "Forbidden" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Analyze workforce request:", { actorUserId, userId, workforceGroup, analyzeAll, organizationId });
 
     // Build query for profiles based on filters
     let profilesQuery = supabase
@@ -306,7 +363,7 @@ Always cite specific HIPAA sections (e.g., §164.308, §164.312) in recommendati
 
     // Log to audit trail
     await supabase.from("audit_logs").insert({
-      user_id: userIds[0], // Use first user as the actor (admin)
+      user_id: actorUserId,
       organization_id: organizationId,
       resource_type: "workforce_analysis",
       action: "ai_analysis_completed",
