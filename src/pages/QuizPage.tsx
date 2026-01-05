@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useProgress } from "@/contexts/ProgressContext";
 import { getQuizById } from "@/data/quizzes";
+import { supabase } from "@/integrations/supabase/client";
 import {
   ArrowLeft,
   ArrowRight,
@@ -15,6 +16,7 @@ import {
   CheckCircle2,
   AlertCircle,
   BookOpen,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +24,26 @@ interface Answer {
   questionId: string;
   selectedOption: string;
   timeSpent: number;
+}
+
+interface ServerGradedAnswer {
+  questionId: string;
   isCorrect: boolean;
+  hipaaSection: string;
+}
+
+interface QuizResult {
+  score: number;
+  passed: boolean;
+  correctCount: number;
+  totalQuestions: number;
+  passingScore: number;
+  gradedAnswers: ServerGradedAnswer[];
+  certificate?: {
+    id: string;
+    certificate_number: string;
+    valid_until: string;
+  };
 }
 
 export default function QuizPage() {
@@ -37,6 +58,8 @@ export default function QuizPage() {
   const [hasAnswered, setHasAnswered] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [questionStartTime, setQuestionStartTime] = useState(Date.now());
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [serverResult, setServerResult] = useState<QuizResult | null>(null);
 
   // Get the actual quiz from data
   const quiz = quizId ? getQuizById(quizId) : undefined;
@@ -92,9 +115,75 @@ export default function QuizPage() {
       questionId: question.id,
       selectedOption,
       timeSpent: Math.floor((Date.now() - questionStartTime) / 1000),
-      isCorrect: selectedOption === question.correct_answer,
     };
     setAnswers([...answers, answer]);
+  };
+
+  // Submit quiz to server for secure scoring
+  const submitQuizToServer = async (finalAnswers: Answer[]) => {
+    setIsSubmitting(true);
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to submit the quiz.",
+          variant: "destructive",
+        });
+        navigate("/login");
+        return;
+      }
+
+      const response = await supabase.functions.invoke('submit-quiz', {
+        body: {
+          quizId: quiz.id,
+          answers: finalAnswers,
+          workforceGroup: currentWorkforceGroup || 'all_staff'
+        }
+      });
+
+      if (response.error) {
+        console.error('Quiz submission error:', response.error);
+        toast({
+          title: "Submission Failed",
+          description: response.error.message || "Failed to submit quiz. Please try again.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      const result = response.data;
+      
+      if (!result.success) {
+        toast({
+          title: "Submission Failed",
+          description: result.error || "Failed to submit quiz. Please try again.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Update local progress context with server-validated result
+      recordQuizResult(quiz.id, result.score, result.passed);
+      
+      // Store server result for display
+      setServerResult(result);
+      setShowResults(true);
+      setIsSubmitting(false);
+      
+    } catch (error) {
+      console.error('Quiz submission error:', error);
+      toast({
+        title: "Submission Failed",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+      setIsSubmitting(false);
+    }
   };
 
   const handleNext = () => {
@@ -104,18 +193,14 @@ export default function QuizPage() {
       setHasAnswered(false);
       setQuestionStartTime(Date.now());
     } else {
-      // Calculate final score and record result
-      const correctCount = [...answers, {
+      // Add the last answer and submit to server
+      const lastAnswer: Answer = {
         questionId: question.id,
         selectedOption: selectedOption!,
-        timeSpent: 0,
-        isCorrect: selectedOption === question.correct_answer,
-      }].filter(a => a.isCorrect).length;
-      const finalScore = Math.round((correctCount / quiz.questions.length) * 100);
-      const passed = finalScore >= quiz.passing_score;
-      
-      recordQuizResult(quiz.id, finalScore, passed);
-      setShowResults(true);
+        timeSpent: Math.floor((Date.now() - questionStartTime) / 1000),
+      };
+      const finalAnswers = [...answers, lastAnswer];
+      submitQuizToServer(finalAnswers);
     }
   };
 
@@ -130,20 +215,23 @@ export default function QuizPage() {
     }
   };
 
-  const calculateScore = () => {
-    let correct = 0;
-    answers.forEach((answer) => {
-      const q = quiz.questions.find((q) => q.id === answer.questionId);
-      if (q && q.correct_answer === answer.selectedOption) {
-        correct++;
-      }
-    });
-    return Math.round((correct / quiz.questions.length) * 100);
-  };
+  // Loading state while submitting to server
+  if (isSubmitting) {
+    return (
+      <DashboardLayout userRole="workforce_user" userName="Jane Smith">
+        <div className="flex min-h-[50vh] items-center justify-center">
+          <div className="text-center space-y-4">
+            <Loader2 className="h-12 w-12 animate-spin mx-auto text-accent" />
+            <p className="text-muted-foreground">Submitting quiz for secure scoring...</p>
+            <p className="text-xs text-muted-foreground">Your answers are being validated server-side</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
-  if (showResults) {
-    const score = calculateScore();
-    const passed = score >= quiz.passing_score;
+  if (showResults && serverResult) {
+    const { score, passed, passingScore } = serverResult;
 
     return (
       <DashboardLayout userRole="workforce_user" userName="Jane Smith">
@@ -170,11 +258,16 @@ export default function QuizPage() {
                 ? "You have passed the quiz and demonstrated HIPAA knowledge."
                 : "Review the materials and try again."}
             </p>
+            {serverResult.certificate && (
+              <p className="mt-2 text-sm text-success">
+                Certificate #{serverResult.certificate.certificate_number} has been generated
+              </p>
+            )}
           </div>
 
           {/* Score Card */}
           <div className="rounded-xl border border-border bg-card p-8 text-center">
-            <p className="text-sm text-muted-foreground mb-2">Your Score</p>
+            <p className="text-sm text-muted-foreground mb-2">Your Score (Server Validated)</p>
             <p className={cn(
               "text-5xl font-bold",
               passed ? "text-success" : "text-warning"
@@ -182,19 +275,25 @@ export default function QuizPage() {
               {score}%
             </p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Passing score: {quiz.passing_score}%
+              Passing score: {passingScore}%
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {serverResult.correctCount} of {serverResult.totalQuestions} correct
             </p>
           </div>
 
-          {/* Question Review */}
+          {/* Question Review - uses server-graded answers */}
           <div className="rounded-xl border border-border bg-card">
             <div className="border-b border-border p-5">
               <h2 className="font-semibold">Question Review</h2>
             </div>
             <div className="divide-y divide-border">
               {quiz.questions.map((q, index) => {
+                // Use server-graded result for correctness
+                const serverGrade = serverResult.gradedAnswers.find((a) => a.questionId === q.id);
+                const questionCorrect = serverGrade?.isCorrect ?? false;
+                // Find user's selected answer from local state for display
                 const userAnswer = answers.find((a) => a.questionId === q.id);
-                const questionCorrect = userAnswer?.selectedOption === q.correct_answer;
 
                 return (
                   <div key={q.id} className="p-5">
@@ -252,7 +351,7 @@ export default function QuizPage() {
             <Button variant="outline" onClick={() => navigate("/dashboard/quizzes")}>
               Return to Quizzes
             </Button>
-            {passed && (
+            {passed && serverResult.certificate && (
               <Button className="gap-2">
                 <CheckCircle2 className="h-4 w-4" />
                 View Certificate
