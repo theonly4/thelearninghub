@@ -23,11 +23,20 @@ function getCorsHeaders(requestOrigin: string | null): Record<string, string> {
 
 interface CreateOrgRequest {
   organizationName: string;
-  organizationSlug: string;
   adminEmail: string;
   adminFirstName: string;
   adminLastName: string;
   adminPassword: string;
+}
+
+// Generate slug from name
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .trim();
 }
 
 Deno.serve(async (req) => {
@@ -89,15 +98,18 @@ Deno.serve(async (req) => {
 
     // Parse request body
     const body: CreateOrgRequest = await req.json();
-    const { organizationName, organizationSlug, adminEmail, adminFirstName, adminLastName, adminPassword } = body;
+    const { organizationName, adminEmail, adminFirstName, adminLastName, adminPassword } = body;
 
     // Validate required fields
-    if (!organizationName || !organizationSlug || !adminEmail || !adminFirstName || !adminLastName || !adminPassword) {
+    if (!organizationName || !adminEmail || !adminFirstName || !adminLastName || !adminPassword) {
       return new Response(
         JSON.stringify({ error: "Missing required fields" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Auto-generate slug from organization name
+    const organizationSlug = generateSlug(organizationName);
 
     // Validate password strength
     if (adminPassword.length < 12) {
