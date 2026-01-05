@@ -64,11 +64,21 @@ export default function MfaEnrollPage() {
       if (error) throw error;
 
       if (data) {
+        console.log("MFA enrollment data received:", { 
+          hasQrCode: !!data.totp.qr_code, 
+          qrCodeLength: data.totp.qr_code?.length,
+          hasSecret: !!data.totp.secret 
+        });
+        
+        // The qr_code is returned as an SVG data URI
         setQrCode(data.totp.qr_code);
         setSecret(data.totp.secret);
         setFactorId(data.id);
+      } else {
+        throw new Error("No MFA enrollment data received");
       }
     } catch (error: any) {
+      console.error("MFA enrollment error:", error);
       toast({
         title: "MFA Setup Error",
         description: error.message || "Failed to initialize MFA setup.",
@@ -210,13 +220,26 @@ export default function MfaEnrollPage() {
                   <span>Scan this QR code with your authenticator app</span>
                 </div>
                 
-                {qrCode && (
+                {qrCode ? (
                   <div className="flex justify-center p-4 bg-white rounded-lg">
                     <img 
                       src={qrCode} 
                       alt="MFA QR Code" 
                       className="w-48 h-48"
+                      onError={(e) => {
+                        console.error("QR code image failed to load");
+                        e.currentTarget.style.display = 'none';
+                      }}
                     />
+                  </div>
+                ) : (
+                  <div className="flex justify-center p-4 bg-muted/50 rounded-lg">
+                    <div className="w-48 h-48 flex items-center justify-center text-muted-foreground text-sm text-center">
+                      <div>
+                        <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                        Loading QR code...
+                      </div>
+                    </div>
                   </div>
                 )}
 
