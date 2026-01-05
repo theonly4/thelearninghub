@@ -40,7 +40,34 @@ export default function LoginPage() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const navigateByRole = (role?: string | null) => {
+  const navigateByRole = async (userId: string) => {
+    // Check MFA status first
+    const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    
+    // Check if user has MFA factors enrolled
+    const { data: factorsData } = await supabase.auth.mfa.listFactors();
+    const verifiedFactors = factorsData?.totp?.filter(f => f.status === 'verified') || [];
+
+    // If at aal1 and has verified factors, need to verify
+    if (aalData?.currentLevel === 'aal1' && verifiedFactors.length > 0) {
+      navigate("/mfa-verify");
+      return;
+    }
+
+    // If at aal1 and no verified factors, need to enroll
+    if (aalData?.currentLevel === 'aal1' && verifiedFactors.length === 0) {
+      navigate("/mfa-enroll");
+      return;
+    }
+
+    // Fully authenticated with MFA (aal2), navigate by role
+    const { data: roleData } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    const role = roleData?.role;
     if (role === "platform_owner") {
       navigate("/platform");
       return;
@@ -66,25 +93,7 @@ export default function LoginPage() {
         return;
       }
 
-      const { data: roleData, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", session.user.id)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (!roleData?.role) {
-        toast({
-          title: "Account not configured",
-          description:
-            "This signed-in account has no assigned role yet. Please sign out, then sign up to create the Platform Owner account.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      navigateByRole(roleData.role);
+      await navigateByRole(session.user.id);
     } catch (error: any) {
       toast({
         title: "Couldn't load your account",
@@ -154,7 +163,7 @@ export default function LoginPage() {
         }
       } else {
         // Sign in
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
@@ -163,8 +172,13 @@ export default function LoginPage() {
 
         toast({
           title: "Welcome back",
-          description: "You have successfully signed in.",
+          description: "Verifying your identity...",
         });
+
+        // Redirect to MFA flow
+        if (data.session) {
+          await navigateByRole(data.session.user.id);
+        }
       }
     } catch (error: any) {
       toast({

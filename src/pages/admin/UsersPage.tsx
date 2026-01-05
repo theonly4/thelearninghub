@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { WorkforceGroupBadge } from "@/components/WorkforceGroupBadge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import {
   User,
   WorkforceGroup,
@@ -47,87 +48,15 @@ import {
   Clock,
   AlertCircle,
   BookOpen,
+  Loader2,
 } from "lucide-react";
 import { TrainingAssignmentDialog } from "@/components/admin/TrainingAssignmentDialog";
 import { cn } from "@/lib/utils";
 
-// Mock users data
-const mockUsers: User[] = [
-  {
-    id: "1",
-    organization_id: "org-1",
-    email: "john.doe@demo.com",
-    first_name: "John",
-    last_name: "Doe",
-    role: "workforce_user",
-    workforce_groups: ["clinical", "all_staff"],
-    status: "active",
-    mfa_enabled: true,
-    is_contractor: false,
-    created_at: "2024-11-01T10:00:00Z",
-    updated_at: "2024-12-15T14:30:00Z",
-  },
-  {
-    id: "2",
-    organization_id: "org-1",
-    email: "jane.smith@demo.com",
-    first_name: "Jane",
-    last_name: "Smith",
-    role: "workforce_user",
-    workforce_groups: ["administrative"],
-    status: "active",
-    mfa_enabled: true,
-    is_contractor: false,
-    created_at: "2024-10-15T09:00:00Z",
-    updated_at: "2024-12-10T11:20:00Z",
-  },
-  {
-    id: "3",
-    organization_id: "org-1",
-    email: "bob.wilson@demo.com",
-    first_name: "Bob",
-    last_name: "Wilson",
-    role: "workforce_user",
-    workforce_groups: [],
-    status: "pending_assignment",
-    mfa_enabled: false,
-    is_contractor: true,
-    created_at: "2024-12-20T08:00:00Z",
-    updated_at: "2024-12-20T08:00:00Z",
-  },
-  {
-    id: "4",
-    organization_id: "org-1",
-    email: "sarah.johnson@demo.com",
-    first_name: "Sarah",
-    last_name: "Johnson",
-    role: "org_admin",
-    workforce_groups: ["management", "all_staff"],
-    status: "active",
-    mfa_enabled: true,
-    is_contractor: false,
-    created_at: "2024-09-01T10:00:00Z",
-    updated_at: "2024-12-01T16:00:00Z",
-  },
-  {
-    id: "5",
-    organization_id: "org-1",
-    email: "mike.tech@demo.com",
-    first_name: "Mike",
-    last_name: "Chen",
-    role: "workforce_user",
-    workforce_groups: ["it", "all_staff"],
-    status: "active",
-    mfa_enabled: true,
-    is_contractor: false,
-    created_at: "2024-11-15T09:00:00Z",
-    updated_at: "2024-12-18T10:00:00Z",
-  },
-];
-
 export default function UsersPage() {
   const { toast } = useToast();
-  const [users, setUsers] = useState<User[]>(mockUsers);
+  const [users, setUsers] = useState<User[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<UserStatus | "all">("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -146,6 +75,60 @@ export default function UsersPage() {
   
   // Selected workforce groups for assignment dialog
   const [selectedWorkforceGroups, setSelectedWorkforceGroups] = useState<WorkforceGroup[]>([]);
+
+  // Fetch users from database
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      setIsLoadingUsers(true);
+      
+      // Fetch profiles with user roles
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*');
+
+      if (profilesError) throw profilesError;
+
+      // Fetch user roles
+      const { data: userRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id, role');
+
+      if (rolesError) throw rolesError;
+
+      // Create a map of user_id to role
+      const roleMap = new Map(userRoles?.map(r => [r.user_id, r.role]) || []);
+
+      // Transform profiles to User type
+      const transformedUsers: User[] = (profiles || []).map((profile) => ({
+        id: profile.id,
+        organization_id: profile.organization_id,
+        email: profile.email,
+        first_name: profile.first_name,
+        last_name: profile.last_name,
+        role: roleMap.get(profile.user_id) || 'workforce_user',
+        workforce_groups: (profile.workforce_groups || []) as WorkforceGroup[],
+        status: profile.status as UserStatus,
+        mfa_enabled: profile.mfa_enabled,
+        is_contractor: profile.is_contractor,
+        created_at: profile.created_at,
+        updated_at: profile.updated_at,
+      }));
+
+      setUsers(transformedUsers);
+    } catch (error: any) {
+      toast({
+        title: "Error loading users",
+        description: error.message || "Failed to load users.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
 
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
@@ -422,7 +405,21 @@ export default function UsersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredUsers.map((user) => (
+              {isLoadingUsers ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                    <p className="mt-2 text-sm text-muted-foreground">Loading users...</p>
+                  </TableCell>
+                </TableRow>
+              ) : filteredUsers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8">
+                    <p className="text-sm text-muted-foreground">No users found</p>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredUsers.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -506,7 +503,8 @@ export default function UsersPage() {
                     )}
                   </TableCell>
                 </TableRow>
-              ))}
+              ))
+              )}
             </TableBody>
           </Table>
         </div>

@@ -4,8 +4,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ProgressProvider } from "@/contexts/ProgressContext";
+import { MfaGuard } from "@/components/MfaGuard";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
+import MfaEnrollPage from "./pages/MfaEnrollPage";
+import MfaVerifyPage from "./pages/MfaVerifyPage";
 import DemoPage from "./pages/DemoPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import UserDashboard from "./pages/UserDashboard";
@@ -46,34 +49,41 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
+            {/* Public routes */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/mfa-enroll" element={<MfaEnrollPage />} />
+            <Route path="/mfa-verify" element={<MfaVerifyPage />} />
             <Route path="/demo" element={<DemoPage />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/users" element={<UsersPage />} />
-            <Route path="/admin/reports" element={<ReportsPage />} />
-            <Route path="/admin/help" element={<AdminHelpGuidePage />} />
-            <Route path="/dashboard" element={<UserDashboard />} />
-            <Route path="/dashboard/quizzes" element={<QuizzesPage />} />
-            <Route path="/dashboard/quiz/:quizId" element={<QuizPage />} />
-            <Route path="/dashboard/training" element={<TrainingMaterialsPage />} />
-            <Route path="/dashboard/training/:materialId" element={<TrainingMaterialPage />} />
             <Route path="/pending-setup" element={<PendingSetupPage />} />
             
-            {/* Employee Training Routes */}
-            <Route path="/employee/training" element={<EmployeeTrainingPage />} />
+            {/* Protected Admin Routes */}
+            <Route path="/admin" element={<MfaGuard><AdminDashboard /></MfaGuard>} />
+            <Route path="/admin/users" element={<MfaGuard><UsersPage /></MfaGuard>} />
+            <Route path="/admin/reports" element={<MfaGuard><ReportsPage /></MfaGuard>} />
+            <Route path="/admin/help" element={<MfaGuard><AdminHelpGuidePage /></MfaGuard>} />
             
-            {/* Platform Owner Routes */}
-            <Route path="/platform" element={<PlatformDashboard />} />
-            <Route path="/platform/questions" element={<QuestionBankPage />} />
-            <Route path="/platform/import" element={<ImportQuestionsPage />} />
-            <Route path="/platform/seed" element={<SeedQuestionsPage />} />
-            <Route path="/platform/materials" element={<TrainingMaterialsManagerPage />} />
-            <Route path="/platform/releases" element={<ContentReleasesPage />} />
-            <Route path="/platform/organizations" element={<OrganizationsPage />} />
-            <Route path="/platform/distribution" element={<QuestionDistributionPage />} />
-            <Route path="/platform/packages" element={<PackageManagerPage />} />
-            <Route path="/platform/help" element={<PlatformHelpGuidePage />} />
+            {/* Protected User Dashboard Routes */}
+            <Route path="/dashboard" element={<MfaGuard><UserDashboard /></MfaGuard>} />
+            <Route path="/dashboard/quizzes" element={<MfaGuard><QuizzesPage /></MfaGuard>} />
+            <Route path="/dashboard/quiz/:quizId" element={<MfaGuard><QuizPage /></MfaGuard>} />
+            <Route path="/dashboard/training" element={<MfaGuard><TrainingMaterialsPage /></MfaGuard>} />
+            <Route path="/dashboard/training/:materialId" element={<MfaGuard><TrainingMaterialPage /></MfaGuard>} />
+            
+            {/* Protected Employee Training Routes */}
+            <Route path="/employee/training" element={<MfaGuard><EmployeeTrainingPage /></MfaGuard>} />
+            
+            {/* Protected Platform Owner Routes */}
+            <Route path="/platform" element={<MfaGuard><PlatformDashboard /></MfaGuard>} />
+            <Route path="/platform/questions" element={<MfaGuard><QuestionBankPage /></MfaGuard>} />
+            <Route path="/platform/import" element={<MfaGuard><ImportQuestionsPage /></MfaGuard>} />
+            <Route path="/platform/seed" element={<MfaGuard><SeedQuestionsPage /></MfaGuard>} />
+            <Route path="/platform/materials" element={<MfaGuard><TrainingMaterialsManagerPage /></MfaGuard>} />
+            <Route path="/platform/releases" element={<MfaGuard><ContentReleasesPage /></MfaGuard>} />
+            <Route path="/platform/organizations" element={<MfaGuard><OrganizationsPage /></MfaGuard>} />
+            <Route path="/platform/distribution" element={<MfaGuard><QuestionDistributionPage /></MfaGuard>} />
+            <Route path="/platform/packages" element={<MfaGuard><PackageManagerPage /></MfaGuard>} />
+            <Route path="/platform/help" element={<MfaGuard><PlatformHelpGuidePage /></MfaGuard>} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
