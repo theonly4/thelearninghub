@@ -8,8 +8,6 @@ import {
   FileQuestion,
   Building2,
   Send,
-  BarChart3,
-  Settings,
   LogOut,
   ChevronLeft,
   Bell,
@@ -32,9 +30,7 @@ const platformOwnerNavItems = [
   { icon: Building2, label: "Organizations", href: "/platform/organizations" },
   { icon: GitBranch, label: "Question Distribution", href: "/platform/distribution" },
   { icon: Send, label: "Content Releases", href: "/platform/releases" },
-  { icon: BarChart3, label: "Analytics", href: "/platform/analytics" },
   { icon: HelpCircle, label: "How To Guide", href: "/platform/help" },
-  { icon: Settings, label: "Settings", href: "/platform/settings" },
 ];
 
 export function PlatformOwnerLayout({ 
