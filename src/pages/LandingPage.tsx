@@ -45,11 +45,6 @@ const features = [
     title: "Progress Tracking",
     description: "Monitor team completion rates, identify areas needing attention, and generate comprehensive reports.",
   },
-  {
-    icon: Award,
-    title: "Completion Certificates",
-    description: "Provide verifiable certificates that document training completion and demonstrate workforce competency.",
-  },
 ];
 
 const workforceGroups: WorkforceGroup[] = [

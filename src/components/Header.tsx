@@ -7,9 +7,6 @@ import { cn } from "@/lib/utils";
 
 const navLinks = [
   { href: "#features", label: "Features" },
-  { href: "#compliance", label: "Compliance" },
-  { href: "#pricing", label: "Pricing" },
-  { href: "#about", label: "About" },
 ];
 
 export function Header() {
