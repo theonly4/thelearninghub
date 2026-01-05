@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/Logo";
 import { useToast } from "@/hooks/use-toast";
@@ -10,26 +10,10 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { Shield, Smartphone, Copy, Check, ArrowLeft, Loader2 } from "lucide-react";
-
-function normalizeTotpQrCode(qr: string | null | undefined): string {
-  if (!qr) return "";
-
-  // Supabase prepends this prefix but does not URL-encode the SVG payload.
-  // Converting to base64 avoids rendering issues in some browsers.
-  const utf8Prefix = "data:image/svg+xml;utf-8,";
-  const svg = qr.startsWith(utf8Prefix) ? qr.slice(utf8Prefix.length) : qr;
-
-  if (svg.trim().startsWith("<svg")) {
-    const base64 = btoa(unescape(encodeURIComponent(svg)));
-    return `data:image/svg+xml;base64,${base64}`;
-  }
-
-  return qr;
-}
+import { QRCodeSVG } from "qrcode.react";
 
 export default function MfaEnrollPage() {
-  const [qrCode, setQrCode] = useState<string>("");
-  const [qrLoadFailed, setQrLoadFailed] = useState(false);
+  const [totpUri, setTotpUri] = useState<string>("");
   const [secret, setSecret] = useState<string>("");
   const [factorId, setFactorId] = useState<string>("");
   const [verifyCode, setVerifyCode] = useState("");
@@ -89,10 +73,12 @@ export default function MfaEnrollPage() {
         throw new Error("No MFA enrollment data received");
       }
 
-      setQrLoadFailed(false);
-      const normalizedQr = normalizeTotpQrCode(data.totp.qr_code);
-      setQrCode(normalizedQr);
-      if (!normalizedQr) setShowSecret(true);
+      // Build the TOTP URI for QR code generation
+      // Format: otpauth://totp/LABEL?secret=SECRET&issuer=ISSUER
+      const totpUriValue = data.totp.uri || 
+        `otpauth://totp/HIPAA%20Learning%20Hub:${encodeURIComponent(session.user.email || 'user')}?secret=${data.totp.secret}&issuer=HIPAA%20Learning%20Hub`;
+      
+      setTotpUri(totpUriValue);
       setSecret(data.totp.secret);
       setFactorId(data.id);
     } catch (error: any) {
@@ -237,33 +223,21 @@ export default function MfaEnrollPage() {
                   <span>Scan this QR code with your authenticator app</span>
                 </div>
                 
-                {qrCode && !qrLoadFailed ? (
-                  <div className="flex justify-center p-4 bg-card rounded-lg border border-border">
-                    <img
-                      src={qrCode}
-                      alt="Authenticator app QR code for MFA setup"
-                      className="w-48 h-48"
-                      onError={() => {
-                        setQrLoadFailed(true);
-                        setShowSecret(true);
-                      }}
+                {totpUri ? (
+                  <div className="flex justify-center p-4 bg-white rounded-lg border border-border">
+                    <QRCodeSVG
+                      value={totpUri}
+                      size={192}
+                      level="M"
+                      includeMargin={false}
                     />
                   </div>
                 ) : (
                   <div className="flex justify-center p-4 bg-muted/50 rounded-lg border border-border">
                     <div className="w-48 h-48 flex items-center justify-center text-muted-foreground text-sm text-center">
                       <div>
-                        {qrCode && qrLoadFailed ? (
-                          <>
-                            <p className="font-medium text-foreground">QR code couldn’t render</p>
-                            <p className="mt-1">Use the manual key below.</p>
-                          </>
-                        ) : (
-                          <>
-                            <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
-                            Loading QR code...
-                          </>
-                        )}
+                        <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                        Loading QR code...
                       </div>
                     </div>
                   </div>
