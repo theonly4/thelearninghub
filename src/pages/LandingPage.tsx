@@ -229,7 +229,7 @@ export default function LandingPage() {
               Ready to Elevate Your HIPAA Training?
             </h2>
             <p className="mb-8 text-white/80">
-              See how HIPAA Sentinel can help your organization build a 
+              See how HIPAA Learning Hub can help your organization build a 
               knowledgeable, confident workforce.
             </p>
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">

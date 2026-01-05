@@ -43,7 +43,7 @@ export function Footer() {
               OCR-audit defensible. Legally evidentiary.
             </p>
             <p className="mt-6 text-xs text-muted-foreground">
-              © {new Date().getFullYear()} HIPAA Sentinel. All rights reserved.
+              © {new Date().getFullYear()} HIPAA Learning Hub. All rights reserved.
             </p>
           </div>
 

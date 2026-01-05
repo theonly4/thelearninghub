@@ -52,7 +52,7 @@ export function Logo({
             textSizeClasses[size],
             textColor
           )}>
-            HIPAA Sentinel
+            HIPAA Learning Hub
           </span>
           {size !== "sm" && (
             <span className={cn(

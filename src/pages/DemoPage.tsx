@@ -69,7 +69,7 @@ export default function DemoPage() {
             </div>
             <h1 className="mb-4 text-2xl font-bold">Demo Request Received</h1>
             <p className="mb-8 text-muted-foreground">
-              Thank you for your interest in HIPAA Sentinel. Our team will contact 
+              Thank you for your interest in HIPAA Learning Hub. Our team will contact 
               you within 24 hours to schedule your personalized demo.
             </p>
             <Link to="/">
@@ -101,7 +101,7 @@ export default function DemoPage() {
             <div className="flex flex-col justify-center">
               <Logo size="lg" className="mb-8" />
               <h1 className="mb-4 text-3xl font-bold tracking-tight">
-                See HIPAA Sentinel in Action
+                See HIPAA Learning Hub in Action
               </h1>
               <p className="mb-8 text-lg text-muted-foreground">
                 Schedule a personalized demo to see how our platform delivers 

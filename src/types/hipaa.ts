@@ -1,4 +1,4 @@
-// HIPAA Sentinel Type Definitions
+// HIPAA Learning Hub Type Definitions
 // Multi-tenant HIPAA Training Platform
 
 export type WorkforceGroup = 
