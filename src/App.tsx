@@ -31,6 +31,7 @@ import PlatformHelpGuidePage from "./pages/platform/HelpGuidePage";
 
 // Admin Pages
 import AdminHelpGuidePage from "./pages/admin/HelpGuidePage";
+import ReportsPage from "./pages/admin/ReportsPage";
 
 // Employee Pages
 import EmployeeTrainingPage from "./pages/employee/TrainingPage";
@@ -50,6 +51,7 @@ const App = () => (
             <Route path="/demo" element={<DemoPage />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/users" element={<UsersPage />} />
+            <Route path="/admin/reports" element={<ReportsPage />} />
             <Route path="/admin/help" element={<AdminHelpGuidePage />} />
             <Route path="/dashboard" element={<UserDashboard />} />
             <Route path="/dashboard/quizzes" element={<QuizzesPage />} />
