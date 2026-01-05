@@ -1,11 +1,26 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+// Dynamic CORS origin validation - prevents cross-origin attacks while allowing legitimate requests
+function getCorsHeaders(requestOrigin: string | null): Record<string, string> {
+  const allowedOrigins = [
+    Deno.env.get('ALLOWED_ORIGIN'),
+    'https://yzuvyvtspdjmewuakpkn.lovableproject.com',
+    'https://lovable.dev',
+    'http://localhost:5173',
+    'http://localhost:8080',
+  ].filter(Boolean) as string[];
+
+  const origin = requestOrigin && allowedOrigins.some(allowed => 
+    requestOrigin === allowed || requestOrigin.endsWith('.lovable.dev') || requestOrigin.endsWith('.lovableproject.com')
+  ) ? requestOrigin : allowedOrigins[0] || 'https://lovable.dev';
+
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
+}
 
 const MASTER_QUIZ_TITLE = "Master Question Bank";
 
@@ -162,6 +177,9 @@ Return a JSON array of objects. Return ONLY the JSON array, no markdown or expla
 }
 
 serve(async (req) => {
+  const requestOrigin = req.headers.get('Origin');
+  const corsHeaders = getCorsHeaders(requestOrigin);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
