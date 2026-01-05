@@ -307,7 +307,9 @@ export type Database = {
           status: Database["public"]["Enums"]["user_status"]
           updated_at: string
           user_id: string
-          workforce_group: Database["public"]["Enums"]["workforce_group"] | null
+          workforce_groups:
+            | Database["public"]["Enums"]["workforce_group"][]
+            | null
         }
         Insert: {
           created_at?: string
@@ -321,8 +323,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
           user_id: string
-          workforce_group?:
-            | Database["public"]["Enums"]["workforce_group"]
+          workforce_groups?:
+            | Database["public"]["Enums"]["workforce_group"][]
             | null
         }
         Update: {
@@ -337,8 +339,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
           user_id?: string
-          workforce_group?:
-            | Database["public"]["Enums"]["workforce_group"]
+          workforce_groups?:
+            | Database["public"]["Enums"]["workforce_group"][]
             | null
         }
         Relationships: [

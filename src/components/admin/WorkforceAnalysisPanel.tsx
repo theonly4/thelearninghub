@@ -133,14 +133,14 @@ export function WorkforceAnalysisPanel() {
         
         const { data: profiles } = await supabase
           .from("profiles")
-          .select("user_id, first_name, last_name, workforce_group")
+          .select("user_id, first_name, last_name, workforce_groups")
           .eq("organization_id", orgs[0].id);
         
         if (profiles && profiles.length > 0) {
           setEmployees(profiles.map(p => ({
             id: p.user_id,
             name: `${p.first_name} ${p.last_name}`,
-            workforceGroup: (p.workforce_group || "all_staff") as WorkforceGroup
+            workforceGroup: ((p.workforce_groups as string[] || [])[0] || "all_staff") as WorkforceGroup
           })));
         }
       }
