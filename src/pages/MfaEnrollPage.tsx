@@ -11,8 +11,25 @@ import {
 } from "@/components/ui/input-otp";
 import { Shield, Smartphone, Copy, Check, ArrowLeft, Loader2 } from "lucide-react";
 
+function normalizeTotpQrCode(qr: string | null | undefined): string {
+  if (!qr) return "";
+
+  // Supabase prepends this prefix but does not URL-encode the SVG payload.
+  // Converting to base64 avoids rendering issues in some browsers.
+  const utf8Prefix = "data:image/svg+xml;utf-8,";
+  const svg = qr.startsWith(utf8Prefix) ? qr.slice(utf8Prefix.length) : qr;
+
+  if (svg.trim().startsWith("<svg")) {
+    const base64 = btoa(unescape(encodeURIComponent(svg)));
+    return `data:image/svg+xml;base64,${base64}`;
+  }
+
+  return qr;
+}
+
 export default function MfaEnrollPage() {
   const [qrCode, setQrCode] = useState<string>("");
+  const [qrLoadFailed, setQrLoadFailed] = useState(false);
   const [secret, setSecret] = useState<string>("");
   const [factorId, setFactorId] = useState<string>("");
   const [verifyCode, setVerifyCode] = useState("");
@@ -63,22 +80,17 @@ export default function MfaEnrollPage() {
 
       if (error) throw error;
 
-      if (data) {
-        console.log("MFA enrollment data received:", { 
-          hasQrCode: !!data.totp.qr_code, 
-          qrCodeLength: data.totp.qr_code?.length,
-          hasSecret: !!data.totp.secret 
-        });
-        
-        // The qr_code is returned as an SVG data URI
-        setQrCode(data.totp.qr_code);
-        setSecret(data.totp.secret);
-        setFactorId(data.id);
-      } else {
+      if (!data) {
         throw new Error("No MFA enrollment data received");
       }
+
+      setQrLoadFailed(false);
+      const normalizedQr = normalizeTotpQrCode(data.totp.qr_code);
+      setQrCode(normalizedQr);
+      if (!normalizedQr) setShowSecret(true);
+      setSecret(data.totp.secret);
+      setFactorId(data.id);
     } catch (error: any) {
-      console.error("MFA enrollment error:", error);
       toast({
         title: "MFA Setup Error",
         description: error.message || "Failed to initialize MFA setup.",
@@ -220,24 +232,33 @@ export default function MfaEnrollPage() {
                   <span>Scan this QR code with your authenticator app</span>
                 </div>
                 
-                {qrCode ? (
-                  <div className="flex justify-center p-4 bg-white rounded-lg">
-                    <img 
-                      src={qrCode} 
-                      alt="MFA QR Code" 
+                {qrCode && !qrLoadFailed ? (
+                  <div className="flex justify-center p-4 bg-card rounded-lg border border-border">
+                    <img
+                      src={qrCode}
+                      alt="Authenticator app QR code for MFA setup"
                       className="w-48 h-48"
-                      onError={(e) => {
-                        console.error("QR code image failed to load");
-                        e.currentTarget.style.display = 'none';
+                      onError={() => {
+                        setQrLoadFailed(true);
+                        setShowSecret(true);
                       }}
                     />
                   </div>
                 ) : (
-                  <div className="flex justify-center p-4 bg-muted/50 rounded-lg">
+                  <div className="flex justify-center p-4 bg-muted/50 rounded-lg border border-border">
                     <div className="w-48 h-48 flex items-center justify-center text-muted-foreground text-sm text-center">
                       <div>
-                        <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
-                        Loading QR code...
+                        {qrCode && qrLoadFailed ? (
+                          <>
+                            <p className="font-medium text-foreground">QR code couldn’t render</p>
+                            <p className="mt-1">Use the manual key below.</p>
+                          </>
+                        ) : (
+                          <>
+                            <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                            Loading QR code...
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
