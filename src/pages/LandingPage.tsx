@@ -149,7 +149,7 @@ export default function LandingPage() {
               Simple, Structured Learning
             </h2>
             <p className="text-lg text-muted-foreground">
-              A clear path from onboarding to certification. No confusion, no wasted time.
+              A clear path from onboarding to completion. No confusion, no wasted time.
             </p>
           </div>
           
