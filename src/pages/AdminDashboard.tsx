@@ -1,19 +1,22 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatCard } from "@/components/StatCard";
 import { WorkforceGroupBadge } from "@/components/WorkforceGroupBadge";
 import { WorkforceAnalysisPanel } from "@/components/admin/WorkforceAnalysisPanel";
+import { TrainingAssignmentDialog } from "@/components/admin/TrainingAssignmentDialog";
 import { Button } from "@/components/ui/button";
 import { 
   Users, 
-  FileText, 
+  BookOpen, 
   Award, 
   AlertTriangle,
   TrendingUp,
   Clock,
   CheckCircle2,
   ArrowRight,
-  UserPlus
+  UserPlus,
+  FileText
 } from "lucide-react";
 import { WorkforceGroup, WORKFORCE_GROUP_LABELS } from "@/types/hipaa";
 
@@ -45,6 +48,8 @@ const workforceBreakdown: { group: WorkforceGroup; count: number; compliance: nu
 ];
 
 export default function AdminDashboard() {
+  const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
+
   return (
     <DashboardLayout userRole="org_admin" userName="Admin User">
       <div className="space-y-8">
@@ -216,9 +221,13 @@ export default function AdminDashboard() {
                 <span>Manage Users</span>
               </Button>
             </Link>
-            <Button variant="outline" className="h-auto flex-col gap-2 py-4">
-              <FileText className="h-5 w-5" />
-              <span>Assign Quiz</span>
+            <Button 
+              variant="outline" 
+              className="h-auto flex-col gap-2 py-4"
+              onClick={() => setAssignmentDialogOpen(true)}
+            >
+              <BookOpen className="h-5 w-5" />
+              <span>Assign Training</span>
             </Button>
             <Button variant="outline" className="h-auto flex-col gap-2 py-4">
               <Award className="h-5 w-5" />
@@ -231,6 +240,14 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Training Assignment Dialog */}
+      <TrainingAssignmentDialog
+        open={assignmentDialogOpen}
+        onOpenChange={setAssignmentDialogOpen}
+        organizationId="demo-org"
+        onSuccess={() => setAssignmentDialogOpen(false)}
+      />
     </DashboardLayout>
   );
 }
