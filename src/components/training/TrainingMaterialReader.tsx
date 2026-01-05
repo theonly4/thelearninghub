@@ -33,6 +33,27 @@ import {
   Database,
   Network,
   Workflow,
+  Heart,
+  Check,
+  Clock,
+  User,
+  AlertCircle,
+  Wifi,
+  CheckCircle,
+  Download,
+  Folder,
+  DollarSign,
+  List,
+  MinusCircle,
+  Volume1,
+  Home,
+  Monitor,
+  Clipboard,
+  RefreshCw,
+  BarChart,
+  Archive,
+  Edit,
+  Search,
 } from "lucide-react";
 
 interface DiagramNode {
@@ -52,12 +73,48 @@ interface InfoCard {
   variant?: "default" | "warning" | "success" | "info";
 }
 
+// Visual element types for new content format
+interface VisualInfoCard {
+  title: string;
+  description: string;
+  icon?: string;
+}
+
+interface VisualHierarchyNode {
+  id: string;
+  label: string;
+  description?: string;
+  children?: string[];
+}
+
+interface VisualComparison {
+  header: string;
+  items: string[];
+}
+
+interface VisualProcessStep {
+  title: string;
+  description: string;
+}
+
+interface VisualElement {
+  type: "info_cards" | "hierarchy" | "comparison" | "process" | "flow";
+  title?: string;
+  items?: VisualInfoCard[];
+  nodes?: VisualHierarchyNode[];
+  columns?: VisualComparison[];
+  steps?: VisualProcessStep[];
+}
+
 interface ContentSection {
   title: string;
-  content: string;
+  // Support both old format (content string) and new format (paragraphs array)
+  content?: string;
+  paragraphs?: string[];
   hipaa_citations?: string[];
   key_points?: string[];
   icon?: string;
+  // Old format diagram
   diagram?: {
     type: "flow" | "hierarchy" | "comparison" | "process";
     title: string;
@@ -66,9 +123,11 @@ interface ContentSection {
     right?: { title: string; items: string[] };
     steps?: ProcessStep[];
   };
+  // New format visual
+  visual?: VisualElement;
   info_cards?: InfoCard[];
   callout?: {
-    type: "warning" | "tip" | "example" | "remember";
+    type: "warning" | "tip" | "example" | "remember" | "info" | "alert";
     title: string;
     content: string;
   };
@@ -109,6 +168,30 @@ const iconMap: Record<string, React.ElementType> = {
   eye: Eye,
   "file-text": FileText,
   "book-open": BookOpen,
+  heart: Heart,
+  check: Check,
+  clock: Clock,
+  user: User,
+  "alert-circle": AlertCircle,
+  wifi: Wifi,
+  "check-circle": CheckCircle,
+  download: Download,
+  folder: Folder,
+  "dollar-sign": DollarSign,
+  list: List,
+  "minus-circle": MinusCircle,
+  "volume-1": Volume1,
+  home: Home,
+  monitor: Monitor,
+  clipboard: Clipboard,
+  "refresh-cw": RefreshCw,
+  zap: Zap,
+  "bar-chart": BarChart,
+  archive: Archive,
+  edit: Edit,
+  search: Search,
+  info: Info,
+  lightbulb: Lightbulb,
 };
 
 function FlowDiagram({ title, nodes }: { title: string; nodes: DiagramNode[] }) {
@@ -306,6 +389,16 @@ function Callout({ type, title, content }: { type: string; title: string; conten
       icon: Zap,
       iconColor: "text-accent",
     },
+    info: {
+      bg: "bg-info/10 border-info/30",
+      icon: Info,
+      iconColor: "text-info",
+    },
+    alert: {
+      bg: "bg-destructive/10 border-destructive/30",
+      icon: AlertTriangle,
+      iconColor: "text-destructive",
+    },
   };
 
   const style = styles[type as keyof typeof styles] || styles.tip;
@@ -336,6 +429,145 @@ function StatsDisplay({ stats }: { stats: { value: string; label: string; descri
       ))}
     </div>
   );
+}
+
+// New format visual renderers
+function VisualInfoCardsRenderer({ items }: { items: VisualInfoCard[] }) {
+  return (
+    <div className="my-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {items.map((item, idx) => {
+        const IconComp = item.icon ? (iconMap[item.icon] || Shield) : Shield;
+        return (
+          <div key={idx} className="rounded-lg border border-border bg-card p-4">
+            <h5 className="font-medium text-sm mb-2 flex items-center gap-2 text-accent">
+              <IconComp className="h-4 w-4" />
+              {item.title}
+            </h5>
+            <p className="text-sm text-muted-foreground">{item.description}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function VisualHierarchyRenderer({ title, nodes }: { title?: string; nodes: VisualHierarchyNode[] }) {
+  // Find root nodes (those that are children of others or the first one)
+  const rootNode = nodes.find(n => n.children && n.children.length > 0) || nodes[0];
+  const childNodes = rootNode?.children?.map(childId => nodes.find(n => n.id === childId)).filter(Boolean) || [];
+
+  return (
+    <div className="my-6 p-4 rounded-xl border border-border bg-gradient-to-br from-primary/5 to-primary/10">
+      {title && (
+        <h4 className="text-sm font-semibold text-primary mb-4 flex items-center gap-2">
+          <Network className="h-4 w-4" />
+          {title}
+        </h4>
+      )}
+      <div className="flex flex-col items-center gap-3">
+        {rootNode && (
+          <div className="bg-card border border-primary bg-primary/10 rounded-lg px-4 py-3 text-center shadow-sm min-w-[200px]">
+            <p className="font-medium text-sm text-primary">{rootNode.label}</p>
+            {rootNode.description && (
+              <p className="text-xs text-muted-foreground mt-1">{rootNode.description}</p>
+            )}
+          </div>
+        )}
+        {childNodes.length > 0 && (
+          <>
+            <ArrowDown className="h-5 w-5 text-muted-foreground" />
+            <div className="flex flex-wrap justify-center gap-3">
+              {childNodes.map((node, idx) => node && (
+                <div key={idx} className="bg-card border border-border rounded-lg px-4 py-3 text-center shadow-sm min-w-[140px]">
+                  <p className="font-medium text-sm">{node.label}</p>
+                  {node.description && (
+                    <p className="text-xs text-muted-foreground mt-1">{node.description}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function VisualComparisonRenderer({ title, columns }: { title?: string; columns: VisualComparison[] }) {
+  return (
+    <div className="my-6 p-4 rounded-xl border border-border bg-muted/30">
+      {title && (
+        <h4 className="text-sm font-semibold mb-4 flex items-center gap-2">
+          <Scale className="h-4 w-4 text-accent" />
+          {title}
+        </h4>
+      )}
+      <div className="grid md:grid-cols-2 gap-4">
+        {columns.map((column, idx) => (
+          <div key={idx} className="bg-card border border-border rounded-lg p-4">
+            <h5 className={cn("font-medium text-sm mb-3", idx === 0 ? "text-primary" : "text-accent")}>
+              {column.header}
+            </h5>
+            <ul className="space-y-2">
+              {column.items.map((item, itemIdx) => (
+                <li key={itemIdx} className="flex items-start gap-2 text-sm">
+                  <CheckCircle2 className={cn("h-4 w-4 shrink-0 mt-0.5", idx === 0 ? "text-primary" : "text-accent")} />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function VisualProcessRenderer({ title, steps }: { title?: string; steps: VisualProcessStep[] }) {
+  return (
+    <div className="my-6 p-4 rounded-xl border border-border bg-gradient-to-br from-success/5 to-success/10">
+      {title && (
+        <h4 className="text-sm font-semibold text-success mb-4 flex items-center gap-2">
+          <ClipboardCheck className="h-4 w-4" />
+          {title}
+        </h4>
+      )}
+      <div className="space-y-3">
+        {steps.map((step, idx) => (
+          <div key={idx} className="flex gap-4">
+            <div className="flex flex-col items-center">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-success text-success-foreground font-bold text-sm">
+                {idx + 1}
+              </div>
+              {idx < steps.length - 1 && (
+                <div className="w-0.5 h-full bg-success/30 my-1" />
+              )}
+            </div>
+            <div className="flex-1 pb-4">
+              <h5 className="font-medium text-sm">{step.title}</h5>
+              <p className="text-sm text-muted-foreground mt-1">{step.description}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function renderVisual(visual: VisualElement) {
+  if (visual.type === "info_cards" && visual.items) {
+    return <VisualInfoCardsRenderer items={visual.items} />;
+  }
+  if (visual.type === "hierarchy" && visual.nodes) {
+    return <VisualHierarchyRenderer title={visual.title} nodes={visual.nodes} />;
+  }
+  if (visual.type === "comparison" && visual.columns) {
+    return <VisualComparisonRenderer title={visual.title} columns={visual.columns} />;
+  }
+  if ((visual.type === "process" || visual.type === "flow") && visual.steps) {
+    return <VisualProcessRenderer title={visual.title} steps={visual.steps} />;
+  }
+  return null;
 }
 
 export function TrainingMaterialReader({
@@ -433,21 +665,34 @@ export function TrainingMaterialReader({
           <StatsDisplay stats={currentSection.stats} />
         )}
 
-        {/* Main Content */}
+        {/* Main Content - Handle both old format (content string) and new format (paragraphs array) */}
         <div className="prose prose-sm max-w-none dark:prose-invert">
-          {currentSection.content.split("\n\n").map((paragraph, idx) => (
-            <p key={idx} className="text-foreground leading-relaxed">
-              {paragraph.split("\n").map((line, lineIdx) => (
-                <span key={lineIdx}>
-                  {line}
-                  {lineIdx < paragraph.split("\n").length - 1 && <br />}
-                </span>
-              ))}
-            </p>
-          ))}
+          {currentSection.paragraphs ? (
+            // New format: paragraphs array
+            currentSection.paragraphs.map((paragraph, idx) => (
+              <p key={idx} className="text-foreground leading-relaxed">
+                {paragraph}
+              </p>
+            ))
+          ) : currentSection.content ? (
+            // Old format: content string
+            currentSection.content.split("\n\n").map((paragraph, idx) => (
+              <p key={idx} className="text-foreground leading-relaxed">
+                {paragraph.split("\n").map((line, lineIdx) => (
+                  <span key={lineIdx}>
+                    {line}
+                    {lineIdx < paragraph.split("\n").length - 1 && <br />}
+                  </span>
+                ))}
+              </p>
+            ))
+          ) : null}
         </div>
 
-        {/* Diagram */}
+        {/* New format visual element */}
+        {currentSection.visual && renderVisual(currentSection.visual)}
+
+        {/* Old format Diagram */}
         {currentSection.diagram && (
           <>
             {currentSection.diagram.type === "flow" && currentSection.diagram.nodes && (
@@ -469,7 +714,7 @@ export function TrainingMaterialReader({
           </>
         )}
 
-        {/* Info Cards */}
+        {/* Old format Info Cards */}
         {currentSection.info_cards && currentSection.info_cards.length > 0 && (
           <InfoCards cards={currentSection.info_cards} />
         )}
