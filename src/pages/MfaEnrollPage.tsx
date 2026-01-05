@@ -66,16 +66,21 @@ export default function MfaEnrollPage() {
         return;
       }
 
-      // If unverified factor exists, unenroll it first
-      const unverifiedFactor = totpFactors.find(f => (f as any).status === 'unverified');
-      if (unverifiedFactor) {
-        await supabase.auth.mfa.unenroll({ factorId: unverifiedFactor.id });
+      // Unenroll ALL unverified factors to avoid name conflicts
+      const unverifiedFactors = totpFactors.filter(f => (f as any).status === 'unverified');
+      for (const factor of unverifiedFactors) {
+        try {
+          await supabase.auth.mfa.unenroll({ factorId: factor.id });
+        } catch (unenrollError) {
+          console.warn("Failed to unenroll factor:", factor.id, unenrollError);
+        }
       }
 
-      // Enroll new TOTP factor
+      // Enroll new TOTP factor with unique friendly name to avoid conflicts
       const { data, error } = await supabase.auth.mfa.enroll({
         factorType: 'totp',
         issuer: 'HIPAA Learning Hub',
+        friendlyName: `HIPAA-${Date.now()}`,
       });
 
       if (error) throw error;
