@@ -38,15 +38,25 @@ export default function DemoPage() {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate submission
-    setTimeout(() => {
-      setIsLoading(false);
-      setIsSubmitted(true);
-      toast({
-        title: "Demo Request Submitted",
-        description: "We'll be in touch within 24 hours.",
-      });
-    }, 1500);
+    // Build mailto link with form data
+    const subject = encodeURIComponent(`Demo Request from ${formData.firstName} ${formData.lastName}`);
+    const body = encodeURIComponent(
+      `Name: ${formData.firstName} ${formData.lastName}\n` +
+      `Email: ${formData.email}\n` +
+      `Organization: ${formData.organization}\n` +
+      `Role: ${formData.role}\n` +
+      `Workforce Size: ${formData.workforceSize}\n` +
+      `Message: ${formData.message || 'N/A'}`
+    );
+    
+    window.location.href = `mailto:yiplawcenter@protonmail.com?subject=${subject}&body=${body}`;
+    
+    setIsLoading(false);
+    setIsSubmitted(true);
+    toast({
+      title: "Demo Request Submitted",
+      description: "We'll be in touch within 24 hours.",
+    });
   };
 
   if (isSubmitted) {
