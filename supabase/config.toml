@@ -20,3 +20,6 @@ verify_jwt = true
 
 [functions.create-organization]
 verify_jwt = true
+
+[functions.complete-training-material]
+verify_jwt = false

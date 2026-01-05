@@ -121,50 +121,42 @@ export default function EmployeeTrainingPage() {
 
   async function handleCompleteMaterial(materialId: string) {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("organization_id")
-        .eq("user_id", user.id)
-        .single();
-
-      if (!profile) return;
-
       const material = materials.find((m) => m.id === materialId);
       if (!material) return;
 
-      // Insert progress record
-      const { error } = await supabase
-        .from("user_training_progress")
-        .insert({
-          user_id: user.id,
-          organization_id: profile.organization_id,
-          material_id: materialId,
-          version_at_completion: 1,
-        });
-
-      if (error && error.code !== "23505") throw error; // Ignore duplicate key error
-
-      setProgress([...progress, { material_id: materialId, completed_at: new Date().toISOString() }]);
-      
-      toast.success("Material completed", {
-        description: `You've completed "${material.title}"`,
+      // Use secure Edge Function for server-side validation
+      const { data, error } = await supabase.functions.invoke('complete-training-material', {
+        body: { material_id: materialId }
       });
 
-      // Check if all materials are complete
-      const completedCount = progress.length + 1;
-      if (completedCount >= materials.length && assignment) {
-        // Update assignment status
-        await supabase
-          .from("training_assignments")
-          .update({ status: "completed", completed_at: new Date().toISOString() })
-          .eq("id", assignment.id);
+      if (error) {
+        console.error("Error completing material:", error);
+        toast.error("Failed to save progress");
+        return;
+      }
 
-        toast.success("Training Complete!", {
-          description: "You can now take the quiz.",
+      if (!data.success) {
+        toast.error(data.error || "Failed to complete material");
+        return;
+      }
+
+      // Update local state
+      if (!data.already_completed) {
+        setProgress([...progress, { material_id: materialId, completed_at: new Date().toISOString() }]);
+        
+        toast.success("Material completed", {
+          description: `You've completed "${material.title}"`,
         });
+
+        // Check if all materials are complete
+        const completedCount = progress.length + 1;
+        if (completedCount >= materials.length && assignment) {
+          toast.success("Training Complete!", {
+            description: "You can now take the quiz.",
+          });
+        }
+      } else {
+        toast.info("Material already completed");
       }
 
       setSelectedMaterial(null);
