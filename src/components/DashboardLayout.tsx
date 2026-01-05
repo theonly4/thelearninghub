@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/Logo";
-import { Button } from "@/components/ui/button";
+import { useSignOut } from "@/hooks/useSignOut";
 import {
   LayoutDashboard,
   Users,
@@ -41,6 +41,7 @@ export function DashboardLayout({
 }: DashboardLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const location = useLocation();
+  const { signOut } = useSignOut();
 
   const navItems = userRole === "org_admin" ? adminNavItems : userNavItems;
 
@@ -95,13 +96,13 @@ export function DashboardLayout({
 
         {/* User Section */}
         <div className="border-t border-sidebar-border p-3">
-          <Link
-            to="/"
-            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          <button
+            onClick={signOut}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
           >
             <LogOut className="h-5 w-5 shrink-0" />
             {!sidebarCollapsed && <span>Sign Out</span>}
-          </Link>
+          </button>
         </div>
       </aside>
 
