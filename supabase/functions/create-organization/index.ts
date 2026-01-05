@@ -1,0 +1,254 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+interface CreateOrgRequest {
+  organizationName: string;
+  organizationSlug: string;
+  adminEmail: string;
+  adminFirstName: string;
+  adminLastName: string;
+  adminPassword: string;
+}
+
+Deno.serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    // Get the authorization header
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.error("No authorization header provided");
+      return new Response(
+        JSON.stringify({ error: "No authorization header" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Create authenticated client to verify the caller
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    // Get the calling user
+    const { data: { user }, error: userError } = await authClient.auth.getUser();
+    if (userError || !user) {
+      console.error("Failed to get user:", userError);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Request from user:", user.id);
+
+    // Verify the user is a platform owner
+    const { data: roleData, error: roleError } = await authClient
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("role", "platform_owner")
+      .single();
+
+    if (roleError || !roleData) {
+      console.error("User is not a platform owner:", roleError);
+      return new Response(
+        JSON.stringify({ error: "Only platform owners can create organizations" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Parse request body
+    const body: CreateOrgRequest = await req.json();
+    const { organizationName, organizationSlug, adminEmail, adminFirstName, adminLastName, adminPassword } = body;
+
+    // Validate required fields
+    if (!organizationName || !organizationSlug || !adminEmail || !adminFirstName || !adminLastName || !adminPassword) {
+      return new Response(
+        JSON.stringify({ error: "Missing required fields" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate password strength
+    if (adminPassword.length < 12) {
+      return new Response(
+        JSON.stringify({ error: "Password must be at least 12 characters" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Create service role client for admin operations
+    const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    // Check if slug already exists
+    const { data: existingOrg, error: slugCheckError } = await adminClient
+      .from("organizations")
+      .select("id")
+      .eq("slug", organizationSlug)
+      .single();
+
+    if (existingOrg) {
+      return new Response(
+        JSON.stringify({ error: "Organization slug already exists" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Check if email already exists
+    const { data: existingUser } = await adminClient.auth.admin.listUsers();
+    const emailExists = existingUser?.users?.some(u => u.email?.toLowerCase() === adminEmail.toLowerCase());
+    if (emailExists) {
+      return new Response(
+        JSON.stringify({ error: "An account with this email already exists" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Creating organization:", organizationName);
+
+    // Step 1: Create the organization
+    const { data: newOrg, error: orgError } = await adminClient
+      .from("organizations")
+      .insert({
+        name: organizationName,
+        slug: organizationSlug,
+      })
+      .select()
+      .single();
+
+    if (orgError) {
+      console.error("Failed to create organization:", orgError);
+      return new Response(
+        JSON.stringify({ error: "Failed to create organization: " + orgError.message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Organization created:", newOrg.id);
+
+    // Step 2: Create the admin user account
+    const { data: newUser, error: createUserError } = await adminClient.auth.admin.createUser({
+      email: adminEmail,
+      password: adminPassword,
+      email_confirm: true,
+      user_metadata: {
+        first_name: adminFirstName,
+        last_name: adminLastName,
+      },
+    });
+
+    if (createUserError) {
+      console.error("Failed to create user:", createUserError);
+      // Rollback: delete the organization
+      await adminClient.from("organizations").delete().eq("id", newOrg.id);
+      return new Response(
+        JSON.stringify({ error: "Failed to create admin user: " + createUserError.message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Admin user created:", newUser.user.id);
+
+    // Step 3: Create the profile (linked to the new organization, not the default one)
+    // First, delete any auto-created profile from the trigger
+    await adminClient.from("profiles").delete().eq("user_id", newUser.user.id);
+    
+    const { error: profileError } = await adminClient.from("profiles").insert({
+      user_id: newUser.user.id,
+      organization_id: newOrg.id,
+      email: adminEmail,
+      first_name: adminFirstName,
+      last_name: adminLastName,
+      status: "active",
+    });
+
+    if (profileError) {
+      console.error("Failed to create profile:", profileError);
+      // Rollback
+      await adminClient.auth.admin.deleteUser(newUser.user.id);
+      await adminClient.from("organizations").delete().eq("id", newOrg.id);
+      return new Response(
+        JSON.stringify({ error: "Failed to create profile: " + profileError.message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Profile created for user");
+
+    // Step 4: Assign org_admin role (delete any auto-assigned role first)
+    await adminClient.from("user_roles").delete().eq("user_id", newUser.user.id);
+    
+    const { error: roleInsertError } = await adminClient.from("user_roles").insert({
+      user_id: newUser.user.id,
+      organization_id: newOrg.id,
+      role: "org_admin",
+    });
+
+    if (roleInsertError) {
+      console.error("Failed to assign role:", roleInsertError);
+      // Rollback
+      await adminClient.from("profiles").delete().eq("user_id", newUser.user.id);
+      await adminClient.auth.admin.deleteUser(newUser.user.id);
+      await adminClient.from("organizations").delete().eq("id", newOrg.id);
+      return new Response(
+        JSON.stringify({ error: "Failed to assign admin role: " + roleInsertError.message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Role assigned: org_admin");
+
+    // Step 5: Create audit log
+    await adminClient.from("audit_logs").insert({
+      user_id: user.id,
+      organization_id: newOrg.id,
+      resource_type: "organization",
+      resource_id: newOrg.id,
+      action: "create",
+      metadata: {
+        organization_name: organizationName,
+        admin_email: adminEmail,
+        created_by: user.email,
+      },
+    });
+
+    console.log("Audit log created");
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        organization: {
+          id: newOrg.id,
+          name: newOrg.name,
+          slug: newOrg.slug,
+        },
+        admin: {
+          email: adminEmail,
+          firstName: adminFirstName,
+          lastName: adminLastName,
+        },
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+
+  } catch (error) {
+    console.error("Unexpected error:", error);
+    return new Response(
+      JSON.stringify({ error: "An unexpected error occurred" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});

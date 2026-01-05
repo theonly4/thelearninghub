@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.seed-questions]
 verify_jwt = true
+
+[functions.create-organization]
+verify_jwt = true
