@@ -5,6 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CheckCircle2, AlertCircle, Loader2, Database } from "lucide-react";
 import { PlatformOwnerLayout } from "@/components/PlatformOwnerLayout";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SeedResult {
   total: number;
@@ -28,6 +29,12 @@ export default function SeedQuestionsPage() {
     setProgress(10);
 
     try {
+      // Get the current session for authentication
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        throw new Error("Not authenticated. Please sign in again.");
+      }
+
       // Fetch the CSV from the public folder
       const csvResponse = await fetch("/data/questions.csv");
       if (!csvResponse.ok) {
@@ -40,13 +47,14 @@ export default function SeedQuestionsPage() {
       
       setProgress(50);
 
-      // Call the edge function with the CSV content
+      // Call the edge function with auth header
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/seed-questions`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({ csv_content: csvContent }),
         }

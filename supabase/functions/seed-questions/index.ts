@@ -254,9 +254,54 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    
-    // Use service role for seeding - this is a one-time operation
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    // Verify authentication
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.error("No authorization header provided");
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Verify user authentication using anon key client
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
+    if (authError || !user) {
+      console.error("Auth error:", authError?.message || "No user found");
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    console.log("Authenticated user:", user.id);
+
+    // Use service role client for role check and database operations
     const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Verify platform_owner role
+    const { data: roleData, error: roleError } = await supabaseClient
+      .from("user_roles")
+      .select("role, organization_id")
+      .eq("user_id", user.id)
+      .eq("role", "platform_owner")
+      .maybeSingle();
+
+    if (roleError || !roleData) {
+      console.error("Role check failed:", roleError?.message || "Not a platform owner");
+      return new Response(
+        JSON.stringify({ error: "Only platform owners can seed questions" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Role verified: platform_owner");
 
     const body = await req.json();
     let { csv_content, csv_url } = body;
@@ -460,6 +505,22 @@ serve(async (req) => {
     if (results.errors.length > 0) {
       console.log(`First 10 errors: ${results.errors.slice(0, 10).join("; ")}`);
     }
+
+    // Audit log the seeding operation
+    await supabaseClient.from("audit_logs").insert({
+      user_id: user.id,
+      organization_id: roleData.organization_id,
+      resource_type: "quiz_seeding",
+      action: "seed_questions",
+      metadata: { 
+        total: results.total, 
+        imported: results.imported,
+        skipped: results.skipped,
+        topics_created: results.topics_created,
+      },
+    });
+
+    console.log("Audit log created");
 
     return new Response(JSON.stringify(results), {
       status: 200,
