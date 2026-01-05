@@ -71,7 +71,6 @@ interface OrgStats {
 
 interface CreatedCredentials {
   organizationName: string;
-  organizationSlug: string;
   adminEmail: string;
   adminFirstName: string;
   adminLastName: string;
@@ -81,9 +80,6 @@ interface CreatedCredentials {
 // Form schema
 const addOrgSchema = z.object({
   organizationName: z.string().min(2, "Organization name must be at least 2 characters"),
-  organizationSlug: z.string()
-    .min(2, "Slug must be at least 2 characters")
-    .regex(/^[a-z0-9-]+$/, "Slug can only contain lowercase letters, numbers, and hyphens"),
   adminEmail: z.string().email("Please enter a valid email address"),
   adminFirstName: z.string().min(1, "First name is required"),
   adminLastName: z.string().min(1, "Last name is required"),
@@ -118,15 +114,6 @@ function generateSecurePassword(): string {
   return password.split('').sort(() => Math.random() - 0.5).join('');
 }
 
-// Generate slug from name
-function generateSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .trim();
-}
 
 export default function OrganizationsPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -145,20 +132,11 @@ export default function OrganizationsPage() {
     resolver: zodResolver(addOrgSchema),
     defaultValues: {
       organizationName: "",
-      organizationSlug: "",
       adminEmail: "",
       adminFirstName: "",
       adminLastName: "",
     },
   });
-
-  // Auto-generate slug when name changes
-  const watchName = form.watch("organizationName");
-  useEffect(() => {
-    if (watchName && !form.getValues("organizationSlug")) {
-      form.setValue("organizationSlug", generateSlug(watchName));
-    }
-  }, [watchName, form]);
 
   useEffect(() => {
     fetchData();
@@ -227,7 +205,6 @@ export default function OrganizationsPage() {
       const response = await supabase.functions.invoke("create-organization", {
         body: {
           organizationName: values.organizationName,
-          organizationSlug: values.organizationSlug,
           adminEmail: values.adminEmail,
           adminFirstName: values.adminFirstName,
           adminLastName: values.adminLastName,
@@ -246,7 +223,6 @@ export default function OrganizationsPage() {
       // Success - store credentials and show success dialog
       setCreatedCredentials({
         organizationName: values.organizationName,
-        organizationSlug: values.organizationSlug,
         adminEmail: values.adminEmail,
         adminFirstName: values.adminFirstName,
         adminLastName: values.adminLastName,
@@ -296,8 +272,7 @@ Please change your password after first login.`;
   }
 
   const filteredOrgs = organizations.filter((org) =>
-    org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    org.slug.toLowerCase().includes(searchTerm.toLowerCase())
+    org.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalUsers = Array.from(orgStats.values()).reduce((sum, stats) => sum + stats.userCount, 0);
@@ -338,22 +313,6 @@ Please change your password after first login.`;
                         <FormControl>
                           <Input placeholder="Acme Healthcare" {...field} />
                         </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="organizationSlug"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>URL Slug</FormLabel>
-                        <FormControl>
-                          <Input placeholder="acme-healthcare" {...field} />
-                        </FormControl>
-                        <FormDescription>
-                          Unique identifier for the organization (lowercase, no spaces)
-                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -443,7 +402,6 @@ Please change your password after first login.`;
                     <div>
                       <Label className="text-xs text-muted-foreground">Organization</Label>
                       <p className="font-medium">{createdCredentials.organizationName}</p>
-                      <p className="text-sm text-muted-foreground">/{createdCredentials.organizationSlug}</p>
                     </div>
                   </div>
                   
@@ -622,10 +580,7 @@ Please change your password after first login.`;
                     return (
                       <TableRow key={org.id}>
                         <TableCell>
-                          <div>
-                            <p className="font-medium">{org.name}</p>
-                            <p className="text-sm text-muted-foreground">/{org.slug}</p>
-                          </div>
+                          <p className="font-medium">{org.name}</p>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1.5">
