@@ -153,8 +153,8 @@ export default function LandingPage() {
             </p>
           </div>
           
-          <div className="mx-auto max-w-4xl">
-            <div className="grid gap-8 md:grid-cols-3">
+          <div className="mx-auto max-w-3xl">
+            <div className="grid gap-8 md:grid-cols-2">
               <div className="text-center">
                 <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-white text-xl font-bold">
                   1
@@ -171,15 +171,6 @@ export default function LandingPage() {
                 <h3 className="mb-2 text-lg font-semibold">Complete Training</h3>
                 <p className="text-sm text-muted-foreground">
                   Team members work through role-specific materials at their own pace, then take progressive quizzes.
-                </p>
-              </div>
-              <div className="text-center">
-                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-white text-xl font-bold">
-                  3
-                </div>
-                <h3 className="mb-2 text-lg font-semibold">Earn Certification</h3>
-                <p className="text-sm text-muted-foreground">
-                  Upon passing all quizzes, team members receive verifiable certificates documenting their training.
                 </p>
               </div>
             </div>
