@@ -96,8 +96,17 @@ Deno.serve(async (req) => {
     const body: CreateOrgRequest = await req.json();
     const { organizationName, adminEmail, adminFirstName, adminLastName, adminPassword } = body;
 
+    console.log("Request body received:", {
+      organizationName,
+      adminEmail,
+      adminFirstName,
+      adminLastName,
+      hasPassword: !!adminPassword,
+    });
+
     // Validate required fields
     if (!organizationName || !adminEmail || !adminFirstName || !adminLastName || !adminPassword) {
+      console.error("Missing required fields");
       return new Response(
         JSON.stringify({ error: "Missing required fields" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -106,9 +115,11 @@ Deno.serve(async (req) => {
 
     // Auto-generate slug from organization name
     const organizationSlug = generateSlug(organizationName);
+    console.log("Generated slug:", organizationSlug);
 
     // Validate password strength
     if (adminPassword.length < 12) {
+      console.error("Password too short");
       return new Response(
         JSON.stringify({ error: "Password must be at least 12 characters" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -120,6 +131,8 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
+    console.log("Checking if slug already exists...");
+
     // Check if slug already exists
     const { data: existingOrg, error: slugCheckError } = await adminClient
       .from("organizations")
@@ -127,22 +140,21 @@ Deno.serve(async (req) => {
       .eq("slug", organizationSlug)
       .single();
 
+    if (slugCheckError && slugCheckError.code !== "PGRST116") {
+      console.error("Slug check error:", slugCheckError);
+    }
+
     if (existingOrg) {
+      console.error("Organization slug already exists");
       return new Response(
         JSON.stringify({ error: "Organization slug already exists" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Check if email already exists
-    const { data: existingUser } = await adminClient.auth.admin.listUsers();
-    const emailExists = existingUser?.users?.some(u => u.email?.toLowerCase() === adminEmail.toLowerCase());
-    if (emailExists) {
-      return new Response(
-        JSON.stringify({ error: "An account with this email already exists" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // Check if email already exists by attempting to create and catching duplicate error
+    // This avoids fetching all users which can timeout
+    console.log("Checking if email exists:", adminEmail);
 
     console.log("Creating organization:", organizationName);
 
