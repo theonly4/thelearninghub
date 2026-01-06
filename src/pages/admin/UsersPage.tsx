@@ -18,187 +18,258 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  User,
   WorkforceGroup,
   UserStatus,
   WORKFORCE_GROUP_LABELS,
-  USER_STATUS_LABELS,
 } from "@/types/hipaa";
 import {
   Search,
-  Plus,
   UserPlus,
   Shield,
-  MoreHorizontal,
   CheckCircle2,
   Clock,
   AlertCircle,
-  BookOpen,
   Loader2,
+  KeyRound,
+  Trash2,
+  Copy,
 } from "lucide-react";
 import { TrainingAssignmentDialog } from "@/components/admin/TrainingAssignmentDialog";
 import { cn } from "@/lib/utils";
 
+interface Employee {
+  id: string;
+  user_id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  workforce_groups: WorkforceGroup[];
+  status: UserStatus;
+  mfa_enabled: boolean;
+  is_contractor: boolean;
+}
+
 export default function UsersPage() {
   const { toast } = useToast();
-  const [users, setUsers] = useState<User[]>([]);
-  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterStatus, setFilterStatus] = useState<UserStatus | "all">("all");
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
-  const [isTrainingDialogOpen, setIsTrainingDialogOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-
-  // New user form state
-  const [newUser, setNewUser] = useState({
-    email: "",
-    first_name: "",
-    last_name: "",
-    workforce_groups: [] as WorkforceGroup[],
-    is_contractor: false,
-  });
   
-  // Selected workforce groups for assignment dialog
-  const [selectedWorkforceGroups, setSelectedWorkforceGroups] = useState<WorkforceGroup[]>([]);
+  // Dialog states
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isTrainingDialogOpen, setIsTrainingDialogOpen] = useState(false);
+  const [isCredentialsDialogOpen, setIsCredentialsDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
+  
+  // Form state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [newEmployee, setNewEmployee] = useState({
+    email: "",
+    firstName: "",
+    lastName: "",
+    workforceGroups: [] as WorkforceGroup[],
+    isContractor: false,
+  });
 
-  // Fetch users from database
   useEffect(() => {
-    fetchUsers();
+    fetchEmployees();
   }, []);
 
-  const fetchUsers = async () => {
+  const fetchEmployees = async () => {
     try {
-      setIsLoadingUsers(true);
+      setIsLoading(true);
       
-      // Fetch profiles with user roles
-      const { data: profiles, error: profilesError } = await supabase
+      // Get current user's org
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
         .from('profiles')
-        .select('*');
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .single();
 
-      if (profilesError) throw profilesError;
+      if (!profile) return;
 
-      // Fetch user roles
-      const { data: userRoles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role');
+      // Fetch employees in org (exclude current user)
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('organization_id', profile.organization_id)
+        .neq('user_id', user.id);
 
-      if (rolesError) throw rolesError;
+      if (error) throw error;
 
-      // Create a map of user_id to role
-      const roleMap = new Map(userRoles?.map(r => [r.user_id, r.role]) || []);
-
-      // Transform profiles to User type
-      const transformedUsers: User[] = (profiles || []).map((profile) => ({
-        id: profile.id,
-        organization_id: profile.organization_id,
-        email: profile.email,
-        first_name: profile.first_name,
-        last_name: profile.last_name,
-        role: roleMap.get(profile.user_id) || 'workforce_user',
-        workforce_groups: (profile.workforce_groups || []) as WorkforceGroup[],
-        status: profile.status as UserStatus,
-        mfa_enabled: profile.mfa_enabled,
-        is_contractor: profile.is_contractor,
-        created_at: profile.created_at,
-        updated_at: profile.updated_at,
+      const employeeList: Employee[] = (profiles || []).map((p) => ({
+        id: p.id,
+        user_id: p.user_id,
+        email: p.email,
+        first_name: p.first_name || '',
+        last_name: p.last_name || '',
+        workforce_groups: (p.workforce_groups || []) as WorkforceGroup[],
+        status: p.status as UserStatus,
+        mfa_enabled: p.mfa_enabled || false,
+        is_contractor: p.is_contractor || false,
       }));
 
-      setUsers(transformedUsers);
+      setEmployees(employeeList);
     } catch (error: any) {
       toast({
-        title: "Error loading users",
-        description: error.message || "Failed to load users.",
+        title: "Error loading employees",
+        description: error.message,
         variant: "destructive",
       });
     } finally {
-      setIsLoadingUsers(false);
+      setIsLoading(false);
     }
   };
 
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch =
-      user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      `${user.first_name} ${user.last_name}`.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = filterStatus === "all" || user.status === filterStatus;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredEmployees = employees.filter((emp) =>
+    emp.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-  const pendingCount = users.filter((u) => u.status === "pending_assignment").length;
-
-  const handleAddUser = () => {
-    if (!newUser.email || !newUser.first_name || !newUser.last_name || newUser.workforce_groups.length === 0) {
+  const handleAddEmployee = async () => {
+    if (!newEmployee.email || !newEmployee.firstName || !newEmployee.lastName) {
       toast({
-        title: "Missing Required Fields",
-        description: "Please fill in all required fields including at least one workforce group.",
+        title: "Missing Fields",
+        description: "Please fill in email, first name, and last name.",
         variant: "destructive",
       });
       return;
     }
 
-    const newUserData: User = {
-      id: `user-${Date.now()}`,
-      organization_id: "org-1",
-      email: newUser.email,
-      first_name: newUser.first_name,
-      last_name: newUser.last_name,
-      role: "workforce_user",
-      workforce_groups: newUser.workforce_groups,
-      status: "active",
-      mfa_enabled: false,
-      is_contractor: newUser.is_contractor,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    setIsSubmitting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await supabase.functions.invoke('manage-employee', {
+        body: {
+          action: 'create',
+          email: newEmployee.email,
+          firstName: newEmployee.firstName,
+          lastName: newEmployee.lastName,
+          workforceGroups: newEmployee.workforceGroups,
+          isContractor: newEmployee.isContractor,
+        },
+      });
 
-    setUsers([...users, newUserData]);
-    setIsAddDialogOpen(false);
-    setNewUser({
-      email: "",
-      first_name: "",
-      last_name: "",
-      workforce_groups: [],
-      is_contractor: false,
-    });
+      if (response.error) throw new Error(response.error.message);
+      if (response.data?.error) throw new Error(response.data.error);
 
-    toast({
-      title: "User Added",
-      description: `${newUserData.first_name} ${newUserData.last_name} has been added with ${newUserData.workforce_groups.length} workforce group(s).`,
-    });
+      // Show credentials
+      setCredentials({
+        email: newEmployee.email,
+        password: response.data.temporaryPassword,
+      });
+      setIsAddDialogOpen(false);
+      setIsCredentialsDialogOpen(true);
+      
+      // Reset form
+      setNewEmployee({
+        email: "",
+        firstName: "",
+        lastName: "",
+        workforceGroups: [],
+        isContractor: false,
+      });
+      
+      fetchEmployees();
+    } catch (error: any) {
+      toast({
+        title: "Failed to add employee",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleAssignWorkforce = (groups: WorkforceGroup[]) => {
-    if (!selectedUser || groups.length === 0) return;
+  const handleResetPassword = async (emp: Employee) => {
+    setIsSubmitting(true);
+    try {
+      const response = await supabase.functions.invoke('manage-employee', {
+        body: {
+          action: 'reset_password',
+          employeeUserId: emp.user_id,
+        },
+      });
 
-    setUsers(
-      users.map((u) =>
-        u.id === selectedUser.id
-          ? { ...u, workforce_groups: groups, status: "active" as UserStatus }
-          : u
-      )
-    );
+      if (response.error) throw new Error(response.error.message);
+      if (response.data?.error) throw new Error(response.data.error);
 
-    setIsAssignDialogOpen(false);
-    setSelectedWorkforceGroups([]);
-    toast({
-      title: "Workforce Groups Assigned",
-      description: `${selectedUser.first_name} ${selectedUser.last_name} has been assigned to ${groups.length} workforce group(s).`,
-    });
-    setSelectedUser(null);
+      setCredentials({
+        email: emp.email,
+        password: response.data.newPassword,
+      });
+      setIsCredentialsDialogOpen(true);
+    } catch (error: any) {
+      toast({
+        title: "Failed to reset password",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteEmployee = async () => {
+    if (!selectedEmployee) return;
+    
+    setIsSubmitting(true);
+    try {
+      const response = await supabase.functions.invoke('manage-employee', {
+        body: {
+          action: 'delete',
+          employeeUserId: selectedEmployee.user_id,
+        },
+      });
+
+      if (response.error) throw new Error(response.error.message);
+      if (response.data?.error) throw new Error(response.data.error);
+
+      toast({
+        title: "Employee deleted",
+        description: `${selectedEmployee.first_name} ${selectedEmployee.last_name} has been removed.`,
+      });
+      
+      setIsDeleteDialogOpen(false);
+      setSelectedEmployee(null);
+      fetchEmployees();
+    } catch (error: any) {
+      toast({
+        title: "Failed to delete employee",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: "Copied to clipboard" });
   };
 
   const getStatusIcon = (status: UserStatus) => {
@@ -213,387 +284,282 @@ export default function UsersPage() {
   };
 
   return (
-    <DashboardLayout userRole="org_admin" userName="Sarah Johnson">
+    <DashboardLayout userRole="org_admin" userName="Admin">
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">User Management</h1>
-            <p className="text-muted-foreground">
-              Manage workforce members and assign training paths
-            </p>
+            <h1 className="text-2xl font-bold">Employees</h1>
+            <p className="text-muted-foreground">Manage your organization's workforce</p>
           </div>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              className="gap-2"
-              onClick={() => setIsTrainingDialogOpen(true)}
-            >
-              <BookOpen className="h-4 w-4" />
-              Assign Training
-            </Button>
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2">
-                  <UserPlus className="h-4 w-4" />
-                  Add User
-                </Button>
-              </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New User</DialogTitle>
-                <DialogDescription>
-                  Add a workforce member and assign their training path. Workforce group is required per 45 CFR §164.530(b).
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="first_name">First Name *</Label>
-                    <Input
-                      id="first_name"
-                      value={newUser.first_name}
-                      onChange={(e) =>
-                        setNewUser({ ...newUser, first_name: e.target.value })
-                      }
-                      placeholder="John"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="last_name">Last Name *</Label>
-                    <Input
-                      id="last_name"
-                      value={newUser.last_name}
-                      onChange={(e) =>
-                        setNewUser({ ...newUser, last_name: e.target.value })
-                      }
-                      placeholder="Doe"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={newUser.email}
-                    onChange={(e) =>
-                      setNewUser({ ...newUser, email: e.target.value })
-                    }
-                    placeholder="john.doe@company.com"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Workforce Groups *</Label>
-                  <div className="space-y-2 max-h-48 overflow-y-auto border border-border rounded-lg p-3">
-                    {(Object.keys(WORKFORCE_GROUP_LABELS) as WorkforceGroup[]).map((group) => (
-                      <label
-                        key={group}
-                        className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer"
-                      >
-                        <Checkbox
-                          checked={newUser.workforce_groups.includes(group)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setNewUser({ ...newUser, workforce_groups: [...newUser.workforce_groups, group] });
-                            } else {
-                              setNewUser({ ...newUser, workforce_groups: newUser.workforce_groups.filter(g => g !== group) });
-                            }
-                          }}
-                        />
-                        <span className="text-sm">{WORKFORCE_GROUP_LABELS[group]}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Select all applicable workforce groups. This determines which training materials and quizzes apply.
-                  </p>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="is_contractor"
-                    checked={newUser.is_contractor}
-                    onCheckedChange={(checked) =>
-                      setNewUser({ ...newUser, is_contractor: checked as boolean })
-                    }
-                  />
-                  <Label htmlFor="is_contractor" className="text-sm font-normal">
-                    This user is a contractor
-                  </Label>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleAddUser}>Add User</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          </div>
+          <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2">
+            <UserPlus className="h-4 w-4" />
+            Add Employee
+          </Button>
         </div>
 
-        {/* Training Assignment Dialog */}
-        <TrainingAssignmentDialog
-          open={isTrainingDialogOpen}
-          onOpenChange={setIsTrainingDialogOpen}
-        />
-
-        {/* Pending Assignment Alert */}
-        {pendingCount > 0 && (
-          <div className="flex items-center gap-3 rounded-xl border border-warning/30 bg-warning/5 p-4">
-            <Clock className="h-5 w-5 text-warning" />
-            <div className="flex-1">
-              <p className="font-medium text-warning">
-                {pendingCount} user{pendingCount > 1 ? "s" : ""} pending workforce assignment
-              </p>
-              <p className="text-sm text-muted-foreground">
-                These users cannot access training until assigned to a workforce group.
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-warning/30 text-warning hover:bg-warning/10"
-              onClick={() => setFilterStatus("pending_assignment")}
-            >
-              View Pending
-            </Button>
-          </div>
-        )}
-
-        {/* Filters */}
-        <div className="flex flex-col gap-4 sm:flex-row">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search by name or email..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Select
-            value={filterStatus}
-            onValueChange={(value) => setFilterStatus(value as UserStatus | "all")}
-          >
-            <SelectTrigger className="w-full sm:w-48">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              {(Object.keys(USER_STATUS_LABELS) as UserStatus[]).map((status) => (
-                <SelectItem key={status} value={status}>
-                  {USER_STATUS_LABELS[status]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* Search */}
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search by name or email..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
         </div>
 
-        {/* Users Table */}
-        <div className="rounded-xl border border-border bg-card">
+        {/* Table */}
+        <div className="rounded-xl border bg-card">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>User</TableHead>
+                <TableHead>Employee</TableHead>
                 <TableHead>Workforce Group</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Role</TableHead>
                 <TableHead>MFA</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoadingUsers ? (
+              {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
+                  <TableCell colSpan={5} className="text-center py-8">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
-                    <p className="mt-2 text-sm text-muted-foreground">Loading users...</p>
                   </TableCell>
                 </TableRow>
-              ) : filteredUsers.length === 0 ? (
+              ) : filteredEmployees.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
-                    <p className="text-sm text-muted-foreground">No users found</p>
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    {employees.length === 0 ? "No employees yet. Add your first employee above." : "No employees match your search."}
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/10 text-accent font-medium">
-                        {user.first_name.charAt(0)}
-                        {user.last_name.charAt(0)}
+                filteredEmployees.map((emp) => (
+                  <TableRow key={emp.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/10 text-accent font-medium">
+                          {emp.first_name.charAt(0)}{emp.last_name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-medium">
+                            {emp.first_name} {emp.last_name}
+                            {emp.is_contractor && <span className="ml-2 text-xs text-muted-foreground">(Contractor)</span>}
+                          </p>
+                          <p className="text-sm text-muted-foreground">{emp.email}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium">
-                          {user.first_name} {user.last_name}
-                          {user.is_contractor && (
-                            <span className="ml-2 text-xs text-muted-foreground">
-                              (Contractor)
-                            </span>
-                          )}
-                        </p>
-                        <p className="text-sm text-muted-foreground">{user.email}</p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {user.workforce_groups.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {user.workforce_groups.map((group) => (
-                          <WorkforceGroupBadge key={group} group={group} size="sm" />
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-sm text-muted-foreground italic">
-                        Not assigned
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {getStatusIcon(user.status)}
-                      <span
-                        className={cn(
-                          "text-sm",
-                          user.status === "active" && "text-success",
-                          user.status === "pending_assignment" && "text-warning",
-                          user.status === "suspended" && "text-destructive"
-                        )}
-                      >
-                        {USER_STATUS_LABELS[user.status]}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={cn(
-                        "text-sm",
-                        user.role === "org_admin" && "font-medium text-accent"
+                    </TableCell>
+                    <TableCell>
+                      {emp.workforce_groups.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {emp.workforce_groups.map((g) => (
+                            <WorkforceGroupBadge key={g} group={g} size="sm" />
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground italic">Not assigned</span>
                       )}
-                    >
-                      {user.role === "org_admin" ? "Admin" : "User"}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    {user.mfa_enabled ? (
-                      <Shield className="h-4 w-4 text-success" />
-                    ) : (
-                      <span className="text-xs text-muted-foreground">Off</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {user.status === "pending_assignment" ? (
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setIsAssignDialogOpen(true);
-                        }}
-                      >
-                        Assign Group
-                      </Button>
-                    ) : (
-                      <Button variant="ghost" size="icon">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {getStatusIcon(emp.status)}
+                        <span className={cn(
+                          "text-sm",
+                          emp.status === "active" && "text-success",
+                          emp.status === "pending_assignment" && "text-warning",
+                          emp.status === "suspended" && "text-destructive"
+                        )}>
+                          {emp.status === "active" ? "Active" : emp.status === "pending_assignment" ? "Pending" : "Suspended"}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {emp.mfa_enabled ? (
+                        <Shield className="h-4 w-4 text-success" />
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Off</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Reset Password"
+                          onClick={() => handleResetPassword(emp)}
+                          disabled={isSubmitting}
+                        >
+                          <KeyRound className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Delete Employee"
+                          onClick={() => {
+                            setSelectedEmployee(emp);
+                            setIsDeleteDialogOpen(true);
+                          }}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
             </TableBody>
           </Table>
         </div>
-
-        {/* HIPAA Notice */}
-        <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
-          <p>
-            Workforce assignments are required per{" "}
-            <a
-              href="https://www.law.cornell.edu/cfr/text/45/164.308"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-accent hover:underline"
-            >
-              45 CFR §164.308(a)(3)
-            </a>{" "}
-            to ensure appropriate access to PHI based on job function.
-          </p>
-        </div>
       </div>
 
-      {/* Assign Workforce Groups Dialog */}
-      <Dialog open={isAssignDialogOpen} onOpenChange={(open) => {
-        setIsAssignDialogOpen(open);
-        if (!open) setSelectedWorkforceGroups([]);
-      }}>
+      {/* Add Employee Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Assign Workforce Groups</DialogTitle>
+            <DialogTitle>Add Employee</DialogTitle>
             <DialogDescription>
-              {selectedUser && (
-                <>
-                  Select one or more workforce groups for{" "}
-                  <strong>
-                    {selectedUser.first_name} {selectedUser.last_name}
-                  </strong>
-                  . This determines their training path and quiz requirements.
-                </>
-              )}
+              Create an account for a new employee. You'll receive their temporary password to share with them.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 py-4 max-h-80 overflow-y-auto">
-            {(Object.keys(WORKFORCE_GROUP_LABELS) as WorkforceGroup[]).map((group) => (
-              <label
-                key={group}
-                className={cn(
-                  "flex w-full items-center gap-3 rounded-lg border border-border p-4 cursor-pointer transition-colors",
-                  selectedWorkforceGroups.includes(group) 
-                    ? "border-accent/50 bg-accent/5" 
-                    : "hover:border-muted-foreground/30 hover:bg-muted/50"
-                )}
-              >
-                <Checkbox
-                  checked={selectedWorkforceGroups.includes(group)}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      setSelectedWorkforceGroups([...selectedWorkforceGroups, group]);
-                    } else {
-                      setSelectedWorkforceGroups(selectedWorkforceGroups.filter(g => g !== group));
-                    }
-                  }}
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>First Name *</Label>
+                <Input
+                  value={newEmployee.firstName}
+                  onChange={(e) => setNewEmployee({ ...newEmployee, firstName: e.target.value })}
+                  placeholder="John"
                 />
-                <WorkforceGroupBadge group={group} />
-                <span className="text-sm text-muted-foreground flex-1">
-                  {group === "all_staff" && "Core HIPAA training for all workforce members"}
-                  {group === "clinical" && "Healthcare providers handling patient care"}
-                  {group === "administrative" && "Billing and administrative personnel"}
-                  {group === "management" && "Leadership and compliance oversight"}
-                  {group === "it" && "IT and security professionals"}
-                </span>
-              </label>
-            ))}
+              </div>
+              <div className="space-y-2">
+                <Label>Last Name *</Label>
+                <Input
+                  value={newEmployee.lastName}
+                  onChange={(e) => setNewEmployee({ ...newEmployee, lastName: e.target.value })}
+                  placeholder="Doe"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Email *</Label>
+              <Input
+                type="email"
+                value={newEmployee.email}
+                onChange={(e) => setNewEmployee({ ...newEmployee, email: e.target.value })}
+                placeholder="john.doe@company.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Workforce Groups</Label>
+              <div className="border rounded-lg p-3 max-h-40 overflow-y-auto space-y-2">
+                {(Object.keys(WORKFORCE_GROUP_LABELS) as WorkforceGroup[]).map((group) => (
+                  <label key={group} className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={newEmployee.workforceGroups.includes(group)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setNewEmployee({ ...newEmployee, workforceGroups: [...newEmployee.workforceGroups, group] });
+                        } else {
+                          setNewEmployee({ ...newEmployee, workforceGroups: newEmployee.workforceGroups.filter(g => g !== group) });
+                        }
+                      }}
+                    />
+                    <span className="text-sm">{WORKFORCE_GROUP_LABELS[group]}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="contractor"
+                checked={newEmployee.isContractor}
+                onCheckedChange={(checked) => setNewEmployee({ ...newEmployee, isContractor: !!checked })}
+              />
+              <Label htmlFor="contractor" className="font-normal">This employee is a contractor</Label>
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setIsAssignDialogOpen(false);
-              setSelectedWorkforceGroups([]);
-            }}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={() => handleAssignWorkforce(selectedWorkforceGroups)}
-              disabled={selectedWorkforceGroups.length === 0}
-            >
-              Assign {selectedWorkforceGroups.length > 0 && `(${selectedWorkforceGroups.length})`}
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddEmployee} disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Add Employee"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Credentials Dialog */}
+      <Dialog open={isCredentialsDialogOpen} onOpenChange={setIsCredentialsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Employee Credentials</DialogTitle>
+            <DialogDescription>
+              Share these credentials with the employee. They should change their password after first login.
+            </DialogDescription>
+          </DialogHeader>
+          {credentials && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <div className="flex gap-2">
+                  <Input value={credentials.email} readOnly className="bg-muted" />
+                  <Button variant="outline" size="icon" onClick={() => copyToClipboard(credentials.email)}>
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Temporary Password</Label>
+                <div className="flex gap-2">
+                  <Input value={credentials.password} readOnly className="bg-muted font-mono" />
+                  <Button variant="outline" size="icon" onClick={() => copyToClipboard(credentials.password)}>
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="p-3 bg-warning/10 border border-warning/30 rounded-lg text-sm text-warning">
+                ⚠️ Save these credentials now. The password cannot be retrieved later.
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => {
+              setIsCredentialsDialogOpen(false);
+              setCredentials(null);
+            }}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Employee?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {selectedEmployee?.first_name} {selectedEmployee?.last_name}'s account and all their training records. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteEmployee}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Training Assignment Dialog */}
+      <TrainingAssignmentDialog
+        open={isTrainingDialogOpen}
+        onOpenChange={setIsTrainingDialogOpen}
+      />
     </DashboardLayout>
   );
 }
