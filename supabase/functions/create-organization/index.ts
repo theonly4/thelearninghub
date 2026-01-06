@@ -2,20 +2,16 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Dynamic CORS origin validation - prevents cross-origin attacks while allowing legitimate requests
 function getCorsHeaders(requestOrigin: string | null): Record<string, string> {
-  const allowedOrigins = [
-    Deno.env.get('ALLOWED_ORIGIN'),
-    'https://yzuvyvtspdjmewuakpkn.lovableproject.com',
-    'https://lovable.dev',
-    'http://localhost:5173',
-    'http://localhost:8080',
-  ].filter(Boolean) as string[];
-
-  const origin = requestOrigin && allowedOrigins.some(allowed => 
-    requestOrigin === allowed || requestOrigin.endsWith('.lovable.dev') || requestOrigin.endsWith('.lovableproject.com')
-  ) ? requestOrigin : allowedOrigins[0] || 'https://lovable.dev';
+  // Allow all lovableproject.com subdomains and localhost for development
+  const isAllowed = requestOrigin && (
+    requestOrigin.endsWith('.lovableproject.com') ||
+    requestOrigin.endsWith('.lovable.dev') ||
+    requestOrigin === 'https://lovable.dev' ||
+    requestOrigin.startsWith('http://localhost:')
+  );
 
   return {
-    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Origin': isAllowed ? requestOrigin : '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
   };
