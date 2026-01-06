@@ -103,20 +103,40 @@ export default function AdminHelpGuidePage() {
                       <GuideImage src={guideSidebarUsers} alt="Find Users in the left sidebar menu" />
                     </li>
                     <li className="flex flex-col gap-2">
-                      <span>2. Click the <strong>Add User</strong> button</span>
-                      <GuideImage src={guideAddUserButton} alt="Click the Add User button in the top right" />
+                      <span>2. Click the <strong>Add Employee</strong> button in the top right</span>
+                      <GuideImage src={guideAddUserButton} alt="Click the Add Employee button" />
                     </li>
                     <li>3. Enter the employee's email address, first name, and last name</li>
-                    <li>4. Select their workforce group (for example: Clinical Staff, Administrative Staff)</li>
-                    <li>5. Click <strong>Send Invitation</strong></li>
-                    <li>6. The employee will receive an email with instructions to set up their account</li>
+                    <li>4. Select their workforce group(s) (for example: Clinical Staff, Administrative Staff)</li>
+                    <li>5. Click <strong>Add Employee</strong></li>
+                    <li>6. A temporary password will be displayed - <strong>copy this and send it to the employee</strong></li>
+                    <li>7. The employee can log in with these credentials and should change their password</li>
+                  </ol>
+                </div>
+
+                <div>
+                  <h4 className="font-medium mb-2">Resetting Employee Password</h4>
+                  <ol className="space-y-2 text-muted-foreground">
+                    <li>1. Find the employee in the Users list</li>
+                    <li>2. Click the <strong>key icon</strong> in the Actions column</li>
+                    <li>3. A new temporary password will be generated</li>
+                    <li>4. Copy and send the new password to the employee</li>
+                  </ol>
+                </div>
+
+                <div>
+                  <h4 className="font-medium mb-2">Deleting an Employee</h4>
+                  <ol className="space-y-2 text-muted-foreground">
+                    <li>1. Find the employee in the Users list</li>
+                    <li>2. Click the <strong>trash icon</strong> in the Actions column</li>
+                    <li>3. Confirm the deletion - this removes all their training records</li>
                   </ol>
                 </div>
                 
                 <div>
                   <h4 className="font-medium mb-2">Employee Status Types</h4>
                   <ul className="space-y-2 text-muted-foreground">
-                    <li><strong>Pending Assignment</strong> - New employee who has not been assigned a workforce group yet</li>
+                    <li><strong>Pending</strong> - Employee has not been assigned a workforce group yet</li>
                     <li><strong>Active</strong> - Employee can access training materials and take quizzes</li>
                     <li><strong>Suspended</strong> - Account is temporarily disabled</li>
                   </ul>
@@ -126,7 +146,7 @@ export default function AdminHelpGuidePage() {
                   <div className="flex items-start gap-2">
                     <AlertCircle className="h-4 w-4 text-info mt-0.5" />
                     <p className="text-muted-foreground">
-                      <strong>Tip:</strong> Employees must be assigned to a workforce group before they can start their training. This ensures they receive the appropriate content for their role.
+                      <strong>Important:</strong> You must manually send the temporary password to new employees. Save it when shown - it cannot be retrieved later.
                     </p>
                   </div>
                 </div>
