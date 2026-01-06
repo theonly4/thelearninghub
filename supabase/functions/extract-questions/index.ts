@@ -371,11 +371,11 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error("Error in extract-questions:", errorMessage);
-    return new Response(JSON.stringify({ error: errorMessage }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
+  const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
+  console.error("Error in extract-questions:", error); // Log the full error for debugging
+  return new Response(JSON.stringify({ error: "An error occurred while processing your request." }), {
+    status: 500,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
 });
