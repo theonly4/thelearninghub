@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.complete-training-material]
 verify_jwt = false
+
+[functions.get-quiz-questions]
+verify_jwt = false

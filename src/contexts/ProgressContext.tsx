@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { WorkforceGroup, QuizStatus } from "@/types/hipaa";
 import { getRequiredMaterialIds } from "@/data/trainingMaterials";
 import { getQuizzesForWorkforceGroup } from "@/data/quizzes";
+import { supabase } from "@/integrations/supabase/client";
 
 interface QuizResult {
   quizId: string;
@@ -14,6 +15,8 @@ interface ProgressState {
   completedMaterials: string[];
   quizResults: QuizResult[];
   currentWorkforceGroup: WorkforceGroup | null;
+  isLoading: boolean;
+  userId: string | null;
 }
 
 interface ProgressContextType {
@@ -21,11 +24,13 @@ interface ProgressContextType {
   completedMaterials: string[];
   quizResults: QuizResult[];
   currentWorkforceGroup: WorkforceGroup | null;
+  isLoading: boolean;
   
   // Actions
   setWorkforceGroup: (group: WorkforceGroup) => void;
-  markMaterialComplete: (materialId: string) => void;
+  markMaterialComplete: (materialId: string) => Promise<void>;
   recordQuizResult: (quizId: string, score: number, passed: boolean) => void;
+  loadProgressFromDatabase: (userId: string, workforceGroup: WorkforceGroup | null) => Promise<void>;
   
   // Computed
   areAllMaterialsComplete: () => boolean;
@@ -40,36 +45,79 @@ interface ProgressContextType {
 
 const ProgressContext = createContext<ProgressContextType | undefined>(undefined);
 
-const STORAGE_KEY = "hipaa_training_progress";
-
 export function ProgressProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<ProgressState>(() => {
-    // Load from localStorage on init
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // Invalid data, use defaults
-      }
-    }
-    return {
-      completedMaterials: [],
-      quizResults: [],
-      currentWorkforceGroup: "administrative" as WorkforceGroup, // Demo default
-    };
+  const [state, setState] = useState<ProgressState>({
+    completedMaterials: [],
+    quizResults: [],
+    currentWorkforceGroup: null,
+    isLoading: true,
+    userId: null,
   });
 
-  // Persist to localStorage on changes
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [state]);
+  // Load progress from database when user is authenticated
+  const loadProgressFromDatabase = useCallback(async (userId: string, workforceGroup: WorkforceGroup | null) => {
+    if (!userId) {
+      setState(prev => ({ ...prev, isLoading: false }));
+      return;
+    }
+
+    setState(prev => ({ ...prev, isLoading: true, userId }));
+
+    try {
+      // Fetch completed materials from database
+      const { data: progressData, error: progressError } = await supabase
+        .from('user_training_progress')
+        .select('material_id')
+        .eq('user_id', userId);
+
+      if (progressError) {
+        console.error("Error fetching training progress:", progressError);
+      }
+
+      // Fetch quiz results from database
+      const { data: quizData, error: quizError } = await supabase
+        .from('quiz_attempts')
+        .select('quiz_id, score, passed, completed_at')
+        .eq('user_id', userId)
+        .not('completed_at', 'is', null);
+
+      if (quizError) {
+        console.error("Error fetching quiz attempts:", quizError);
+      }
+
+      const completedMaterials = progressData?.map(p => p.material_id) || [];
+      const quizResults: QuizResult[] = quizData?.map(q => ({
+        quizId: q.quiz_id,
+        score: q.score,
+        passed: q.passed,
+        completedAt: q.completed_at || new Date().toISOString(),
+      })) || [];
+
+      setState({
+        completedMaterials,
+        quizResults,
+        currentWorkforceGroup: workforceGroup,
+        isLoading: false,
+        userId,
+      });
+    } catch (error) {
+      console.error("Error loading progress from database:", error);
+      setState(prev => ({ ...prev, isLoading: false }));
+    }
+  }, []);
 
   const setWorkforceGroup = (group: WorkforceGroup) => {
     setState(prev => ({ ...prev, currentWorkforceGroup: group }));
   };
 
-  const markMaterialComplete = (materialId: string) => {
+  // Mark material complete - now uses database via Edge Function
+  const markMaterialComplete = async (materialId: string) => {
+    if (!state.userId) {
+      console.warn("Cannot mark material complete: no user ID");
+      return;
+    }
+
+    // Optimistically update local state
     setState(prev => {
       if (prev.completedMaterials.includes(materialId)) {
         return prev;
@@ -79,6 +127,9 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
         completedMaterials: [...prev.completedMaterials, materialId],
       };
     });
+
+    // The actual database insert is handled by the complete-training-material Edge Function
+    // which is called from TrainingMaterialReader component
   };
 
   const recordQuizResult = (quizId: string, score: number, passed: boolean) => {
@@ -197,6 +248,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
 
   const resetProgress = (newWorkforceGroup?: WorkforceGroup) => {
     setState(prev => ({
+      ...prev,
       completedMaterials: [],
       quizResults: [],
       currentWorkforceGroup: newWorkforceGroup ?? prev.currentWorkforceGroup,
@@ -209,9 +261,11 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
         completedMaterials: state.completedMaterials,
         quizResults: state.quizResults,
         currentWorkforceGroup: state.currentWorkforceGroup,
+        isLoading: state.isLoading,
         setWorkforceGroup,
         markMaterialComplete,
         recordQuizResult,
+        loadProgressFromDatabase,
         areAllMaterialsComplete,
         getMaterialProgress,
         getQuizStatus,
