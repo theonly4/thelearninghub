@@ -435,7 +435,15 @@ export default function PackageManagerPage() {
                   <Label>Workforce Group</Label>
                   <Select 
                     value={selectedWorkforceGroup} 
-                    onValueChange={(val) => setSelectedWorkforceGroup(val as WorkforceGroup)}
+                    onValueChange={(val) => {
+                      const group = val as WorkforceGroup;
+                      setSelectedWorkforceGroup(group);
+                      // Auto-populate package name if empty
+                      if (!packageName.trim()) {
+                        const nextSeq = getNextSequenceNumber(group);
+                        setPackageName(`${WORKFORCE_GROUP_LABELS[group]} - Set ${nextSeq}`);
+                      }
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select workforce group..." />
