@@ -241,13 +241,6 @@ export type Database = {
             referencedRelation: "quiz_questions"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "package_questions_question_id_fkey"
-            columns: ["question_id"]
-            isOneToOne: false
-            referencedRelation: "quiz_questions_public"
-            referencedColumns: ["id"]
-          },
         ]
       }
       package_releases: {
@@ -434,13 +427,6 @@ export type Database = {
             columns: ["question_id"]
             isOneToOne: false
             referencedRelation: "quiz_questions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "question_releases_question_id_fkey"
-            columns: ["question_id"]
-            isOneToOne: false
-            referencedRelation: "quiz_questions_public"
             referencedColumns: ["id"]
           },
         ]
@@ -773,66 +759,7 @@ export type Database = {
       }
     }
     Views: {
-      quiz_questions_public: {
-        Row: {
-          created_at: string | null
-          hipaa_section: string | null
-          hipaa_topic_id: string | null
-          id: string | null
-          options: Json | null
-          question_number: number | null
-          question_text: string | null
-          quiz_id: string | null
-          rationale: string | null
-          scenario: string | null
-          updated_at: string | null
-          workforce_groups: string[] | null
-        }
-        Insert: {
-          created_at?: string | null
-          hipaa_section?: string | null
-          hipaa_topic_id?: string | null
-          id?: string | null
-          options?: Json | null
-          question_number?: number | null
-          question_text?: string | null
-          quiz_id?: string | null
-          rationale?: string | null
-          scenario?: string | null
-          updated_at?: string | null
-          workforce_groups?: string[] | null
-        }
-        Update: {
-          created_at?: string | null
-          hipaa_section?: string | null
-          hipaa_topic_id?: string | null
-          id?: string | null
-          options?: Json | null
-          question_number?: number | null
-          question_text?: string | null
-          quiz_id?: string | null
-          rationale?: string | null
-          scenario?: string | null
-          updated_at?: string | null
-          workforce_groups?: string[] | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "quiz_questions_hipaa_topic_id_fkey"
-            columns: ["hipaa_topic_id"]
-            isOneToOne: false
-            referencedRelation: "hipaa_topics"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "quiz_questions_quiz_id_fkey"
-            columns: ["quiz_id"]
-            isOneToOne: false
-            referencedRelation: "quizzes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Functions: {
       get_user_organization: { Args: { _user_id: string }; Returns: string }
