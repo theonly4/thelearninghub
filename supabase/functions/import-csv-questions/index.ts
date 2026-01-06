@@ -4,21 +4,28 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 // Dynamic CORS origin validation - prevents cross-origin attacks while allowing legitimate requests
 function getCorsHeaders(requestOrigin: string | null): Record<string, string> {
   const allowedOrigins = [
-    Deno.env.get('ALLOWED_ORIGIN'),
-    'https://yzuvyvtspdjmewuakpkn.lovableproject.com',
-    'https://lovable.dev',
-    'http://localhost:5173',
-    'http://localhost:8080',
+    Deno.env.get("ALLOWED_ORIGIN"),
+    "https://yzuvyvtspdjmewuakpkn.lovableproject.com",
+    "https://lovable.dev",
+    "http://localhost:5173",
+    "http://localhost:8080",
   ].filter(Boolean) as string[];
 
-  const origin = requestOrigin && allowedOrigins.some(allowed => 
-    requestOrigin === allowed || requestOrigin.endsWith('.lovable.dev') || requestOrigin.endsWith('.lovableproject.com')
-  ) ? requestOrigin : allowedOrigins[0] || 'https://lovable.dev';
+  const origin =
+    requestOrigin &&
+    allowedOrigins.some(
+      (allowed) =>
+        requestOrigin === allowed ||
+        requestOrigin.endsWith(".lovable.dev") ||
+        requestOrigin.endsWith(".lovableproject.com"),
+    )
+      ? requestOrigin
+      : allowedOrigins[0] || "https://lovable.dev";
 
   return {
-    'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
 }
 
@@ -105,7 +112,6 @@ function extractOptions(optionsText: string): { label: string; text: string }[] 
   ];
 }
 
-
 function extractCorrectAnswerLetter(correctAnswerText: string): string {
   const text = (correctAnswerText || "").trim().toUpperCase();
   if (!text) return "";
@@ -117,7 +123,6 @@ function extractCorrectAnswerLetter(correctAnswerText: string): string {
   const match = text.match(/\b([A-D])\b/);
   return match?.[1] ?? "";
 }
-
 
 function mapWorkforceGroup(groupText: string): string {
   const text = groupText.toLowerCase();
@@ -178,9 +183,7 @@ function buildHeaderIndex(headerFields: string[]): HeaderIndex {
   const workforceGroup = findHeaderIndex(headerFields, "Workforce Group");
   const hipaaRule = findHeaderIndex(headerFields, "HIPAA Rule");
   const topicName = findHeaderIndex(headerFields, "HIPAA Topic Name");
-  const topicDesc = headerFields.findIndex((h) =>
-    (h || "").toLowerCase().includes("description of topic"),
-  );
+  const topicDesc = headerFields.findIndex((h) => (h || "").toLowerCase().includes("description of topic"));
 
   // Sensible fallbacks based on the known export structure.
   return {
@@ -206,8 +209,7 @@ function getField(fields: string[], idx: number): string {
 function joinRange(fields: string[], start: number, endExclusive: number): string {
   if (start < 0) return "";
 
-  const safeEnd =
-    endExclusive > start ? Math.min(endExclusive, fields.length) : Math.min(start + 8, fields.length);
+  const safeEnd = endExclusive > start ? Math.min(endExclusive, fields.length) : Math.min(start + 8, fields.length);
 
   return fields
     .slice(start, safeEnd)
@@ -217,7 +219,6 @@ function joinRange(fields: string[], start: number, endExclusive: number): strin
 }
 
 async function ensureMasterQuizId(supabaseClient: SupabaseClient): Promise<string> {
-
   const { data: existing, error } = await supabaseClient
     .from("quizzes")
     .select("id")
@@ -238,13 +239,7 @@ async function ensureMasterQuizId(supabaseClient: SupabaseClient): Promise<strin
       title: MASTER_QUIZ_TITLE,
       description: "Imported question bank (CSV).",
       sequence_number: 1,
-      workforce_groups: [
-        "all_staff",
-        "clinical",
-        "administrative",
-        "management",
-        "it",
-      ],
+      workforce_groups: ["all_staff", "clinical", "administrative", "management", "it"],
       passing_score: 80,
       version: 1,
       effective_date: today,
@@ -262,7 +257,7 @@ async function ensureMasterQuizId(supabaseClient: SupabaseClient): Promise<strin
 }
 
 serve(async (req) => {
-  const requestOrigin = req.headers.get('Origin');
+  const requestOrigin = req.headers.get("Origin");
   const corsHeaders = getCorsHeaders(requestOrigin);
 
   if (req.method === "OPTIONS") {
@@ -311,13 +306,10 @@ serve(async (req) => {
       .single();
 
     if (!roleData) {
-      return new Response(
-        JSON.stringify({ error: "Only platform owners can import questions" }),
-        {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
+      return new Response(JSON.stringify({ error: "Only platform owners can import questions" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const body = await req.json();
@@ -391,7 +383,6 @@ serve(async (req) => {
         }
       }
     }
-
 
     console.log(`Created/found ${topicMap.size} HIPAA topics`);
 
@@ -511,9 +502,7 @@ serve(async (req) => {
             results.updated++;
           }
         } else {
-          const { error: insertError } = await supabaseClient
-            .from("quiz_questions")
-            .insert(questionData);
+          const { error: insertError } = await supabaseClient.from("quiz_questions").insert(questionData);
 
           if (insertError) {
             results.errors.push(`Q${qNum}: Insert failed - ${insertError.message}`);
@@ -538,9 +527,7 @@ serve(async (req) => {
       }
     }
 
-    console.log(
-      `Import complete: ${results.imported} new, ${results.updated} updated, ${results.skipped} skipped`,
-    );
+    console.log(`Import complete: ${results.imported} new, ${results.updated} updated, ${results.skipped} skipped`);
     if (results.errors.length > 0) {
       console.log(`First 10 errors: ${results.errors.slice(0, 10).join("; ")}`);
     }
@@ -552,7 +539,9 @@ serve(async (req) => {
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error("Import error:", errorMessage);
-    return new Response(JSON.stringify({ error: errorMessage }), {
+
+    // Ensure that only a generic error message is returned to the user
+    return new Response(JSON.stringify({ error: "An error occurred while importing the CSV." }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
