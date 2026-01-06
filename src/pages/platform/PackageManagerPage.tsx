@@ -37,6 +37,7 @@ interface PackageQuestion {
     question_text: string;
     question_number: number;
     hipaa_section: string;
+    scenario: string | null;
   };
 }
 
@@ -372,7 +373,8 @@ export default function PackageManagerPage() {
         quiz_questions (
           question_text,
           question_number,
-          hipaa_section
+          hipaa_section,
+          scenario
         )
       `)
       .eq("package_id", pkg.id);
@@ -760,10 +762,15 @@ export default function PackageManagerPage() {
                         <Badge variant="outline" className="shrink-0">
                           {index + 1}
                         </Badge>
-                        <div className="flex-1">
+                        <div className="flex-1 space-y-2">
+                          {pq.question?.scenario && (
+                            <p className="text-sm text-muted-foreground italic border-l-2 border-muted pl-3">
+                              {pq.question.scenario}
+                            </p>
+                          )}
                           <p className="text-sm">{pq.question?.question_text || "Question not found"}</p>
                           {pq.question?.hipaa_section && (
-                            <Badge variant="secondary" className="mt-2 text-xs">
+                            <Badge variant="secondary" className="text-xs">
                               {pq.question.hipaa_section}
                             </Badge>
                           )}
