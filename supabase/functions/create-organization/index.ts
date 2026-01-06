@@ -193,6 +193,17 @@ Deno.serve(async (req) => {
       console.error("Failed to create user:", createUserError);
       // Rollback: delete the organization
       await adminClient.from("organizations").delete().eq("id", newOrg.id);
+      console.log("Rolled back organization creation due to user creation failure");
+      
+      // Check for specific error codes and return user-friendly messages
+      const errorCode = (createUserError as any).code;
+      if (errorCode === "email_exists") {
+        return new Response(
+          JSON.stringify({ error: "An account with this email address already exists" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
       return new Response(
         JSON.stringify({ error: "Failed to create admin user: " + createUserError.message }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
