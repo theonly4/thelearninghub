@@ -22,6 +22,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { 
   Building2, 
   Users, 
@@ -35,7 +45,15 @@ import {
   Copy,
   Check,
   AlertTriangle,
-  Loader2
+  Loader2,
+  ChevronDown,
+  ChevronRight,
+  Mail,
+  KeyRound,
+  UserX,
+  Pencil,
+  Shield,
+  ShieldOff
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -69,6 +87,16 @@ interface OrgStats {
   packageReleases: number;
 }
 
+interface OrgAdmin {
+  userId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  status: string;
+  mfaEnabled: boolean;
+  organizationId: string;
+}
+
 interface CreatedCredentials {
   organizationName: string;
   adminEmail: string;
@@ -86,6 +114,15 @@ const addOrgSchema = z.object({
 });
 
 type AddOrgFormValues = z.infer<typeof addOrgSchema>;
+
+// Edit admin schema
+const editAdminSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  email: z.string().email("Please enter a valid email address"),
+});
+
+type EditAdminFormValues = z.infer<typeof editAdminSchema>;
 
 // Generate a secure password
 function generateSecurePassword(): string {
@@ -118,8 +155,10 @@ function generateSecurePassword(): string {
 export default function OrganizationsPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [orgStats, setOrgStats] = useState<Map<string, OrgStats>>(new Map());
+  const [orgAdmins, setOrgAdmins] = useState<Map<string, OrgAdmin[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [expandedOrgs, setExpandedOrgs] = useState<Set<string>>(new Set());
   
   // Dialog states
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -127,6 +166,14 @@ export default function OrganizationsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdCredentials, setCreatedCredentials] = useState<CreatedCredentials | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  
+  // Admin management states
+  const [editAdminDialogOpen, setEditAdminDialogOpen] = useState(false);
+  const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
+  const [deactivateDialogOpen, setDeactivateDialogOpen] = useState(false);
+  const [selectedAdmin, setSelectedAdmin] = useState<OrgAdmin | null>(null);
+  const [adminActionLoading, setAdminActionLoading] = useState(false);
+  const [newPasswordCredentials, setNewPasswordCredentials] = useState<{ email: string; password: string } | null>(null);
 
   const form = useForm<AddOrgFormValues>({
     resolver: zodResolver(addOrgSchema),
@@ -138,6 +185,15 @@ export default function OrganizationsPage() {
     },
   });
 
+  const editForm = useForm<EditAdminFormValues>({
+    resolver: zodResolver(editAdminSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+    },
+  });
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -145,11 +201,12 @@ export default function OrganizationsPage() {
   async function fetchData() {
     setLoading(true);
     try {
-      const [orgsRes, profilesRes, releasesRes, packageReleasesRes] = await Promise.all([
+      const [orgsRes, profilesRes, releasesRes, packageReleasesRes, rolesRes] = await Promise.all([
         supabase.from("organizations").select("*").order("name"),
-        supabase.from("profiles").select("organization_id"),
+        supabase.from("profiles").select("*"),
         supabase.from("content_releases").select("organization_id, content_type"),
         supabase.from("package_releases").select("organization_id"),
+        supabase.from("user_roles").select("user_id, role, organization_id"),
       ]);
 
       if (orgsRes.error) throw orgsRes.error;
@@ -158,11 +215,15 @@ export default function OrganizationsPage() {
 
       // Calculate stats per org
       const statsMap = new Map<string, OrgStats>();
+      const adminsMap = new Map<string, OrgAdmin[]>();
+      
+      // Get admin user IDs
+      const adminRoles = (rolesRes.data || []).filter(r => r.role === 'org_admin');
       
       for (const org of orgsRes.data || []) {
-        const userCount = (profilesRes.data || []).filter(
+        const orgProfiles = (profilesRes.data || []).filter(
           (p) => p.organization_id === org.id
-        ).length;
+        );
         
         const releases = (releasesRes.data || []).filter(
           (r) => r.organization_id === org.id
@@ -174,19 +235,168 @@ export default function OrganizationsPage() {
         
         statsMap.set(org.id, {
           orgId: org.id,
-          userCount,
+          userCount: orgProfiles.length,
           quizReleases: releases.filter((r) => r.content_type === "quiz").length,
           materialReleases: releases.filter((r) => r.content_type === "training_material").length,
           packageReleases: pkgReleases.length,
         });
+
+        // Find admins for this org
+        const orgAdminRoles = adminRoles.filter(r => r.organization_id === org.id);
+        const orgAdminsList: OrgAdmin[] = [];
+        
+        for (const adminRole of orgAdminRoles) {
+          const profile = orgProfiles.find(p => p.user_id === adminRole.user_id);
+          if (profile) {
+            orgAdminsList.push({
+              userId: profile.user_id,
+              email: profile.email,
+              firstName: profile.first_name,
+              lastName: profile.last_name,
+              status: profile.status,
+              mfaEnabled: profile.mfa_enabled,
+              organizationId: org.id,
+            });
+          }
+        }
+        
+        adminsMap.set(org.id, orgAdminsList);
       }
       
       setOrgStats(statsMap);
+      setOrgAdmins(adminsMap);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Failed to load organizations");
     } finally {
       setLoading(false);
+    }
+  }
+
+  function toggleOrgExpanded(orgId: string) {
+    setExpandedOrgs(prev => {
+      const next = new Set(prev);
+      if (next.has(orgId)) {
+        next.delete(orgId);
+      } else {
+        next.add(orgId);
+      }
+      return next;
+    });
+  }
+
+  function openEditAdminDialog(admin: OrgAdmin) {
+    setSelectedAdmin(admin);
+    editForm.reset({
+      firstName: admin.firstName,
+      lastName: admin.lastName,
+      email: admin.email,
+    });
+    setEditAdminDialogOpen(true);
+  }
+
+  async function handleEditAdmin(values: EditAdminFormValues) {
+    if (!selectedAdmin) return;
+    
+    setAdminActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          first_name: values.firstName,
+          last_name: values.lastName,
+          email: values.email,
+        })
+        .eq("user_id", selectedAdmin.userId);
+
+      if (error) throw error;
+
+      toast.success("Admin details updated");
+      setEditAdminDialogOpen(false);
+      fetchData();
+    } catch (error: any) {
+      console.error("Error updating admin:", error);
+      toast.error(error.message || "Failed to update admin");
+    } finally {
+      setAdminActionLoading(false);
+    }
+  }
+
+  async function handleResetPassword() {
+    if (!selectedAdmin) return;
+    
+    setAdminActionLoading(true);
+    try {
+      const newPassword = generateSecurePassword();
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("You must be logged in");
+        return;
+      }
+
+      const response = await supabase.functions.invoke("reset-admin-password", {
+        body: {
+          userId: selectedAdmin.userId,
+          newPassword: newPassword,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || "Failed to reset password");
+      }
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
+
+      setNewPasswordCredentials({
+        email: selectedAdmin.email,
+        password: newPassword,
+      });
+      setResetPasswordDialogOpen(false);
+      toast.success("Password reset successfully");
+    } catch (error: any) {
+      console.error("Error resetting password:", error);
+      toast.error(error.message || "Failed to reset password");
+    } finally {
+      setAdminActionLoading(false);
+    }
+  }
+
+  async function handleDeactivateAdmin() {
+    if (!selectedAdmin) return;
+    
+    setAdminActionLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("You must be logged in");
+        return;
+      }
+
+      const response = await supabase.functions.invoke("deactivate-admin", {
+        body: {
+          userId: selectedAdmin.userId,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || "Failed to deactivate admin");
+      }
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
+
+      toast.success("Admin account deactivated");
+      setDeactivateDialogOpen(false);
+      fetchData();
+    } catch (error: any) {
+      console.error("Error deactivating admin:", error);
+      toast.error(error.message || "Failed to deactivate admin");
+    } finally {
+      setAdminActionLoading(false);
     }
   }
 
@@ -552,6 +762,7 @@ Please change your password after first login.`;
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-8"></TableHead>
                   <TableHead>Organization</TableHead>
                   <TableHead>Users</TableHead>
                   <TableHead>Packages</TableHead>
@@ -564,62 +775,179 @@ Please change your password after first login.`;
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
+                    <TableCell colSpan={8} className="text-center py-8">
                       Loading organizations...
                     </TableCell>
                   </TableRow>
                 ) : filteredOrgs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       No organizations found.
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredOrgs.map((org) => {
                     const stats = orgStats.get(org.id);
+                    const admins = orgAdmins.get(org.id) || [];
+                    const isExpanded = expandedOrgs.has(org.id);
+                    
                     return (
-                      <TableRow key={org.id}>
-                        <TableCell>
-                          <p className="font-medium">{org.name}</p>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1.5">
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                            <span>{stats?.userCount || 0}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1.5">
-                            <Package className="h-4 w-4 text-primary" />
-                            <span>{stats?.packageReleases || 0}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1.5">
-                            <FileQuestion className="h-4 w-4 text-info" />
-                            <span>{stats?.quizReleases || 0}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1.5">
-                            <BookOpen className="h-4 w-4 text-success" />
-                            <span>{stats?.materialReleases || 0}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm">
-                            {format(new Date(org.created_at), "MMM d, yyyy")}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link to={`/platform/releases?org=${org.id}`}>
-                              <ExternalLink className="h-4 w-4 mr-1" />
-                              View
-                            </Link>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
+                      <>
+                        <TableRow 
+                          key={org.id} 
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => toggleOrgExpanded(org.id)}
+                        >
+                          <TableCell className="w-8">
+                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                              {isExpanded ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </TableCell>
+                          <TableCell>
+                            <p className="font-medium">{org.name}</p>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5">
+                              <Users className="h-4 w-4 text-muted-foreground" />
+                              <span>{stats?.userCount || 0}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5">
+                              <Package className="h-4 w-4 text-primary" />
+                              <span>{stats?.packageReleases || 0}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5">
+                              <FileQuestion className="h-4 w-4 text-info" />
+                              <span>{stats?.quizReleases || 0}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5">
+                              <BookOpen className="h-4 w-4 text-success" />
+                              <span>{stats?.materialReleases || 0}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm">
+                              {format(new Date(org.created_at), "MMM d, yyyy")}
+                            </span>
+                          </TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Button variant="ghost" size="sm" asChild>
+                              <Link to={`/platform/releases?org=${org.id}`}>
+                                <ExternalLink className="h-4 w-4 mr-1" />
+                                View
+                              </Link>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                        
+                        {/* Expanded Admin Row */}
+                        {isExpanded && (
+                          <TableRow key={`${org.id}-admins`} className="bg-muted/30">
+                            <TableCell colSpan={8} className="p-4">
+                              <div className="space-y-3">
+                                <div className="flex items-center gap-2">
+                                  <Shield className="h-4 w-4 text-primary" />
+                                  <span className="font-medium text-sm">Admin Accounts</span>
+                                  <Badge variant="secondary" className="text-xs">
+                                    {admins.length} admin{admins.length !== 1 ? 's' : ''}
+                                  </Badge>
+                                </div>
+                                
+                                {admins.length === 0 ? (
+                                  <p className="text-sm text-muted-foreground pl-6">
+                                    No admin accounts found for this organization.
+                                  </p>
+                                ) : (
+                                  <div className="pl-6 space-y-2">
+                                    {admins.map((admin) => (
+                                      <div 
+                                        key={admin.userId}
+                                        className="flex items-center justify-between p-3 rounded-lg border bg-background"
+                                      >
+                                        <div className="flex items-center gap-4">
+                                          <div>
+                                            <p className="font-medium">
+                                              {admin.firstName} {admin.lastName}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground flex items-center gap-1">
+                                              <Mail className="h-3 w-3" />
+                                              {admin.email}
+                                            </p>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            <Badge 
+                                              variant={admin.status === 'active' ? 'default' : 'secondary'}
+                                              className="text-xs"
+                                            >
+                                              {admin.status}
+                                            </Badge>
+                                            {admin.mfaEnabled ? (
+                                              <Badge variant="outline" className="text-xs text-success border-success">
+                                                <Shield className="h-3 w-3 mr-1" />
+                                                MFA
+                                              </Badge>
+                                            ) : (
+                                              <Badge variant="outline" className="text-xs text-warning border-warning">
+                                                <ShieldOff className="h-3 w-3 mr-1" />
+                                                No MFA
+                                              </Badge>
+                                            )}
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-1">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              openEditAdminDialog(admin);
+                                            }}
+                                          >
+                                            <Pencil className="h-4 w-4" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSelectedAdmin(admin);
+                                              setResetPasswordDialogOpen(true);
+                                            }}
+                                          >
+                                            <KeyRound className="h-4 w-4" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-destructive hover:text-destructive"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setSelectedAdmin(admin);
+                                              setDeactivateDialogOpen(true);
+                                            }}
+                                          >
+                                            <UserX className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
                     );
                   })
                 )}
@@ -627,6 +955,207 @@ Please change your password after first login.`;
             </Table>
           </CardContent>
         </Card>
+
+        {/* Edit Admin Dialog */}
+        <Dialog open={editAdminDialogOpen} onOpenChange={setEditAdminDialogOpen}>
+          <DialogContent className="sm:max-w-[400px]">
+            <DialogHeader>
+              <DialogTitle>Edit Admin Details</DialogTitle>
+              <DialogDescription>
+                Update the admin's profile information.
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...editForm}>
+              <form onSubmit={editForm.handleSubmit(handleEditAdmin)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={editForm.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>First Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={editForm.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Last Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={editForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input type="email" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setEditAdminDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={adminActionLoading}>
+                    {adminActionLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      "Save Changes"
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Reset Password Confirmation */}
+        <AlertDialog open={resetPasswordDialogOpen} onOpenChange={setResetPasswordDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Reset Admin Password</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will generate a new temporary password for {selectedAdmin?.firstName} {selectedAdmin?.lastName} ({selectedAdmin?.email}). 
+                You will need to send them the new credentials securely.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={adminActionLoading}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleResetPassword} disabled={adminActionLoading}>
+                {adminActionLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Resetting...
+                  </>
+                ) : (
+                  "Reset Password"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Deactivate Confirmation */}
+        <AlertDialog open={deactivateDialogOpen} onOpenChange={setDeactivateDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-destructive">Deactivate Admin Account</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will deactivate the admin account for {selectedAdmin?.firstName} {selectedAdmin?.lastName} ({selectedAdmin?.email}). 
+                They will no longer be able to log in or manage their organization. This action can be reversed by reactivating the account.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={adminActionLoading}>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleDeactivateAdmin} 
+                disabled={adminActionLoading}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {adminActionLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deactivating...
+                  </>
+                ) : (
+                  "Deactivate Account"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* New Password Display Dialog */}
+        <Dialog open={!!newPasswordCredentials} onOpenChange={() => setNewPasswordCredentials(null)}>
+          <DialogContent className="sm:max-w-[450px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-success">
+                <Check className="h-5 w-5" />
+                Password Reset Successfully
+              </DialogTitle>
+              <DialogDescription>
+                Save these credentials now. The password will not be shown again.
+              </DialogDescription>
+            </DialogHeader>
+            
+            {newPasswordCredentials && (
+              <div className="space-y-4">
+                <div className="rounded-lg border bg-muted/50 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Email</Label>
+                      <p className="font-medium font-mono">{newPasswordCredentials.email}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => copyToClipboard(newPasswordCredentials.email, "reset-email")}
+                    >
+                      {copiedField === "reset-email" ? (
+                        <Check className="h-4 w-4 text-success" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  
+                  <div className="border-t pt-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">New Temporary Password</Label>
+                        <p className="font-medium font-mono text-lg">{newPasswordCredentials.password}</p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => copyToClipboard(newPasswordCredentials.password, "reset-password")}
+                      >
+                        {copiedField === "reset-password" ? (
+                          <Check className="h-4 w-4 text-success" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-warning/10 border border-warning/20">
+                  <AlertTriangle className="h-5 w-5 text-warning shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium text-warning">Send securely</p>
+                    <p className="text-muted-foreground">
+                      Send the new password to the admin through a secure channel.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <DialogFooter>
+              <Button onClick={() => setNewPasswordCredentials(null)}>Done</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </PlatformOwnerLayout>
   );
