@@ -1,6 +1,18 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Sanitize database errors to prevent information leakage
+function sanitizeError(error: any): string {
+  const errorMap: Record<string, string> = {
+    '23505': 'Record already exists',
+    '23503': 'Invalid reference',
+    '23502': 'Required field missing',
+    '22P02': 'Invalid input format',
+  };
+  const code = error?.code || 'unknown';
+  return errorMap[code] || 'An error occurred';
+}
+
 // Dynamic CORS origin validation - prevents cross-origin attacks while allowing legitimate requests
 function getCorsHeaders(requestOrigin: string | null): Record<string, string> {
   const allowedOrigins = [
@@ -508,8 +520,8 @@ serve(async (req) => {
         .upsert(batch, { onConflict: "quiz_id,question_number", ignoreDuplicates: false });
 
       if (insertError) {
-        console.error(`Batch ${i / BATCH_SIZE + 1} error:`, insertError.message);
-        results.errors.push(`Batch insert error: ${insertError.message}`);
+        console.error(`Batch ${i / BATCH_SIZE + 1} error:`, insertError);
+        results.errors.push(`Batch insert error: ${sanitizeError(insertError)}`);
         results.skipped += batch.length;
       } else {
         results.imported += batch.length;
@@ -545,9 +557,8 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error("Import error:", errorMessage);
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    console.error("Import error:", error);
+    return new Response(JSON.stringify({ error: "An error occurred while seeding questions" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

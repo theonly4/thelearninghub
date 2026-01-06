@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
     if (updateError) {
       console.error("Error resetting password:", updateError);
       return new Response(
-        JSON.stringify({ error: updateError.message }),
+        JSON.stringify({ error: "Failed to reset password. Please try again." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -122,9 +122,8 @@ Deno.serve(async (req) => {
     );
   } catch (error: unknown) {
     console.error("Error in reset-admin-password:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: "An unexpected error occurred" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

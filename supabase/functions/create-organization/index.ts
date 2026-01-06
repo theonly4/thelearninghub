@@ -1,5 +1,25 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Sanitize database errors to prevent information leakage
+function sanitizeError(error: any, context: string): string {
+  // Log full error server-side for debugging
+  console.error(`[${context}] Database error:`, error);
+  
+  // Map common PostgreSQL error codes to generic messages
+  const errorMap: Record<string, string> = {
+    '23505': 'A record with this information already exists',
+    '23503': 'Invalid reference - related record not found',
+    '23502': 'Required field is missing',
+    '22P02': 'Invalid input format',
+    '23514': 'Value does not meet requirements',
+    '42P01': 'Configuration error occurred',
+    '42703': 'Configuration error occurred',
+  };
+  
+  const code = error?.code || 'unknown';
+  return errorMap[code] || 'An error occurred while processing your request';
+}
+
 // Dynamic CORS origin validation - prevents cross-origin attacks while allowing legitimate requests
 function getCorsHeaders(requestOrigin: string | null): Record<string, string> {
   // Allow all lovableproject.com subdomains and localhost for development
@@ -171,7 +191,7 @@ Deno.serve(async (req) => {
     if (orgError) {
       console.error("Failed to create organization:", orgError);
       return new Response(
-        JSON.stringify({ error: "Failed to create organization: " + orgError.message }),
+        JSON.stringify({ error: sanitizeError(orgError, "create_organization") }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -205,7 +225,7 @@ Deno.serve(async (req) => {
       }
       
       return new Response(
-        JSON.stringify({ error: "Failed to create admin user: " + createUserError.message }),
+        JSON.stringify({ error: sanitizeError(createUserError, "create_admin_user") }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -231,7 +251,7 @@ Deno.serve(async (req) => {
       await adminClient.auth.admin.deleteUser(newUser.user.id);
       await adminClient.from("organizations").delete().eq("id", newOrg.id);
       return new Response(
-        JSON.stringify({ error: "Failed to create profile: " + profileError.message }),
+        JSON.stringify({ error: sanitizeError(profileError, "create_profile") }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -254,7 +274,7 @@ Deno.serve(async (req) => {
       await adminClient.auth.admin.deleteUser(newUser.user.id);
       await adminClient.from("organizations").delete().eq("id", newOrg.id);
       return new Response(
-        JSON.stringify({ error: "Failed to assign admin role: " + roleInsertError.message }),
+        JSON.stringify({ error: sanitizeError(roleInsertError, "assign_role") }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
