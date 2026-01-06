@@ -72,8 +72,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Verify the user is an org_admin
-    const { data: roleData, error: roleError } = await authClient
+    const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    // Verify the user is an org_admin (use admin client to bypass RLS)
+    const { data: roleData, error: roleError } = await adminClient
       .from("user_roles")
       .select("role, organization_id")
       .eq("user_id", user.id)
@@ -81,6 +85,7 @@ Deno.serve(async (req) => {
       .single();
 
     if (roleError || !roleData) {
+      console.log("Role check failed for user:", user.id, "Error:", roleError);
       return new Response(
         JSON.stringify({ error: "Only organization admins can manage employees" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -92,9 +97,6 @@ Deno.serve(async (req) => {
     const body: ManageEmployeeRequest = await req.json();
     const { action, email, firstName, lastName, workforceGroups, isContractor, employeeUserId } = body;
 
-    const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
 
     // CREATE EMPLOYEE
     if (action === 'create') {
