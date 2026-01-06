@@ -12,10 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { usePageMeta } from "@/hooks/usePageMeta";
-import { Package, Plus, Building2, Calendar, Send, Eye, Shuffle, Trash2 } from "lucide-react";
+import { Package, Plus, Eye, Shuffle } from "lucide-react";
 import { format } from "date-fns";
 import { WORKFORCE_GROUP_LABELS, WorkforceGroup } from "@/types/hipaa";
 
@@ -41,22 +40,6 @@ interface PackageQuestion {
   };
 }
 
-interface PackageRelease {
-  id: string;
-  package_id: string;
-  organization_id: string;
-  workforce_group: WorkforceGroup;
-  training_year: number;
-  released_at: string;
-  notes: string | null;
-}
-
-interface Organization {
-  id: string;
-  name: string;
-  slug: string;
-}
-
 interface QuizQuestion {
   id: string;
   question_text: string;
@@ -74,14 +57,12 @@ export default function PackageManagerPage() {
   usePageMeta({
     title: "Question Packages | Platform Owner",
     description:
-      "Create and manage 25-question HIPAA training question packages by workforce group, and release them to organizations.",
+      "Create and manage 25-question HIPAA training question packages by workforce group.",
     canonicalPath: "/platform/packages",
   });
 
   const [packages, setPackages] = useState<QuestionPackage[]>([]);
   const [packageQuestions, setPackageQuestions] = useState<Record<string, PackageQuestion[]>>({});
-  const [releases, setReleases] = useState<PackageRelease[]>([]);
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -91,14 +72,6 @@ export default function PackageManagerPage() {
   const [packageName, setPackageName] = useState("");
   const [packageDescription, setPackageDescription] = useState("");
   const [creating, setCreating] = useState(false);
-  
-  // Release dialog state
-  const [releaseDialogOpen, setReleaseDialogOpen] = useState(false);
-  const [selectedPackage, setSelectedPackage] = useState<QuestionPackage | null>(null);
-  const [selectedOrg, setSelectedOrg] = useState<string>("");
-  const [trainingYear, setTrainingYear] = useState<number>(new Date().getFullYear());
-  const [releaseNotes, setReleaseNotes] = useState("");
-  const [releasing, setReleasing] = useState(false);
   
   // View package dialog
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
@@ -128,10 +101,8 @@ export default function PackageManagerPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [packagesRes, releasesRes, orgsRes, questionsRes] = await Promise.all([
+      const [packagesRes, questionsRes] = await Promise.all([
         supabase.from("question_packages").select("*").order("workforce_group").order("sequence_number"),
-        supabase.from("package_releases").select("*").order("released_at", { ascending: false }),
-        supabase.from("organizations").select("*").neq("slug", "platform-owner"),
         supabase.from("quiz_questions").select("id, question_text, question_number, hipaa_section, workforce_groups")
       ]);
 
@@ -149,8 +120,6 @@ export default function PackageManagerPage() {
         setPackages(packagesWithCounts);
       }
       
-      if (releasesRes.data) setReleases(releasesRes.data as PackageRelease[]);
-      if (orgsRes.data) setOrganizations(orgsRes.data);
       if (questionsRes.data) setQuestions(questionsRes.data as QuizQuestion[]);
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -301,65 +270,6 @@ export default function PackageManagerPage() {
     }
   };
 
-  const handleReleasePackage = async () => {
-    if (!selectedPackage || !selectedOrg || !trainingYear) {
-      toast({
-        title: "Validation Error",
-        description: "Please select an organization and training year.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setReleasing(true);
-    try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error("Not authenticated");
-
-      const { error } = await supabase.from("package_releases").insert({
-        package_id: selectedPackage.id,
-        organization_id: selectedOrg,
-        workforce_group: selectedPackage.workforce_group,
-        training_year: trainingYear,
-        released_by: userData.user.id,
-        notes: releaseNotes.trim() || null
-      });
-
-      if (error) {
-        if (error.message.includes("duplicate") || error.code === "23505") {
-          toast({
-            title: "Already Released",
-            description: "This package has already been released to this organization, or this org already has a package for this workforce group and year.",
-            variant: "destructive"
-          });
-        } else {
-          throw error;
-        }
-        return;
-      }
-
-      toast({
-        title: "Package Released",
-        description: `Released "${selectedPackage.name}" to ${organizations.find(o => o.id === selectedOrg)?.name}.`
-      });
-
-      setReleaseDialogOpen(false);
-      setSelectedPackage(null);
-      setSelectedOrg("");
-      setReleaseNotes("");
-      fetchData();
-    } catch (error: any) {
-      console.error("Error releasing package:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to release package.",
-        variant: "destructive"
-      });
-    } finally {
-      setReleasing(false);
-    }
-  };
-
   const handleViewPackage = async (pkg: QuestionPackage) => {
     setViewingPackage(pkg);
     
@@ -390,21 +300,6 @@ export default function PackageManagerPage() {
     }
     
     setViewDialogOpen(true);
-  };
-
-  const getOrgName = (orgId: string) => organizations.find(o => o.id === orgId)?.name || "Unknown";
-  const getPackageName = (pkgId: string) => packages.find(p => p.id === pkgId)?.name || "Unknown";
-
-  const getPackageReleaseCount = (pkgId: string) => releases.filter(r => r.package_id === pkgId).length;
-
-  const isPackageReleasedToOrg = (pkgId: string, orgId: string) => 
-    releases.some(r => r.package_id === pkgId && r.organization_id === orgId);
-
-  const getAvailablePackagesForOrg = (orgId: string, workforceGroup?: WorkforceGroup) => {
-    return packages.filter(pkg => {
-      if (workforceGroup && pkg.workforce_group !== workforceGroup) return false;
-      return !isPackageReleasedToOrg(pkg.id, orgId);
-    });
   };
 
   return (
@@ -500,248 +395,83 @@ export default function PackageManagerPage() {
           </Dialog>
         </div>
 
-        <Tabs defaultValue="packages">
-          <TabsList>
-            <TabsTrigger value="packages">Packages ({packages.length})</TabsTrigger>
-            <TabsTrigger value="releases">Release History ({releases.length})</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="packages" className="space-y-4">
-            {/* Package summary by workforce group */}
-            <div className="grid gap-4 md:grid-cols-5">
-              {WORKFORCE_GROUPS.map(group => {
-                const groupPackages = packages.filter(p => p.workforce_group === group);
-                const available = getAvailableQuestionsForGroup(group);
-                return (
-                  <Card key={group}>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium">{WORKFORCE_GROUP_LABELS[group]}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{groupPackages.length}</div>
-                      <p className="text-xs text-muted-foreground">
-                        packages ({available.length} questions left)
-                      </p>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-
-            {/* Packages table */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  All Packages
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <div className="text-center py-8 text-muted-foreground">Loading...</div>
-                ) : packages.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No packages created yet. Create your first package above.
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Workforce Group</TableHead>
-                        <TableHead>Questions</TableHead>
-                        <TableHead>Released To</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {packages.map(pkg => (
-                        <TableRow key={pkg.id}>
-                          <TableCell className="font-medium">{pkg.name}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">
-                              {WORKFORCE_GROUP_LABELS[pkg.workforce_group]}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{pkg.question_count || 0}</TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">
-                              {getPackageReleaseCount(pkg.id)} orgs
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{format(new Date(pkg.created_at), "MMM d, yyyy")}</TableCell>
-                          <TableCell className="text-right space-x-2">
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => handleViewPackage(pkg)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => {
-                                setSelectedPackage(pkg);
-                                setReleaseDialogOpen(true);
-                              }}
-                            >
-                              <Send className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="releases">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Release History
-                </CardTitle>
-                <CardDescription>
-                  Track which packages were released to which organizations
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {releases.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No releases yet. Release a package to an organization to get started.
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Package</TableHead>
-                        <TableHead>Organization</TableHead>
-                        <TableHead>Workforce Group</TableHead>
-                        <TableHead>Training Year</TableHead>
-                        <TableHead>Released</TableHead>
-                        <TableHead>Notes</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {releases.map(release => (
-                        <TableRow key={release.id}>
-                          <TableCell className="font-medium">
-                            {getPackageName(release.package_id)}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Building2 className="h-4 w-4 text-muted-foreground" />
-                              {getOrgName(release.organization_id)}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">
-                              {WORKFORCE_GROUP_LABELS[release.workforce_group]}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge>{release.training_year}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            {format(new Date(release.released_at), "MMM d, yyyy")}
-                          </TableCell>
-                          <TableCell className="max-w-xs truncate">
-                            {release.notes || "-"}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-
-        {/* Release Package Dialog */}
-        <Dialog open={releaseDialogOpen} onOpenChange={setReleaseDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Release Package to Organization</DialogTitle>
-              <DialogDescription>
-                {selectedPackage && `Release "${selectedPackage.name}" to an organization for a training year.`}
-              </DialogDescription>
-            </DialogHeader>
-            
-            {selectedPackage && (
-              <div className="space-y-4 pt-4">
-                <div className="p-3 bg-muted rounded-lg">
-                  <p className="font-medium">{selectedPackage.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {WORKFORCE_GROUP_LABELS[selectedPackage.workforce_group]} • {selectedPackage.question_count || 25} questions
+        {/* Package summary by workforce group */}
+        <div className="grid gap-4 md:grid-cols-5">
+          {WORKFORCE_GROUPS.map(group => {
+            const groupPackages = packages.filter(p => p.workforce_group === group);
+            const available = getAvailableQuestionsForGroup(group);
+            return (
+              <Card key={group}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">{WORKFORCE_GROUP_LABELS[group]}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{groupPackages.length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    packages ({available.length} questions left)
                   </p>
-                </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
 
-                <div className="space-y-2">
-                  <Label>Organization</Label>
-                  <Select value={selectedOrg} onValueChange={setSelectedOrg}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select organization..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {organizations.map(org => {
-                        const alreadyReleased = isPackageReleasedToOrg(selectedPackage.id, org.id);
-                        return (
-                          <SelectItem 
-                            key={org.id} 
-                            value={org.id}
-                            disabled={alreadyReleased}
-                          >
-                            {org.name} {alreadyReleased && "(already released)"}
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Training Year</Label>
-                  <Select 
-                    value={trainingYear.toString()} 
-                    onValueChange={(val) => setTrainingYear(parseInt(val))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[2024, 2025, 2026, 2027, 2028].map(year => (
-                        <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Notes (optional)</Label>
-                  <Textarea
-                    value={releaseNotes}
-                    onChange={(e) => setReleaseNotes(e.target.value)}
-                    placeholder="Add release notes..."
-                  />
-                </div>
-
-                <Button 
-                  onClick={handleReleasePackage} 
-                  disabled={releasing || !selectedOrg}
-                  className="w-full"
-                >
-                  {releasing ? "Releasing..." : "Release Package"}
-                </Button>
+        {/* Packages table */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              All Packages
+            </CardTitle>
+            <CardDescription>
+              Release packages to organizations via the Content Releases page
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="text-center py-8 text-muted-foreground">Loading...</div>
+            ) : packages.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No packages created yet. Create your first package above.
               </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Workforce Group</TableHead>
+                    <TableHead>Questions</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {packages.map(pkg => (
+                    <TableRow key={pkg.id}>
+                      <TableCell className="font-medium">{pkg.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {WORKFORCE_GROUP_LABELS[pkg.workforce_group]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{pkg.question_count || 0}</TableCell>
+                      <TableCell>{format(new Date(pkg.created_at), "MMM d, yyyy")}</TableCell>
+                      <TableCell className="text-right">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => handleViewPackage(pkg)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
-          </DialogContent>
-        </Dialog>
+          </CardContent>
+        </Card>
 
         {/* View Package Dialog */}
         <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>

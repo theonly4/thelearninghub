@@ -47,7 +47,6 @@ import {
   Calendar,
   Package,
   Eye,
-  X
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -81,16 +80,19 @@ interface PackageRelease {
   package_description?: string;
 }
 
-interface Quiz {
+interface QuestionPackage {
   id: string;
-  title: string;
+  name: string;
+  workforce_group: WorkforceGroup;
   sequence_number: number;
+  question_count?: number;
 }
 
 interface TrainingMaterial {
   id: string;
   title: string;
   sequence_number: number;
+  workforce_groups: WorkforceGroup[];
 }
 
 interface PackageQuestion {
@@ -101,11 +103,13 @@ interface PackageQuestion {
   hipaa_section: string;
 }
 
+const WORKFORCE_GROUPS: WorkforceGroup[] = ["all_staff", "clinical", "administrative", "management", "it"];
+
 export default function ContentReleasesPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [releases, setReleases] = useState<ContentRelease[]>([]);
   const [packageReleases, setPackageReleases] = useState<PackageRelease[]>([]);
-  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [packages, setPackages] = useState<QuestionPackage[]>([]);
   const [materials, setMaterials] = useState<TrainingMaterial[]>([]);
   const [loading, setLoading] = useState(true);
   const [isReleaseDialogOpen, setIsReleaseDialogOpen] = useState(false);
@@ -124,21 +128,21 @@ export default function ContentReleasesPage() {
   async function fetchData() {
     setLoading(true);
     try {
-      const [orgsRes, releasesRes, packageReleasesRes, quizzesRes, materialsRes] = await Promise.all([
-        supabase.from("organizations").select("id, name, slug").order("name"),
+      const [orgsRes, releasesRes, packageReleasesRes, packagesRes, materialsRes] = await Promise.all([
+        supabase.from("organizations").select("id, name, slug").neq("slug", "platform-owner").order("name"),
         supabase.from("content_releases").select("*").order("released_at", { ascending: false }),
         supabase
           .from("package_releases")
           .select("id, package_id, organization_id, workforce_group, training_year, released_at, notes, question_packages(name)")
           .order("released_at", { ascending: false }),
-        supabase.from("quizzes").select("id, title, sequence_number").order("sequence_number"),
-        supabase.from("training_materials").select("id, title, sequence_number").order("sequence_number"),
+        supabase.from("question_packages").select("id, name, workforce_group, sequence_number").order("workforce_group").order("sequence_number"),
+        supabase.from("training_materials").select("id, title, sequence_number, workforce_groups").order("sequence_number"),
       ]);
 
       if (orgsRes.error) throw orgsRes.error;
       if (releasesRes.error) throw releasesRes.error;
       if (packageReleasesRes.error) throw packageReleasesRes.error;
-      if (quizzesRes.error) throw quizzesRes.error;
+      if (packagesRes.error) throw packagesRes.error;
       if (materialsRes.error) throw materialsRes.error;
 
       setOrganizations(orgsRes.data || []);
@@ -157,8 +161,24 @@ export default function ContentReleasesPage() {
       }));
       setPackageReleases(mappedPackageReleases);
       
-      setQuizzes(quizzesRes.data || []);
-      setMaterials(materialsRes.data || []);
+      // Get question counts for packages
+      const packagesWithCounts = await Promise.all(
+        (packagesRes.data || []).map(async (pkg) => {
+          const { count } = await supabase
+            .from("package_questions")
+            .select("*", { count: "exact", head: true })
+            .eq("package_id", pkg.id);
+          return { ...pkg, question_count: count || 0, workforce_group: pkg.workforce_group as WorkforceGroup };
+        })
+      );
+      setPackages(packagesWithCounts);
+      
+      setMaterials(
+        (materialsRes.data || []).map((m) => ({
+          ...m,
+          workforce_groups: m.workforce_groups as WorkforceGroup[],
+        }))
+      );
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Failed to load data");
@@ -168,9 +188,6 @@ export default function ContentReleasesPage() {
   }
 
   function getContentTitle(contentType: string, contentId: string) {
-    if (contentType === "quiz") {
-      return quizzes.find((q) => q.id === contentId)?.title || "Unknown Quiz";
-    }
     return materials.find((m) => m.id === contentId)?.title || "Unknown Material";
   }
 
@@ -178,22 +195,12 @@ export default function ContentReleasesPage() {
     return organizations.find((o) => o.id === orgId)?.name || "Unknown Organization";
   }
 
-  function getOrgReleaseCount(orgId: string) {
-    const contentCount = releases.filter((r) => r.organization_id === orgId).length;
-    const packageCount = packageReleases.filter((r) => r.organization_id === orgId).length;
-    return contentCount + packageCount;
-  }
-
-  function getOrgQuizCount(orgId: string) {
-    return releases.filter((r) => r.organization_id === orgId && r.content_type === "quiz").length;
+  function getOrgPackageCount(orgId: string) {
+    return packageReleases.filter((r) => r.organization_id === orgId).length;
   }
 
   function getOrgMaterialCount(orgId: string) {
     return releases.filter((r) => r.organization_id === orgId && r.content_type === "training_material").length;
-  }
-
-  function getOrgPackageCount(orgId: string) {
-    return packageReleases.filter((r) => r.organization_id === orgId).length;
   }
 
   async function handleViewPackage(release: PackageRelease) {
@@ -242,7 +249,7 @@ export default function ContentReleasesPage() {
           <div>
             <h2 className="text-2xl font-semibold tracking-tight">Content Releases</h2>
             <p className="text-muted-foreground">
-              Control which content is available to each organization.
+              Release question packages and training materials to organizations.
             </p>
           </div>
           <Dialog open={isReleaseDialogOpen} onOpenChange={setIsReleaseDialogOpen}>
@@ -252,12 +259,13 @@ export default function ContentReleasesPage() {
                 Release Content
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <ReleaseForm
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <UnifiedReleaseForm
                 organizations={organizations}
-                quizzes={quizzes}
+                packages={packages}
                 materials={materials}
-                existingReleases={releases}
+                existingPackageReleases={packageReleases}
+                existingContentReleases={releases}
                 onSuccess={() => {
                   setIsReleaseDialogOpen(false);
                   fetchData();
@@ -303,11 +311,6 @@ export default function ContentReleasesPage() {
                       <Package className="h-4 w-4 text-primary" />
                       <span className="text-sm font-medium">{getOrgPackageCount(org.id)}</span>
                       <span className="text-xs text-muted-foreground">packages</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <FileQuestion className="h-4 w-4 text-info" />
-                      <span className="text-sm font-medium">{getOrgQuizCount(org.id)}</span>
-                      <span className="text-xs text-muted-foreground">quizzes</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <BookOpen className="h-4 w-4 text-success" />
@@ -401,12 +404,8 @@ export default function ContentReleasesPage() {
                         {getContentTitle(release.content_type, release.content_id)}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={release.content_type === "quiz" ? "default" : "secondary"}>
-                          {release.content_type === "quiz" ? (
-                            <><FileQuestion className="h-3 w-3 mr-1" /> Quiz</>
-                          ) : (
-                            <><BookOpen className="h-3 w-3 mr-1" /> Material</>
-                          )}
+                        <Badge variant="secondary">
+                          <BookOpen className="h-3 w-3 mr-1" /> Material
                         </Badge>
                       </TableCell>
                       <TableCell>{getOrgName(release.organization_id)}</TableCell>
@@ -456,80 +455,106 @@ export default function ContentReleasesPage() {
                     {WORKFORCE_GROUP_LABELS[selectedPackageRelease.workforce_group as WorkforceGroup] || selectedPackageRelease.workforce_group}
                   </Badge>
                   <Badge variant="outline">{selectedPackageRelease.training_year}</Badge>
-                  <Badge variant="outline">
-                    {getOrgName(selectedPackageRelease.organization_id)}
-                  </Badge>
                 </div>
               )}
             </SheetDescription>
           </SheetHeader>
           
-          <div className="mt-6">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="font-medium text-sm text-muted-foreground">
-                Questions in Package
-              </h4>
-              <Badge variant="secondary">{packageQuestions.length} questions</Badge>
-            </div>
-            
-            <ScrollArea className="h-[calc(100vh-220px)]">
-              {loadingQuestions ? (
-                <div className="py-8 text-center text-muted-foreground">
-                  Loading questions...
-                </div>
-              ) : packageQuestions.length === 0 ? (
-                <div className="py-8 text-center text-muted-foreground">
-                  No questions found in this package.
-                </div>
-              ) : (
-                <div className="space-y-3 pr-4">
-                  {packageQuestions.map((q, index) => (
-                    <Card key={q.id} className="p-3">
-                      <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-medium flex items-center justify-center">
-                          {index + 1}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm">{q.question_text}</p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <Badge variant="outline" className="text-xs">
-                              {q.hipaa_section}
-                            </Badge>
-                          </div>
-                        </div>
+          <ScrollArea className="h-[calc(100vh-180px)] mt-6">
+            {loadingQuestions ? (
+              <div className="flex items-center justify-center py-8">
+                <p className="text-muted-foreground">Loading questions...</p>
+              </div>
+            ) : packageQuestions.length === 0 ? (
+              <div className="flex items-center justify-center py-8">
+                <p className="text-muted-foreground">No questions found in this package.</p>
+              </div>
+            ) : (
+              <div className="space-y-3 pr-4">
+                {packageQuestions.map((q, index) => (
+                  <div 
+                    key={q.id} 
+                    className="p-4 rounded-lg border border-border bg-card"
+                  >
+                    <div className="flex items-start gap-3">
+                      <Badge variant="outline" className="shrink-0">
+                        Q{index + 1}
+                      </Badge>
+                      <div className="space-y-2">
+                        <p className="text-sm">{q.question_text}</p>
+                        <Badge variant="secondary" className="text-xs">
+                          {q.hipaa_section}
+                        </Badge>
                       </div>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
-          </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
         </SheetContent>
       </Sheet>
     </PlatformOwnerLayout>
   );
 }
 
-interface ReleaseFormProps {
+// Unified Release Form Component
+interface UnifiedReleaseFormProps {
   organizations: Organization[];
-  quizzes: Quiz[];
+  packages: QuestionPackage[];
   materials: TrainingMaterial[];
-  existingReleases: ContentRelease[];
+  existingPackageReleases: PackageRelease[];
+  existingContentReleases: ContentRelease[];
   onSuccess: () => void;
 }
 
-function ReleaseForm({ organizations, quizzes, materials, existingReleases, onSuccess }: ReleaseFormProps) {
+function UnifiedReleaseForm({
+  organizations,
+  packages,
+  materials,
+  existingPackageReleases,
+  existingContentReleases,
+  onSuccess,
+}: UnifiedReleaseFormProps) {
   const [selectedOrgs, setSelectedOrgs] = useState<string[]>([]);
-  const [contentType, setContentType] = useState<"quiz" | "training_material">("quiz");
-  const [selectedContent, setSelectedContent] = useState<string[]>([]);
+  const [workforceGroup, setWorkforceGroup] = useState<WorkforceGroup | "">("");
+  const [trainingYear, setTrainingYear] = useState<number>(new Date().getFullYear());
+  const [selectedPackage, setSelectedPackage] = useState<string>("");
+  const [selectedMaterials, setSelectedMaterials] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const contentOptions = contentType === "quiz" ? quizzes : materials;
+  // Filter packages by workforce group
+  const filteredPackages = workforceGroup
+    ? packages.filter((p) => p.workforce_group === workforceGroup)
+    : [];
 
-  function isAlreadyReleased(orgId: string, contentId: string) {
-    return existingReleases.some(
-      (r) => r.organization_id === orgId && r.content_id === contentId && r.content_type === contentType
+  // Filter materials by workforce group
+  const filteredMaterials = workforceGroup
+    ? materials.filter((m) => m.workforce_groups.includes(workforceGroup))
+    : [];
+
+  function isPackageAlreadyReleased(orgId: string, packageId: string) {
+    return existingPackageReleases.some(
+      (r) => r.organization_id === orgId && r.package_id === packageId
+    );
+  }
+
+  function isOrgYearGroupConflict(orgId: string) {
+    return existingPackageReleases.some(
+      (r) =>
+        r.organization_id === orgId &&
+        r.workforce_group === workforceGroup &&
+        r.training_year === trainingYear
+    );
+  }
+
+  function isMaterialAlreadyReleased(orgId: string, materialId: string) {
+    return existingContentReleases.some(
+      (r) =>
+        r.organization_id === orgId &&
+        r.content_id === materialId &&
+        r.content_type === "training_material"
     );
   }
 
@@ -539,64 +564,125 @@ function ReleaseForm({ organizations, quizzes, materials, existingReleases, onSu
     );
   }
 
-  function handleContentToggle(contentId: string) {
-    setSelectedContent((prev) =>
-      prev.includes(contentId) ? prev.filter((id) => id !== contentId) : [...prev, contentId]
+  function handleMaterialToggle(materialId: string) {
+    setSelectedMaterials((prev) =>
+      prev.includes(materialId)
+        ? prev.filter((id) => id !== materialId)
+        : [...prev, materialId]
     );
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (selectedOrgs.length === 0 || selectedContent.length === 0) {
-      toast.error("Please select at least one organization and one content item");
+    if (selectedOrgs.length === 0) {
+      toast.error("Please select at least one organization");
+      return;
+    }
+
+    if (!workforceGroup) {
+      toast.error("Please select a workforce group");
+      return;
+    }
+
+    if (!selectedPackage && selectedMaterials.length === 0) {
+      toast.error("Please select a question package or training materials to release");
       return;
     }
 
     setSaving(true);
 
     try {
-      // Create releases for each org/content combination
-      const releases = [];
-      for (const orgId of selectedOrgs) {
-        for (const contentId of selectedContent) {
-          if (!isAlreadyReleased(orgId, contentId)) {
-            releases.push({
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error("Not authenticated");
+
+      let packageReleasesCreated = 0;
+      let materialReleasesCreated = 0;
+
+      // Release package to each org
+      if (selectedPackage) {
+        const packageReleasesToCreate = [];
+        for (const orgId of selectedOrgs) {
+          if (!isPackageAlreadyReleased(orgId, selectedPackage) && !isOrgYearGroupConflict(orgId)) {
+            packageReleasesToCreate.push({
+              package_id: selectedPackage,
               organization_id: orgId,
-              content_type: contentType,
-              content_id: contentId,
+              workforce_group: workforceGroup,
+              training_year: trainingYear,
+              released_by: userData.user.id,
               notes: notes || null,
-              released_by: "00000000-0000-0000-0000-000000000000", // Placeholder - should be current user
             });
           }
         }
+
+        if (packageReleasesToCreate.length > 0) {
+          const { error } = await supabase.from("package_releases").insert(packageReleasesToCreate);
+          if (error) throw error;
+          packageReleasesCreated = packageReleasesToCreate.length;
+        }
       }
 
-      if (releases.length === 0) {
+      // Release materials to each org
+      if (selectedMaterials.length > 0) {
+        const materialReleasesToCreate = [];
+        for (const orgId of selectedOrgs) {
+          for (const materialId of selectedMaterials) {
+            if (!isMaterialAlreadyReleased(orgId, materialId)) {
+              materialReleasesToCreate.push({
+                organization_id: orgId,
+                content_type: "training_material",
+                content_id: materialId,
+                released_by: userData.user.id,
+                notes: notes || null,
+              });
+            }
+          }
+        }
+
+        if (materialReleasesToCreate.length > 0) {
+          const { error } = await supabase.from("content_releases").insert(materialReleasesToCreate);
+          if (error) throw error;
+          materialReleasesCreated = materialReleasesToCreate.length;
+        }
+      }
+
+      if (packageReleasesCreated === 0 && materialReleasesCreated === 0) {
         toast.info("All selected content is already released to selected organizations");
         return;
       }
 
-      const { error } = await supabase.from("content_releases").insert(releases);
-
-      if (error) throw error;
-
-      toast.success(`Released ${releases.length} content item(s) successfully`);
+      const messages = [];
+      if (packageReleasesCreated > 0) {
+        messages.push(`${packageReleasesCreated} package release(s)`);
+      }
+      if (materialReleasesCreated > 0) {
+        messages.push(`${materialReleasesCreated} material release(s)`);
+      }
+      toast.success(`Released: ${messages.join(" and ")}`);
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error releasing content:", error);
-      toast.error("Failed to release content");
+      if (error.message?.includes("duplicate") || error.code === "23505") {
+        toast.error("Duplicate release detected. An organization may already have a package for this workforce group and year.");
+      } else {
+        toast.error("Failed to release content");
+      }
     } finally {
       setSaving(false);
     }
   }
+
+  // Check for conflicts
+  const orgsWithConflicts = selectedOrgs.filter((orgId) => 
+    selectedPackage && isOrgYearGroupConflict(orgId)
+  );
 
   return (
     <form onSubmit={handleSubmit}>
       <DialogHeader>
         <DialogTitle>Release Content to Organizations</DialogTitle>
         <DialogDescription>
-          Select organizations and content to release. Content already released will be skipped.
+          Release a question package and training materials together for a workforce group.
         </DialogDescription>
       </DialogHeader>
 
@@ -604,7 +690,7 @@ function ReleaseForm({ organizations, quizzes, materials, existingReleases, onSu
         {/* Organizations */}
         <div className="space-y-3">
           <Label>Select Organizations</Label>
-          <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto border rounded-md p-3">
+          <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto border rounded-md p-3">
             {organizations.map((org) => (
               <div key={org.id} className="flex items-center space-x-2">
                 <Checkbox
@@ -620,54 +706,117 @@ function ReleaseForm({ organizations, quizzes, materials, existingReleases, onSu
           </div>
         </div>
 
-        {/* Content Type */}
-        <div className="space-y-2">
-          <Label>Content Type</Label>
-          <Select value={contentType} onValueChange={(v) => {
-            setContentType(v as "quiz" | "training_material");
-            setSelectedContent([]);
-          }}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="quiz">
-                <div className="flex items-center gap-2">
-                  <FileQuestion className="h-4 w-4" />
-                  Quizzes
-                </div>
-              </SelectItem>
-              <SelectItem value="training_material">
-                <div className="flex items-center gap-2">
-                  <BookOpen className="h-4 w-4" />
-                  Training Materials
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Workforce Group & Training Year */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Workforce Group</Label>
+            <Select
+              value={workforceGroup}
+              onValueChange={(v) => {
+                setWorkforceGroup(v as WorkforceGroup);
+                setSelectedPackage("");
+                setSelectedMaterials([]);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select group..." />
+              </SelectTrigger>
+              <SelectContent>
+                {WORKFORCE_GROUPS.map((group) => (
+                  <SelectItem key={group} value={group}>
+                    {WORKFORCE_GROUP_LABELS[group]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-        {/* Content Selection */}
-        <div className="space-y-3">
-          <Label>Select Content to Release</Label>
-          <div className="grid gap-2 max-h-48 overflow-y-auto border rounded-md p-3">
-            {contentOptions.map((item) => (
-              <div key={item.id} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`content-${item.id}`}
-                  checked={selectedContent.includes(item.id)}
-                  onCheckedChange={() => handleContentToggle(item.id)}
-                />
-                <Label htmlFor={`content-${item.id}`} className="text-sm font-normal cursor-pointer flex-1">
-                  <span className="font-mono text-xs text-muted-foreground mr-2">
-                    #{item.sequence_number}
-                  </span>
-                  {item.title}
-                </Label>
-              </div>
-            ))}
+          <div className="space-y-2">
+            <Label>Training Year</Label>
+            <Select
+              value={trainingYear.toString()}
+              onValueChange={(v) => setTrainingYear(parseInt(v))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[2024, 2025, 2026, 2027, 2028].map((year) => (
+                  <SelectItem key={year} value={year.toString()}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
+
+        {/* Question Package */}
+        {workforceGroup && (
+          <div className="space-y-2">
+            <Label>Question Package</Label>
+            <Select value={selectedPackage} onValueChange={setSelectedPackage}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select package..." />
+              </SelectTrigger>
+              <SelectContent>
+                {filteredPackages.length === 0 ? (
+                  <div className="py-2 px-3 text-sm text-muted-foreground">
+                    No packages for this group
+                  </div>
+                ) : (
+                  filteredPackages.map((pkg) => (
+                    <SelectItem key={pkg.id} value={pkg.id}>
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        {pkg.name}
+                        <span className="text-xs text-muted-foreground">
+                          ({pkg.question_count || 25} questions)
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+            {orgsWithConflicts.length > 0 && (
+              <p className="text-xs text-warning">
+                Warning: {orgsWithConflicts.length} org(s) already have a package for this group/year
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Training Materials */}
+        {workforceGroup && (
+          <div className="space-y-3">
+            <Label>Training Materials</Label>
+            {filteredMaterials.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No materials for this group</p>
+            ) : (
+              <div className="grid gap-2 max-h-40 overflow-y-auto border rounded-md p-3">
+                {filteredMaterials.map((material) => (
+                  <div key={material.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`material-${material.id}`}
+                      checked={selectedMaterials.includes(material.id)}
+                      onCheckedChange={() => handleMaterialToggle(material.id)}
+                    />
+                    <Label
+                      htmlFor={`material-${material.id}`}
+                      className="text-sm font-normal cursor-pointer flex-1"
+                    >
+                      <span className="font-mono text-xs text-muted-foreground mr-2">
+                        #{material.sequence_number}
+                      </span>
+                      {material.title}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Notes */}
         <div className="space-y-2">
@@ -682,18 +831,40 @@ function ReleaseForm({ organizations, quizzes, materials, existingReleases, onSu
         </div>
 
         {/* Summary */}
-        {selectedOrgs.length > 0 && selectedContent.length > 0 && (
-          <div className="rounded-md bg-muted p-3">
-            <p className="text-sm">
-              <span className="font-medium">{selectedContent.length}</span> {contentType === "quiz" ? "quiz(zes)" : "material(s)"} will be released to{" "}
-              <span className="font-medium">{selectedOrgs.length}</span> organization(s).
-            </p>
+        {selectedOrgs.length > 0 && (selectedPackage || selectedMaterials.length > 0) && (
+          <div className="rounded-md bg-muted p-3 space-y-2">
+            <p className="text-sm font-medium">Release Summary</p>
+            <div className="text-sm text-muted-foreground space-y-1">
+              <p>
+                <strong>{selectedOrgs.length}</strong> organization(s) selected
+              </p>
+              {selectedPackage && (
+                <p className="flex items-center gap-1">
+                  <Package className="h-3 w-3" />
+                  1 question package
+                </p>
+              )}
+              {selectedMaterials.length > 0 && (
+                <p className="flex items-center gap-1">
+                  <BookOpen className="h-3 w-3" />
+                  {selectedMaterials.length} training material(s)
+                </p>
+              )}
+            </div>
           </div>
         )}
       </div>
 
       <DialogFooter>
-        <Button type="submit" disabled={saving || selectedOrgs.length === 0 || selectedContent.length === 0}>
+        <Button
+          type="submit"
+          disabled={
+            saving ||
+            selectedOrgs.length === 0 ||
+            !workforceGroup ||
+            (!selectedPackage && selectedMaterials.length === 0)
+          }
+        >
           <CheckCircle2 className="h-4 w-4 mr-2" />
           {saving ? "Releasing..." : "Release Content"}
         </Button>

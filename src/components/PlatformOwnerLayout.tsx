@@ -29,7 +29,6 @@ const platformOwnerNavItems = [
   { icon: Package, label: "Question Packages", href: "/platform/packages" },
   { icon: BookOpen, label: "Training Materials", href: "/platform/materials" },
   { icon: Building2, label: "Organizations", href: "/platform/organizations" },
-  { icon: GitBranch, label: "Question Distribution", href: "/platform/distribution" },
   { icon: Send, label: "Content Releases", href: "/platform/releases" },
   { icon: HelpCircle, label: "How To Guide", href: "/platform/help" },
 ];
