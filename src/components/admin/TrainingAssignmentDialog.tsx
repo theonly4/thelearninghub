@@ -25,7 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { format, addDays } from "date-fns";
-import { CalendarIcon, Clock, BookOpen, FileText, Users } from "lucide-react";
+import { CalendarIcon, Clock, BookOpen, FileText, Users, Package, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -54,6 +54,13 @@ interface Employee {
   workforce_groups: WorkforceGroup[];
 }
 
+interface ReleasedPackage {
+  package_id: string;
+  workforce_group: WorkforceGroup;
+  training_year: number;
+  package_name: string;
+}
+
 export function TrainingAssignmentDialog({
   open,
   onOpenChange,
@@ -66,7 +73,10 @@ export function TrainingAssignmentDialog({
   const [loading, setLoading] = useState(false);
   const [materials, setMaterials] = useState<TrainingMaterial[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [releasedPackages, setReleasedPackages] = useState<ReleasedPackage[]>([]);
+  const [releasedMaterialIds, setReleasedMaterialIds] = useState<string[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [adminOrgId, setAdminOrgId] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -77,24 +87,77 @@ export function TrainingAssignmentDialog({
   async function fetchData() {
     setLoadingData(true);
     try {
-      // Fetch training materials
-      const { data: materialsData, error: materialsError } = await supabase
-        .from("training_materials")
-        .select("id, title, estimated_minutes, workforce_groups")
-        .order("sequence_number");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      if (materialsError) throw materialsError;
-      setMaterials(
-        (materialsData || []).map((m) => ({
-          ...m,
-          workforce_groups: m.workforce_groups as WorkforceGroup[],
+      // Get admin's organization
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("organization_id")
+        .eq("user_id", user.id)
+        .single();
+
+      if (!profile) return;
+      setAdminOrgId(profile.organization_id);
+
+      // Fetch released training material IDs for this org
+      const { data: releasedContent, error: releasedError } = await supabase
+        .from("content_releases")
+        .select("content_id")
+        .eq("organization_id", profile.organization_id)
+        .eq("content_type", "training_material");
+
+      if (releasedError) throw releasedError;
+      
+      const releasedIds = releasedContent?.map(r => r.content_id) || [];
+      setReleasedMaterialIds(releasedIds);
+
+      // Fetch only released training materials
+      if (releasedIds.length > 0) {
+        const { data: materialsData, error: materialsError } = await supabase
+          .from("training_materials")
+          .select("id, title, estimated_minutes, workforce_groups")
+          .in("id", releasedIds)
+          .order("sequence_number");
+
+        if (materialsError) throw materialsError;
+        setMaterials(
+          (materialsData || []).map((m) => ({
+            ...m,
+            workforce_groups: m.workforce_groups as WorkforceGroup[],
+          }))
+        );
+      } else {
+        setMaterials([]);
+      }
+
+      // Fetch released packages for this org
+      const { data: packagesData, error: packagesError } = await supabase
+        .from("package_releases")
+        .select(`
+          package_id,
+          workforce_group,
+          training_year,
+          question_packages (name)
+        `)
+        .eq("organization_id", profile.organization_id);
+
+      if (packagesError) throw packagesError;
+      
+      setReleasedPackages(
+        (packagesData || []).map((p: any) => ({
+          package_id: p.package_id,
+          workforce_group: p.workforce_group as WorkforceGroup,
+          training_year: p.training_year,
+          package_name: p.question_packages?.name || "Question Package",
         }))
       );
 
       // Fetch employees in organization
       const { data: employeesData, error: employeesError } = await supabase
         .from("profiles")
-        .select("id, user_id, first_name, last_name, email, workforce_groups");
+        .select("id, user_id, first_name, last_name, email, workforce_groups")
+        .eq("organization_id", profile.organization_id);
 
       if (employeesError) throw employeesError;
       setEmployees(
@@ -121,11 +184,19 @@ export function TrainingAssignmentDialog({
     ? employees.filter((e) => e.workforce_groups.includes(workforceGroup))
     : [];
 
+  // Get released package for this workforce group
+  const packageForGroup = workforceGroup
+    ? releasedPackages.find((p) => p.workforce_group === workforceGroup)
+    : null;
+
   // Calculate total training time
   const totalMinutes = filteredMaterials.reduce(
     (sum, m) => sum + m.estimated_minutes,
     0
   );
+
+  // Check if content is available
+  const hasReleasedContent = filteredMaterials.length > 0 || packageForGroup;
 
   async function handleAssign() {
     if (!workforceGroup || !dueDate) {
@@ -138,24 +209,22 @@ export function TrainingAssignmentDialog({
       return;
     }
 
+    if (!hasReleasedContent) {
+      toast.error("No content has been released for this workforce group");
+      return;
+    }
+
     setLoading(true);
     try {
       // Get current user for assigned_by
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Get organization ID from profile
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("organization_id")
-        .eq("user_id", user.id)
-        .single();
-
-      if (!profile) throw new Error("Profile not found");
+      if (!adminOrgId) throw new Error("Organization not found");
 
       // Create assignment for each employee
       const assignments = filteredEmployees.map((emp) => ({
-        organization_id: profile.organization_id,
+        organization_id: adminOrgId,
         assigned_to: emp.user_id,
         assigned_by: user.id,
         workforce_group: workforceGroup,
@@ -197,8 +266,7 @@ export function TrainingAssignmentDialog({
             Assign Training
           </DialogTitle>
           <DialogDescription>
-            Assign training materials and quizzes to a workforce group with a
-            completion deadline.
+            Assign released training materials and quizzes to a workforce group.
           </DialogDescription>
         </DialogHeader>
 
@@ -224,6 +292,19 @@ export function TrainingAssignmentDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {/* No Content Warning */}
+          {workforceGroup && !hasReleasedContent && (
+            <div className="rounded-lg border border-warning/30 bg-warning/5 p-3">
+              <div className="flex items-center gap-2 text-warning">
+                <AlertTriangle className="h-4 w-4" />
+                <p className="text-sm font-medium">No Content Released</p>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                No training materials or quiz packages have been released for this workforce group. Contact your platform administrator.
+              </p>
+            </div>
+          )}
 
           {/* Due Date Selection */}
           <div className="space-y-2">
@@ -294,6 +375,12 @@ export function TrainingAssignmentDialog({
                     <strong>{totalMinutes}</strong> min estimated
                   </span>
                 </div>
+                {packageForGroup && (
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-xs">1 quiz package</span>
+                  </div>
+                )}
               </div>
 
               {filteredMaterials.length > 0 && (
@@ -308,6 +395,18 @@ export function TrainingAssignmentDialog({
                       </Badge>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {packageForGroup && (
+                <div className="pt-2 border-t border-border">
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Quiz Package:
+                  </p>
+                  <Badge variant="outline" className="text-xs">
+                    <Package className="h-3 w-3 mr-1" />
+                    {packageForGroup.package_name} ({packageForGroup.training_year})
+                  </Badge>
                 </div>
               )}
             </div>
@@ -325,7 +424,11 @@ export function TrainingAssignmentDialog({
           <Button
             onClick={handleAssign}
             disabled={
-              loading || !workforceGroup || !dueDate || filteredEmployees.length === 0
+              loading || 
+              !workforceGroup || 
+              !dueDate || 
+              filteredEmployees.length === 0 ||
+              !hasReleasedContent
             }
           >
             {loading ? "Assigning..." : "Assign Training"}

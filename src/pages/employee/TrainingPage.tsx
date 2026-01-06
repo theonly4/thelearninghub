@@ -4,7 +4,7 @@ import { TrainingMaterialReader } from "@/components/training/TrainingMaterialRe
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { WorkforceGroupBadge } from "@/components/WorkforceGroupBadge";
 import { HipaaLink } from "@/components/HipaaLink";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,6 +30,7 @@ interface TrainingAssignment {
   status: string;
   assigned_at: string;
   notes: string | null;
+  organization_id: string;
 }
 
 interface TrainingMaterial {
@@ -86,22 +87,39 @@ export default function EmployeeTrainingPage() {
           workforce_group: assignmentData.workforce_group as WorkforceGroup,
         });
 
-        // Fetch materials for this workforce group
-        const { data: materialsData, error: materialsError } = await supabase
-          .from("training_materials")
-          .select("*")
-          .contains("workforce_groups", [assignmentData.workforce_group])
-          .order("sequence_number");
+        // Fetch released training material IDs for this organization
+        const { data: releasedMaterials, error: releasedError } = await supabase
+          .from("content_releases")
+          .select("content_id")
+          .eq("organization_id", assignmentData.organization_id)
+          .eq("content_type", "training_material");
 
-        if (materialsError) throw materialsError;
+        if (releasedError) throw releasedError;
 
-        setMaterials(
-          (materialsData || []).map((m) => ({
-            ...m,
-            workforce_groups: m.workforce_groups as WorkforceGroup[],
-            content: m.content as TrainingMaterial["content"],
-          }))
-        );
+        const releasedMaterialIds = releasedMaterials?.map(r => r.content_id) || [];
+
+        if (releasedMaterialIds.length === 0) {
+          // No materials released to this org
+          setMaterials([]);
+        } else {
+          // Fetch materials that are released AND match workforce group
+          const { data: materialsData, error: materialsError } = await supabase
+            .from("training_materials")
+            .select("*")
+            .in("id", releasedMaterialIds)
+            .contains("workforce_groups", [assignmentData.workforce_group])
+            .order("sequence_number");
+
+          if (materialsError) throw materialsError;
+
+          setMaterials(
+            (materialsData || []).map((m) => ({
+              ...m,
+              workforce_groups: m.workforce_groups as WorkforceGroup[],
+              content: m.content as TrainingMaterial["content"],
+            }))
+          );
+        }
       }
 
       // Fetch user progress
@@ -250,6 +268,21 @@ export default function EmployeeTrainingPage() {
           <h2 className="text-xl font-semibold mb-2">No Training Assigned</h2>
           <p className="text-muted-foreground max-w-md">
             Your administrator has not yet assigned training materials. Please check back later or contact your administrator.
+          </p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // No materials released
+  if (materials.length === 0) {
+    return (
+      <DashboardLayout userRole="workforce_user" userName="Employee">
+        <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
+          <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Training Materials Pending</h2>
+          <p className="text-muted-foreground max-w-md">
+            Training has been assigned, but the training materials are not yet available. Please check back later.
           </p>
         </div>
       </DashboardLayout>
