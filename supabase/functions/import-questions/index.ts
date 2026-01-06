@@ -1,6 +1,18 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Sanitize database errors to prevent information leakage
+function sanitizeError(error: any): string {
+  const errorMap: Record<string, string> = {
+    '23505': 'Record already exists',
+    '23503': 'Invalid reference',
+    '23502': 'Required field missing',
+    '22P02': 'Invalid input format',
+  };
+  const code = error?.code || 'unknown';
+  return errorMap[code] || 'An error occurred';
+}
+
 // Dynamic CORS origin validation - prevents cross-origin attacks while allowing legitimate requests
 function getCorsHeaders(requestOrigin: string | null): Record<string, string> {
   const allowedOrigins = [
@@ -205,8 +217,9 @@ serve(async (req) => {
             .single();
 
           if (topicError) {
+            console.error(`Failed to create topic ${topic.topic_name}:`, topicError);
             results.errors.push(
-              `Failed to create topic ${topic.topic_name}: ${topicError.message}`,
+              `Failed to create topic: ${sanitizeError(topicError)}`,
             );
           } else if (newTopic) {
             topicMap.set(key, newTopic.id);
@@ -265,7 +278,8 @@ serve(async (req) => {
           .insert(questionData);
 
         if (insertError) {
-          results.errors.push(`Question ${q.question_number}: ${insertError.message}`);
+          console.error(`Question ${q.question_number} insert error:`, insertError);
+          results.errors.push(`Question ${q.question_number}: ${sanitizeError(insertError)}`);
           results.skipped++;
         } else {
           results.imported++;
@@ -282,8 +296,8 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    console.error("Import questions error:", error);
+    return new Response(JSON.stringify({ error: "An error occurred while importing questions" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
