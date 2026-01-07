@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { PlatformOwnerLayout } from "@/components/PlatformOwnerLayout";
+import { CredentialEmailTemplate } from "@/components/CredentialEmailTemplate";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -671,6 +672,17 @@ Please change your password after first login.`;
                     </p>
                   </div>
                 </div>
+
+                {/* Email Template */}
+                <div className="border-t pt-4">
+                  <CredentialEmailTemplate
+                    recipientName={createdCredentials.adminFirstName}
+                    email={createdCredentials.adminEmail}
+                    password={createdCredentials.password}
+                    organizationName={createdCredentials.organizationName}
+                    isPasswordReset={false}
+                  />
+                </div>
               </div>
             )}
             
@@ -1086,7 +1098,7 @@ Please change your password after first login.`;
 
         {/* New Password Display Dialog */}
         <Dialog open={!!newPasswordCredentials} onOpenChange={() => setNewPasswordCredentials(null)}>
-          <DialogContent className="sm:max-w-[450px]">
+          <DialogContent className="sm:max-w-[550px]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-success">
                 <Check className="h-5 w-5" />
@@ -1147,6 +1159,16 @@ Please change your password after first login.`;
                       Send the new password to the admin through a secure channel.
                     </p>
                   </div>
+                </div>
+
+                {/* Email Template */}
+                <div className="border-t pt-4">
+                  <CredentialEmailTemplate
+                    recipientName={selectedAdmin?.firstName || newPasswordCredentials.email.split('@')[0]}
+                    email={newPasswordCredentials.email}
+                    password={newPasswordCredentials.password}
+                    isPasswordReset={true}
+                  />
                 </div>
               </div>
             )}

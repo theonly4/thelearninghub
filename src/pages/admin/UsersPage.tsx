@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { WorkforceGroupBadge } from "@/components/WorkforceGroupBadge";
+import { CredentialEmailTemplate } from "@/components/CredentialEmailTemplate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -505,7 +506,7 @@ export default function UsersPage() {
 
       {/* Credentials Dialog */}
       <Dialog open={isCredentialsDialogOpen} onOpenChange={setIsCredentialsDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
             <DialogTitle>Employee Credentials</DialogTitle>
             <DialogDescription>
@@ -534,6 +535,16 @@ export default function UsersPage() {
               </div>
               <div className="p-3 bg-warning/10 border border-warning/30 rounded-lg text-sm text-warning">
                 ⚠️ Save these credentials now. The password cannot be retrieved later.
+              </div>
+              
+              {/* Email Template */}
+              <div className="border-t pt-4">
+                <CredentialEmailTemplate
+                  recipientName={newEmployee.firstName || credentials.email.split('@')[0]}
+                  email={credentials.email}
+                  password={credentials.password}
+                  isPasswordReset={!newEmployee.firstName}
+                />
               </div>
             </div>
           )}
