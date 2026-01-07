@@ -49,9 +49,10 @@ import {
   KeyRound,
   Trash2,
   Copy,
+  BookOpen,
 } from "lucide-react";
-import { TrainingAssignmentDialog } from "@/components/admin/TrainingAssignmentDialog";
 import { cn } from "@/lib/utils";
+import { SingleEmployeeAssignmentDialog } from "@/components/admin/SingleEmployeeAssignmentDialog";
 
 interface Employee {
   id: string;
@@ -73,7 +74,7 @@ export default function UsersPage() {
   
   // Dialog states
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isTrainingDialogOpen, setIsTrainingDialogOpen] = useState(false);
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
   const [isCredentialsDialogOpen, setIsCredentialsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -387,6 +388,18 @@ export default function UsersPage() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          title="Assign Training"
+                          onClick={() => {
+                            setSelectedEmployee(emp);
+                            setIsAssignDialogOpen(true);
+                          }}
+                          disabled={emp.workforce_groups.length === 0}
+                        >
+                          <BookOpen className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           title="Reset Password"
                           onClick={() => handleResetPassword(emp)}
                           disabled={isSubmitting}
@@ -556,9 +569,10 @@ export default function UsersPage() {
       </AlertDialog>
 
       {/* Training Assignment Dialog */}
-      <TrainingAssignmentDialog
-        open={isTrainingDialogOpen}
-        onOpenChange={setIsTrainingDialogOpen}
+      <SingleEmployeeAssignmentDialog
+        open={isAssignDialogOpen}
+        onOpenChange={setIsAssignDialogOpen}
+        employee={selectedEmployee}
       />
     </DashboardLayout>
   );
