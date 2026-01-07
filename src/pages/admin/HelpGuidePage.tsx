@@ -9,25 +9,11 @@ import {
   FileText, 
   BookOpen,
   ClipboardCheck,
-  Settings,
   CheckCircle2,
   AlertCircle,
   Shield,
   CalendarClock
 } from "lucide-react";
-
-// Import guide images
-import guideSidebarUsers from "@/assets/guide-sidebar-users.png";
-import guideAddUserButton from "@/assets/guide-add-user-button.png";
-import guideEditButton from "@/assets/guide-edit-button.png";
-import guideRunAnalysisButton from "@/assets/guide-run-analysis-button.png";
-
-const GuideImage = ({ src, alt }: { src: string; alt: string }) => (
-  <div className="my-4 rounded-lg border overflow-hidden bg-muted/30">
-    <img src={src} alt={alt} className="w-full max-w-md mx-auto" />
-    <p className="text-xs text-muted-foreground text-center py-2 bg-muted/50">{alt}</p>
-  </div>
-);
 
 export default function AdminHelpGuidePage() {
   return (
@@ -55,19 +41,19 @@ export default function AdminHelpGuidePage() {
             <ol className="space-y-3 text-sm">
               <li className="flex items-start gap-3">
                 <Badge variant="outline" className="mt-0.5">1</Badge>
-                <span><strong>Add Employees</strong> - Invite your staff members to the training platform</span>
+                <span><strong>Add Employees</strong> - Create accounts for your staff members on the training platform</span>
               </li>
               <li className="flex items-start gap-3">
                 <Badge variant="outline" className="mt-0.5">2</Badge>
-                <span><strong>Assign Workforce Groups</strong> - Categorize each employee by their role type</span>
+                <span><strong>Assign Workforce Groups</strong> - Categorize employees by their role type when adding them</span>
               </li>
               <li className="flex items-start gap-3">
                 <Badge variant="outline" className="mt-0.5">3</Badge>
-                <span><strong>Assign Training with Deadline</strong> - Set a completion deadline for each workforce group</span>
+                <span><strong>Assign Training with Deadline</strong> - Set a completion deadline for individual employees</span>
               </li>
               <li className="flex items-start gap-3">
                 <Badge variant="outline" className="mt-0.5">4</Badge>
-                <span><strong>Monitor Progress</strong> - Track who has completed their training and meet deadlines</span>
+                <span><strong>Monitor Progress</strong> - Track who has completed their training and met deadlines</span>
               </li>
               <li className="flex items-start gap-3">
                 <Badge variant="outline" className="mt-0.5">5</Badge>
@@ -98,29 +84,26 @@ export default function AdminHelpGuidePage() {
                 <div>
                   <h4 className="font-medium mb-2">Adding New Employees</h4>
                   <ol className="space-y-3 text-muted-foreground">
-                    <li className="flex flex-col gap-2">
-                      <span>1. Go to <strong>Users</strong> in the left menu</span>
-                      <GuideImage src={guideSidebarUsers} alt="Find Users in the left sidebar menu" />
-                    </li>
-                    <li className="flex flex-col gap-2">
-                      <span>2. Click the <strong>Add Employee</strong> button in the top right</span>
-                      <GuideImage src={guideAddUserButton} alt="Click the Add Employee button" />
-                    </li>
-                    <li>3. Enter the employee's email address, first name, and last name</li>
-                    <li>4. Select their workforce group(s) (for example: Clinical Staff, Administrative Staff)</li>
-                    <li>5. Click <strong>Add Employee</strong></li>
-                    <li>6. A temporary password will be displayed - <strong>copy this and send it to the employee</strong></li>
-                    <li>7. The employee can log in with these credentials and should change their password</li>
+                    <li>1. Go to <strong>Users</strong> in the left sidebar menu</li>
+                    <li>2. Click the <strong>Add Employee</strong> button in the top right corner</li>
+                    <li>3. Enter the employee's first name, last name, and email address</li>
+                    <li>4. Select their workforce group(s) - for example: Clinical Staff, Administrative Staff, or All Staff</li>
+                    <li>5. Optionally, check "This employee is a contractor" if applicable</li>
+                    <li>6. Click <strong>Add Employee</strong> to create the account</li>
+                    <li>7. A temporary password will be displayed along with a ready-to-use email template</li>
+                    <li>8. Click <strong>Copy Email</strong> to copy the email template with login instructions</li>
+                    <li>9. Paste the email into your email client and send it to the employee</li>
                   </ol>
                 </div>
 
                 <div>
-                  <h4 className="font-medium mb-2">Resetting Employee Password</h4>
+                  <h4 className="font-medium mb-2">Resetting an Employee's Password</h4>
                   <ol className="space-y-2 text-muted-foreground">
                     <li>1. Find the employee in the Users list</li>
                     <li>2. Click the <strong>key icon</strong> in the Actions column</li>
-                    <li>3. A new temporary password will be generated</li>
-                    <li>4. Copy and send the new password to the employee</li>
+                    <li>3. A new temporary password will be generated with an email template</li>
+                    <li>4. Click <strong>Copy Email</strong> to copy the password reset notification</li>
+                    <li>5. Send the email to the employee through your email client</li>
                   </ol>
                 </div>
 
@@ -129,14 +112,14 @@ export default function AdminHelpGuidePage() {
                   <ol className="space-y-2 text-muted-foreground">
                     <li>1. Find the employee in the Users list</li>
                     <li>2. Click the <strong>trash icon</strong> in the Actions column</li>
-                    <li>3. Confirm the deletion - this removes all their training records</li>
+                    <li>3. Confirm the deletion - this permanently removes the employee and all their training records</li>
                   </ol>
                 </div>
                 
                 <div>
                   <h4 className="font-medium mb-2">Employee Status Types</h4>
                   <ul className="space-y-2 text-muted-foreground">
-                    <li><strong>Pending</strong> - Employee has not been assigned a workforce group yet</li>
+                    <li><strong>Pending</strong> - Employee has been created but has not yet logged in or been assigned training</li>
                     <li><strong>Active</strong> - Employee can access training materials and take quizzes</li>
                     <li><strong>Suspended</strong> - Account is temporarily disabled</li>
                   </ul>
@@ -146,7 +129,7 @@ export default function AdminHelpGuidePage() {
                   <div className="flex items-start gap-2">
                     <AlertCircle className="h-4 w-4 text-info mt-0.5" />
                     <p className="text-muted-foreground">
-                      <strong>Important:</strong> You must manually send the temporary password to new employees. Save it when shown - it cannot be retrieved later.
+                      <strong>Important:</strong> Temporary passwords expire in 7 days. Make sure employees log in and set a new password promptly.
                     </p>
                   </div>
                 </div>
@@ -170,7 +153,7 @@ export default function AdminHelpGuidePage() {
             <AccordionContent className="pt-4 pb-6">
               <div className="space-y-4 text-sm">
                 <div>
-                  <h4 className="font-medium mb-2">What are Workforce Groups?</h4>
+                  <h4 className="font-medium mb-2">What Are Workforce Groups?</h4>
                   <p className="text-muted-foreground">
                     Workforce groups determine which training content an employee receives. Different roles have different HIPAA responsibilities, so their training is customized accordingly.
                   </p>
@@ -188,17 +171,25 @@ export default function AdminHelpGuidePage() {
                 </div>
 
                 <div>
-                  <h4 className="font-medium mb-2">Changing an Employee's Group</h4>
-                  <ol className="space-y-3 text-muted-foreground">
-                    <li>1. Go to <strong>Users</strong> in the left menu</li>
-                    <li>2. Find the employee you want to update</li>
-                    <li className="flex flex-col gap-2">
-                      <span>3. Click the <strong>Edit</strong> button</span>
-                      <GuideImage src={guideEditButton} alt="Click the Edit button to modify employee details" />
-                    </li>
-                    <li>4. Select a new workforce group</li>
-                    <li>5. Click <strong>Save Changes</strong></li>
+                  <h4 className="font-medium mb-2">Assigning Workforce Groups</h4>
+                  <p className="text-muted-foreground mb-2">
+                    Workforce groups are assigned when you create a new employee account:
+                  </p>
+                  <ol className="space-y-2 text-muted-foreground">
+                    <li>1. Click <strong>Add Employee</strong> to open the new employee form</li>
+                    <li>2. Enter the employee's details (name and email)</li>
+                    <li>3. In the <strong>Workforce Groups</strong> section, check one or more groups that apply</li>
+                    <li>4. Click <strong>Add Employee</strong> to save</li>
                   </ol>
+                </div>
+
+                <div className="p-3 bg-muted rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-info mt-0.5" />
+                    <p className="text-muted-foreground">
+                      <strong>Note:</strong> Employees can belong to multiple workforce groups. For example, a nurse manager might be assigned to both "Clinical Staff" and "Management and Leadership."
+                    </p>
+                  </div>
                 </div>
               </div>
             </AccordionContent>
@@ -273,13 +264,10 @@ export default function AdminHelpGuidePage() {
                 
                 <div>
                   <h4 className="font-medium mb-2">Running an Analysis</h4>
-                  <ol className="space-y-3 text-muted-foreground">
+                  <ol className="space-y-2 text-muted-foreground">
                     <li>1. Go to your <strong>Dashboard</strong></li>
                     <li>2. Find the <strong>Workforce Analysis</strong> section</li>
-                    <li className="flex flex-col gap-2">
-                      <span>3. Click <strong>Run Analysis</strong></span>
-                      <GuideImage src={guideRunAnalysisButton} alt="Click Run Analysis to start the AI-powered review" />
-                    </li>
+                    <li>3. Click the <strong>Run Analysis</strong> button</li>
                     <li>4. Wait for the AI to process your data (this may take a few moments)</li>
                     <li>5. Review the findings and recommendations</li>
                   </ol>
