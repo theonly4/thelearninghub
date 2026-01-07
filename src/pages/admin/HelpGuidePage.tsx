@@ -352,7 +352,7 @@ export default function AdminHelpGuidePage() {
                 </div>
                 <div className="text-left">
                   <p className="font-medium">How to Assign Training with Deadlines</p>
-                  <p className="text-sm text-muted-foreground font-normal">Set completion deadlines for workforce groups</p>
+                  <p className="text-sm text-muted-foreground font-normal">Set completion deadlines for employees</p>
                 </div>
               </div>
             </AccordionTrigger>
@@ -361,21 +361,30 @@ export default function AdminHelpGuidePage() {
                 <div>
                   <h4 className="font-medium mb-2">What is Training Assignment?</h4>
                   <p className="text-muted-foreground">
-                    Training assignment allows you to officially assign training materials and quizzes to employees by workforce group, with a specific completion deadline. Employees will see their deadline prominently displayed and receive alerts as the deadline approaches.
+                    Training assignment allows you to officially assign training materials and quizzes to individual employees, with a specific completion deadline. Employees will see their deadline prominently displayed and receive alerts as the deadline approaches.
                   </p>
                 </div>
                 
                 <div>
-                  <h4 className="font-medium mb-2">Assigning Training to a Workforce Group</h4>
+                  <h4 className="font-medium mb-2">Assigning Training to an Employee</h4>
                   <ol className="space-y-3 text-muted-foreground">
                     <li>1. Go to <strong>Users</strong> in the left menu</li>
-                    <li>2. Click the <strong>Assign Training</strong> button at the top right</li>
-                    <li>3. Select the <strong>Workforce Group</strong> you want to assign training to</li>
-                    <li>4. Choose a <strong>Completion Deadline</strong> using the date picker</li>
-                    <li>5. Add any optional notes or instructions for employees</li>
-                    <li>6. Review the assignment preview showing number of employees and materials</li>
+                    <li>2. Find the employee you want to assign training to</li>
+                    <li>3. Click the <strong>book icon</strong> in the Actions column (this is the Assign Training button)</li>
+                    <li>4. Review the employee's workforce groups and available content</li>
+                    <li>5. Choose a <strong>Completion Deadline</strong> using the date picker</li>
+                    <li>6. Add any optional notes or instructions</li>
                     <li>7. Click <strong>Assign Training</strong></li>
                   </ol>
+                </div>
+
+                <div className="p-3 bg-muted rounded-lg mb-4">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-info mt-0.5" />
+                    <p className="text-muted-foreground">
+                      <strong>Note:</strong> The Assign Training button is only available for employees who have a workforce group assigned. If the button is disabled, first assign the employee to a workforce group.
+                    </p>
+                  </div>
                 </div>
 
                 <div>
