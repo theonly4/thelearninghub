@@ -199,6 +199,16 @@ export default function ReportsPage() {
     return matchesSearch && matchesGroup;
   });
 
+  // HTML escape function to prevent XSS attacks
+  function escapeHtml(unsafe: string): string {
+    return unsafe
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
   // Print functionality
   function handlePrint() {
     const printContent = printRef.current;
@@ -287,11 +297,11 @@ export default function ReportsPage() {
   function generateTrainingTable() {
     const rows = filteredTraining.map(t => `
       <tr>
-        <td>${t.userName}</td>
-        <td>${t.email}</td>
-        <td><span class="badge badge-group">${t.workforceGroups.map(g => WORKFORCE_GROUP_LABELS[g]).join(", ") || "Unassigned"}</span></td>
-        <td>${t.materialTitle}</td>
-        <td>${format(new Date(t.completedAt), "MMM d, yyyy 'at' h:mm a")}</td>
+        <td>${escapeHtml(t.userName)}</td>
+        <td>${escapeHtml(t.email)}</td>
+        <td><span class="badge badge-group">${escapeHtml(t.workforceGroups.map(g => WORKFORCE_GROUP_LABELS[g]).join(", ") || "Unassigned")}</span></td>
+        <td>${escapeHtml(t.materialTitle)}</td>
+        <td>${escapeHtml(format(new Date(t.completedAt), "MMM d, yyyy 'at' h:mm a"))}</td>
       </tr>
     `).join("");
 
@@ -316,13 +326,13 @@ export default function ReportsPage() {
   function generateQuizTable() {
     const rows = filteredQuiz.map(q => `
       <tr>
-        <td>${q.userName}</td>
-        <td>${q.email}</td>
-        <td><span class="badge badge-group">${q.workforceGroups.map(g => WORKFORCE_GROUP_LABELS[g]).join(", ") || "Unassigned"}</span></td>
-        <td>${q.quizTitle}</td>
+        <td>${escapeHtml(q.userName)}</td>
+        <td>${escapeHtml(q.email)}</td>
+        <td><span class="badge badge-group">${escapeHtml(q.workforceGroups.map(g => WORKFORCE_GROUP_LABELS[g]).join(", ") || "Unassigned")}</span></td>
+        <td>${escapeHtml(q.quizTitle)}</td>
         <td>${q.score}/${q.totalQuestions} (${Math.round((q.score / q.totalQuestions) * 100)}%)</td>
         <td><span class="badge ${q.passed ? "badge-pass" : "badge-fail"}">${q.passed ? "PASSED" : "FAILED"}</span></td>
-        <td>${q.completedAt ? format(new Date(q.completedAt), "MMM d, yyyy 'at' h:mm a") : "In Progress"}</td>
+        <td>${escapeHtml(q.completedAt ? format(new Date(q.completedAt), "MMM d, yyyy 'at' h:mm a") : "In Progress")}</td>
       </tr>
     `).join("");
 
