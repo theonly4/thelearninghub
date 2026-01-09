@@ -711,6 +711,110 @@ export default function UsersPage() {
         onOpenChange={setIsAssignDialogOpen}
         employee={selectedEmployee}
       />
+
+      {/* CSV Import Dialog */}
+      <Dialog open={isCSVDialogOpen} onOpenChange={setIsCSVDialogOpen}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Import Employees from CSV
+            </DialogTitle>
+            <DialogDescription>
+              Review the parsed data before importing. {csvData.length} employee(s) found.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {/* Preview Table */}
+            <div className="max-h-64 overflow-auto rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>First Name</TableHead>
+                    <TableHead>Last Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Workforce Group</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {csvData.map((emp, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell>{emp.first_name}</TableCell>
+                      <TableCell>{emp.last_name}</TableCell>
+                      <TableCell className="font-mono text-sm">{emp.email}</TableCell>
+                      <TableCell>
+                        {emp.workforce_group ? (
+                          <span className="text-sm">{emp.workforce_group}</span>
+                        ) : (
+                          <span className="text-muted-foreground italic text-sm">Not specified</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Import Results */}
+            {csvResults.success > 0 || csvResults.failed > 0 ? (
+              <div className="space-y-2">
+                <div className="flex gap-4">
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-success" />
+                    <span>{csvResults.success} imported successfully</span>
+                  </div>
+                  {csvResults.failed > 0 && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <AlertCircle className="h-4 w-4 text-destructive" />
+                      <span>{csvResults.failed} failed</span>
+                    </div>
+                  )}
+                </div>
+                {csvResults.errors.length > 0 && (
+                  <div className="max-h-24 overflow-auto rounded border bg-destructive/10 p-2 text-sm">
+                    {csvResults.errors.map((err, idx) => (
+                      <p key={idx} className="text-destructive">{err}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : null}
+
+            {/* CSV Format Help */}
+            <div className="rounded-lg bg-muted/50 p-3 text-sm">
+              <p className="font-medium mb-1">Expected CSV format:</p>
+              <code className="text-xs">first_name,last_name,email,workforce_group</code>
+              <p className="text-muted-foreground mt-1 text-xs">
+                Workforce group values: all_staff, clinical, administrative, management, it
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setIsCSVDialogOpen(false); setCsvData([]); }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCSVImport} 
+              disabled={csvImporting || csvData.length === 0}
+              className="gap-2"
+            >
+              {csvImporting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Importing...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4" />
+                  Import {csvData.length} Employee(s)
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

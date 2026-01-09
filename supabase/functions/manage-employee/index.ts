@@ -94,20 +94,55 @@ Deno.serve(async (req) => {
 
     const adminOrgId = roleData.organization_id;
 
-    const body: ManageEmployeeRequest = await req.json();
-    const { action, email, firstName, lastName, workforceGroups, isContractor, employeeUserId } = body;
+  const body: ManageEmployeeRequest = await req.json();
+  const { action, email, firstName, lastName, workforceGroups, isContractor, employeeUserId } = body;
 
 
-    // CREATE EMPLOYEE
-    if (action === 'create') {
-      if (!email || !firstName || !lastName) {
+  // CREATE EMPLOYEE
+  if (action === 'create') {
+    if (!email || !firstName || !lastName) {
+      return new Response(
+        JSON.stringify({ error: "Email, first name, and last name are required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Check user limit before creating employee
+    const { data: subscription } = await adminClient
+      .from("subscriptions")
+      .select("users_limit, status")
+      .eq("organization_id", adminOrgId)
+      .single();
+
+    if (subscription) {
+      // Count current employees in org
+      const { count: currentCount } = await adminClient
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", adminOrgId);
+
+      if (currentCount !== null && currentCount >= subscription.users_limit) {
         return new Response(
-          JSON.stringify({ error: "Email, first name, and last name are required" }),
+          JSON.stringify({ 
+            error: `User limit reached. Your plan allows ${subscription.users_limit} users. Contact support to upgrade.`,
+            limitReached: true,
+            current: currentCount,
+            limit: subscription.users_limit
+          }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      const tempPassword = generatePassword();
+      // Check subscription status
+      if (subscription.status === 'expired') {
+        return new Response(
+          JSON.stringify({ error: "Your subscription has expired. Please renew to add employees." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    const tempPassword = generatePassword();
 
       // Create user account
       const { data: newUser, error: createUserError } = await adminClient.auth.admin.createUser({

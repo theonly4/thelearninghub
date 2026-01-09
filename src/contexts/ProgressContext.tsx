@@ -1,7 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
+import React, { createContext, useContext, useState, ReactNode, useCallback } from "react";
 import { WorkforceGroup, QuizStatus } from "@/types/hipaa";
-import { getRequiredMaterialIds } from "@/data/trainingMaterials";
-import { getQuizzesForWorkforceGroup } from "@/data/quizzes";
 import { supabase } from "@/integrations/supabase/client";
 
 interface QuizResult {
@@ -11,12 +9,21 @@ interface QuizResult {
   completedAt: string;
 }
 
+interface QuizInfo {
+  id: string;
+  title: string;
+  sequence_number: number;
+}
+
 interface ProgressState {
   completedMaterials: string[];
   quizResults: QuizResult[];
   currentWorkforceGroup: WorkforceGroup | null;
   isLoading: boolean;
   userId: string | null;
+  // Database-loaded data
+  requiredMaterialIds: string[];
+  quizzes: QuizInfo[];
 }
 
 interface ProgressContextType {
@@ -52,6 +59,8 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     currentWorkforceGroup: null,
     isLoading: true,
     userId: null,
+    requiredMaterialIds: [],
+    quizzes: [],
   });
 
   // Load progress from database when user is authenticated
@@ -85,6 +94,40 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
         console.error("Error fetching quiz attempts:", quizError);
       }
 
+      // Fetch required training materials for this workforce group from database
+      let requiredMaterialIds: string[] = [];
+      if (workforceGroup) {
+        const { data: materialsData, error: materialsError } = await supabase
+          .from('training_materials')
+          .select('id, workforce_groups')
+          .order('sequence_number', { ascending: true });
+
+        if (materialsError) {
+          console.error("Error fetching materials:", materialsError);
+        } else if (materialsData) {
+          requiredMaterialIds = materialsData
+            .filter(m => (m.workforce_groups as WorkforceGroup[])?.includes(workforceGroup))
+            .map(m => m.id);
+        }
+      }
+
+      // Fetch quizzes for this workforce group from database
+      let quizzes: QuizInfo[] = [];
+      if (workforceGroup) {
+        const { data: quizzesData, error: quizzesError } = await supabase
+          .from('quizzes')
+          .select('id, title, sequence_number, workforce_groups')
+          .order('sequence_number', { ascending: true });
+
+        if (quizzesError) {
+          console.error("Error fetching quizzes:", quizzesError);
+        } else if (quizzesData) {
+          quizzes = quizzesData
+            .filter(q => (q.workforce_groups as WorkforceGroup[])?.includes(workforceGroup))
+            .map(q => ({ id: q.id, title: q.title, sequence_number: q.sequence_number }));
+        }
+      }
+
       const completedMaterials = progressData?.map(p => p.material_id) || [];
       const quizResults: QuizResult[] = quizData?.map(q => ({
         quizId: q.quiz_id,
@@ -99,6 +142,8 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
         currentWorkforceGroup: workforceGroup,
         isLoading: false,
         userId,
+        requiredMaterialIds,
+        quizzes,
       });
     } catch (error) {
       console.error("Error loading progress from database:", error);
@@ -156,18 +201,16 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
   };
 
   const areAllMaterialsComplete = (): boolean => {
-    if (!state.currentWorkforceGroup) return false;
-    const requiredIds = getRequiredMaterialIds(state.currentWorkforceGroup);
-    return requiredIds.every(id => state.completedMaterials.includes(id));
+    if (!state.currentWorkforceGroup || state.requiredMaterialIds.length === 0) return false;
+    return state.requiredMaterialIds.every(id => state.completedMaterials.includes(id));
   };
 
   const getMaterialProgress = () => {
-    if (!state.currentWorkforceGroup) {
+    if (!state.currentWorkforceGroup || state.requiredMaterialIds.length === 0) {
       return { completed: 0, total: 0, percentage: 0 };
     }
-    const requiredIds = getRequiredMaterialIds(state.currentWorkforceGroup);
-    const completed = requiredIds.filter(id => state.completedMaterials.includes(id)).length;
-    const total = requiredIds.length;
+    const completed = state.requiredMaterialIds.filter(id => state.completedMaterials.includes(id)).length;
+    const total = state.requiredMaterialIds.length;
     const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
     return { completed, total, percentage };
   };
@@ -175,8 +218,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
   const getQuizStatus = (quizId: string): QuizStatus => {
     if (!state.currentWorkforceGroup) return "locked";
     
-    const quizzes = getQuizzesForWorkforceGroup(state.currentWorkforceGroup);
-    const quiz = quizzes.find(q => q.id === quizId);
+    const quiz = state.quizzes.find(q => q.id === quizId);
     if (!quiz) return "locked";
 
     const result = state.quizResults.find(r => r.quizId === quizId);
@@ -192,7 +234,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     if (quiz.sequence_number === 1) return "unlocked";
 
     // For quiz 2+, need previous quiz passed
-    const previousQuiz = quizzes.find(q => q.sequence_number === quiz.sequence_number - 1);
+    const previousQuiz = state.quizzes.find(q => q.sequence_number === quiz.sequence_number - 1);
     if (previousQuiz) {
       const prevResult = state.quizResults.find(r => r.quizId === previousQuiz.id);
       if (!prevResult?.passed) return "locked";
@@ -212,8 +254,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     }
 
     // Check if all materials are complete
-    const requiredMaterialIds = getRequiredMaterialIds(state.currentWorkforceGroup);
-    const incompleteMaterial = requiredMaterialIds.find(id => !state.completedMaterials.includes(id));
+    const incompleteMaterial = state.requiredMaterialIds.find(id => !state.completedMaterials.includes(id));
     if (incompleteMaterial) {
       return { 
         type: 'material', 
@@ -223,14 +264,13 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
     }
 
     // Check quizzes in order
-    const quizzes = getQuizzesForWorkforceGroup(state.currentWorkforceGroup);
-    for (const quiz of quizzes) {
+    for (const quiz of state.quizzes) {
       const result = state.quizResults.find(r => r.quizId === quiz.id);
       if (!result?.passed) {
         return { 
           type: 'quiz', 
           id: quiz.id, 
-          message: `Take ${quiz.title} (${quiz.sequence_number} of ${quizzes.length})` 
+          message: `Take ${quiz.title} (${quiz.sequence_number} of ${state.quizzes.length})` 
         };
       }
     }
