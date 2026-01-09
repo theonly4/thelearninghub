@@ -5,6 +5,7 @@ import { HipaaLink } from "@/components/HipaaLink";
 import { Button } from "@/components/ui/button";
 import { useProgress } from "@/contexts/ProgressContext";
 import { getMaterialsForWorkforceGroup } from "@/data/trainingMaterials";
+import { getQuizzesForWorkforceGroup } from "@/data/quizzes";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft,
@@ -12,8 +13,8 @@ import {
   CheckCircle2,
   Clock,
   BookOpen,
+  FileText,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 export default function TrainingMaterialPage() {
   const { materialId } = useParams<{ materialId: string }>();
@@ -23,11 +24,16 @@ export default function TrainingMaterialPage() {
     currentWorkforceGroup, 
     isMaterialComplete, 
     markMaterialComplete,
-    getMaterialProgress 
+    getMaterialProgress,
+    areAllMaterialsComplete,
   } = useProgress();
 
   const materials = currentWorkforceGroup
     ? getMaterialsForWorkforceGroup(currentWorkforceGroup)
+    : [];
+
+  const quizzes = currentWorkforceGroup
+    ? getQuizzesForWorkforceGroup(currentWorkforceGroup)
     : [];
 
   const material = materials.find((m) => m.id === materialId);
@@ -46,15 +52,20 @@ export default function TrainingMaterialPage() {
         description: `You have completed "${material.title}".`,
       });
 
-      // If there's a next material, navigate to it
+      // Check if this was the last material
+      const willBeAllComplete = progress.completed + 1 >= progress.total;
+
       if (nextMaterial) {
+        // Navigate to next material
         navigate(`/dashboard/training/${nextMaterial.id}`);
-      } else if (progress.completed + 1 === progress.total) {
-        // All materials complete, go to dashboard
+      } else if (willBeAllComplete && quizzes.length > 0) {
+        // All materials complete, prompt to go to quizzes
         toast({
           title: "All Training Complete!",
           description: "You can now take the quizzes.",
         });
+        navigate("/dashboard/quizzes");
+      } else {
         navigate("/dashboard");
       }
     }
@@ -75,6 +86,10 @@ export default function TrainingMaterialPage() {
       </DashboardLayout>
     );
   }
+
+  // Check if all materials will be complete after marking this one
+  const isLastMaterial = !nextMaterial;
+  const willUnlockQuizzes = isLastMaterial && !isComplete && quizzes.length > 0;
 
   return (
     <DashboardLayout userRole="workforce_user" userName="Jane Smith">
@@ -164,6 +179,21 @@ export default function TrainingMaterialPage() {
           </div>
         )}
 
+        {/* Quiz Unlock Notice */}
+        {willUnlockQuizzes && (
+          <div className="rounded-xl border-2 border-accent/50 bg-accent/5 p-4">
+            <div className="flex items-center gap-3">
+              <FileText className="h-6 w-6 text-accent" />
+              <div>
+                <p className="font-medium text-accent">Almost there!</p>
+                <p className="text-sm text-muted-foreground">
+                  Complete this material to unlock your assessment quizzes.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-t border-border pt-6">
           {/* Navigation */}
@@ -198,6 +228,12 @@ export default function TrainingMaterialPage() {
                     <ArrowRight className="h-4 w-4" />
                   </>
                 )}
+                {willUnlockQuizzes && (
+                  <>
+                    <span className="mx-1">•</span>
+                    Go to Quizzes
+                  </>
+                )}
               </Button>
             ) : nextMaterial ? (
               <Link to={`/dashboard/training/${nextMaterial.id}`}>
@@ -206,10 +242,18 @@ export default function TrainingMaterialPage() {
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
+            ) : areAllMaterialsComplete() && quizzes.length > 0 ? (
+              <Link to="/dashboard/quizzes">
+                <Button className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  Go to Quizzes
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
             ) : (
               <Link to="/dashboard">
                 <Button className="gap-2">
-                  Go to Quizzes
+                  Back to Dashboard
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>

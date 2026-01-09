@@ -39,6 +39,7 @@ import ReportsPage from "./pages/admin/ReportsPage";
 
 // Employee Pages
 import EmployeeTrainingPage from "./pages/employee/TrainingPage";
+import HistoryPage from "./pages/employee/HistoryPage";
 
 const queryClient = new QueryClient();
 
@@ -159,6 +160,16 @@ const App = () => (
                 <MfaGuard>
                   <RoleGuard allowedRoles={["workforce_user"]}>
                     <EmployeeTrainingPage />
+                  </RoleGuard>
+                </MfaGuard>
+              }
+            />
+            <Route
+              path="/dashboard/history"
+              element={
+                <MfaGuard>
+                  <RoleGuard allowedRoles={["workforce_user"]}>
+                    <HistoryPage />
                   </RoleGuard>
                 </MfaGuard>
               }

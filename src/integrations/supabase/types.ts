@@ -596,6 +596,47 @@ export type Database = {
         }
         Relationships: []
       }
+      subscriptions: {
+        Row: {
+          created_at: string
+          id: string
+          organization_id: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          tier: Database["public"]["Enums"]["subscription_tier"]
+          trial_ends_at: string | null
+          updated_at: string
+          users_limit: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          organization_id: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          tier?: Database["public"]["Enums"]["subscription_tier"]
+          trial_ends_at?: string | null
+          updated_at?: string
+          users_limit?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          organization_id?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          tier?: Database["public"]["Enums"]["subscription_tier"]
+          trial_ends_at?: string | null
+          updated_at?: string
+          users_limit?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       training_assignments: {
         Row: {
           assigned_at: string
@@ -773,6 +814,8 @@ export type Database = {
     }
     Enums: {
       app_role: "org_admin" | "workforce_user" | "platform_owner"
+      subscription_status: "trial" | "active" | "expired"
+      subscription_tier: "basic" | "pro"
       user_status: "pending_assignment" | "active" | "suspended"
       workforce_group:
         | "all_staff"
@@ -908,6 +951,8 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["org_admin", "workforce_user", "platform_owner"],
+      subscription_status: ["trial", "active", "expired"],
+      subscription_tier: ["basic", "pro"],
       user_status: ["pending_assignment", "active", "suspended"],
       workforce_group: [
         "all_staff",

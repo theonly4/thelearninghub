@@ -13,6 +13,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Table,
   TableBody,
   TableCell,
@@ -25,6 +31,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { WorkforceGroupBadge } from "@/components/WorkforceGroupBadge";
 import { WORKFORCE_GROUP_LABELS, type WorkforceGroup } from "@/types/hipaa";
 import { format } from "date-fns";
+import jsPDF from "jspdf";
+import Papa from "papaparse";
 import {
   FileText,
   Printer,
@@ -36,6 +44,8 @@ import {
   CheckCircle2,
   XCircle,
   Download,
+  FileDown,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -356,6 +366,126 @@ export default function ReportsPage() {
     `;
   }
 
+  // Export to CSV
+  function handleExportCSV() {
+    let csv: string;
+    let fileName: string;
+    
+    if (activeTab === "training") {
+      const data = filteredTraining.map(t => ({
+        "Employee Name": t.userName,
+        "Email": t.email,
+        "Workforce Group": t.workforceGroups.map(g => WORKFORCE_GROUP_LABELS[g]).join(", "),
+        "Training Material": t.materialTitle,
+        "Completed At": format(new Date(t.completedAt), "yyyy-MM-dd HH:mm:ss"),
+        "Version": t.version,
+      }));
+      csv = Papa.unparse(data);
+      fileName = `training_report_${format(new Date(), "yyyy-MM-dd")}.csv`;
+    } else {
+      const data = filteredQuiz.map(q => ({
+        "Employee Name": q.userName,
+        "Email": q.email,
+        "Workforce Group": q.workforceGroups.map(g => WORKFORCE_GROUP_LABELS[g]).join(", "),
+        "Quiz Title": q.quizTitle,
+        "Score": `${q.score}/${q.totalQuestions}`,
+        "Percentage": `${Math.round((q.score / q.totalQuestions) * 100)}%`,
+        "Result": q.passed ? "PASSED" : "FAILED",
+        "Completed At": q.completedAt ? format(new Date(q.completedAt), "yyyy-MM-dd HH:mm:ss") : "In Progress",
+      }));
+      csv = Papa.unparse(data);
+      fileName = `quiz_report_${format(new Date(), "yyyy-MM-dd")}.csv`;
+    }
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = fileName;
+    link.click();
+    toast.success("CSV exported successfully");
+  }
+
+  // Export to PDF
+  function handleExportPDF() {
+    const doc = new jsPDF();
+    const title = activeTab === "training" ? "Training Completion Report" : "Quiz Completion Report";
+    const dateGenerated = format(new Date(), "MMMM d, yyyy");
+
+    // Header
+    doc.setFontSize(20);
+    doc.setTextColor(0, 102, 204);
+    doc.text(title, 20, 20);
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Generated: ${dateGenerated}`, 20, 28);
+    if (filterGroup !== "all") {
+      doc.text(`Filtered by: ${WORKFORCE_GROUP_LABELS[filterGroup as WorkforceGroup]}`, 20, 34);
+    }
+
+    let yPos = 45;
+    doc.setFontSize(9);
+    doc.setTextColor(0);
+
+    if (activeTab === "training") {
+      // Table header
+      doc.setFillColor(245, 245, 245);
+      doc.rect(15, yPos - 5, 180, 8, "F");
+      doc.setFont(undefined, "bold");
+      doc.text("Employee", 17, yPos);
+      doc.text("Material", 70, yPos);
+      doc.text("Completed", 150, yPos);
+      doc.setFont(undefined, "normal");
+      yPos += 8;
+
+      filteredTraining.slice(0, 40).forEach(t => {
+        if (yPos > 270) {
+          doc.addPage();
+          yPos = 20;
+        }
+        doc.text(t.userName.substring(0, 25), 17, yPos);
+        doc.text(t.materialTitle.substring(0, 40), 70, yPos);
+        doc.text(format(new Date(t.completedAt), "MMM d, yyyy"), 150, yPos);
+        yPos += 6;
+      });
+    } else {
+      // Quiz table header
+      doc.setFillColor(245, 245, 245);
+      doc.rect(15, yPos - 5, 180, 8, "F");
+      doc.setFont(undefined, "bold");
+      doc.text("Employee", 17, yPos);
+      doc.text("Quiz", 55, yPos);
+      doc.text("Score", 110, yPos);
+      doc.text("Result", 135, yPos);
+      doc.text("Date", 160, yPos);
+      doc.setFont(undefined, "normal");
+      yPos += 8;
+
+      filteredQuiz.slice(0, 40).forEach(q => {
+        if (yPos > 270) {
+          doc.addPage();
+          yPos = 20;
+        }
+        doc.text(q.userName.substring(0, 18), 17, yPos);
+        doc.text(q.quizTitle.substring(0, 25), 55, yPos);
+        doc.text(`${q.score}/${q.totalQuestions} (${Math.round((q.score / q.totalQuestions) * 100)}%)`, 110, yPos);
+        doc.setTextColor(q.passed ? 0 : 150, q.passed ? 128 : 0, 0);
+        doc.text(q.passed ? "PASS" : "FAIL", 135, yPos);
+        doc.setTextColor(0);
+        doc.text(q.completedAt ? format(new Date(q.completedAt), "MMM d") : "-", 160, yPos);
+        yPos += 6;
+      });
+    }
+
+    // Footer
+    doc.setFontSize(8);
+    doc.setTextColor(100);
+    doc.text(`Total Records: ${activeTab === "training" ? filteredTraining.length : filteredQuiz.length}`, 20, 285);
+
+    const fileName = `${activeTab === "training" ? "training" : "quiz"}_report_${format(new Date(), "yyyy-MM-dd")}.pdf`;
+    doc.save(fileName);
+    toast.success("PDF exported successfully");
+  }
+
   return (
     <DashboardLayout userRole="org_admin" userName="Admin User">
       <div className="space-y-6">
@@ -367,10 +497,31 @@ export default function ReportsPage() {
               View employee training and quiz completion records
             </p>
           </div>
-          <Button onClick={handlePrint} className="gap-2">
-            <Printer className="h-4 w-4" />
-            Print Report
-          </Button>
+          <div className="flex gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <FileDown className="h-4 w-4" />
+                  Export
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportPDF}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  Export as PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportCSV}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export as CSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button onClick={handlePrint} className="gap-2">
+              <Printer className="h-4 w-4" />
+              Print
+            </Button>
+          </div>
         </div>
 
         {/* Summary Cards */}

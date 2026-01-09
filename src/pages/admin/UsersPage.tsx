@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { WorkforceGroupBadge } from "@/components/WorkforceGroupBadge";
 import { CredentialEmailTemplate } from "@/components/CredentialEmailTemplate";
@@ -34,6 +34,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import Papa from "papaparse";
 import {
   WorkforceGroup,
   UserStatus,
@@ -51,6 +52,8 @@ import {
   Trash2,
   Copy,
   BookOpen,
+  Upload,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SingleEmployeeAssignmentDialog } from "@/components/admin/SingleEmployeeAssignmentDialog";
@@ -67,8 +70,16 @@ interface Employee {
   is_contractor: boolean;
 }
 
+interface CSVEmployee {
+  first_name: string;
+  last_name: string;
+  email: string;
+  workforce_group?: string;
+}
+
 export default function UsersPage() {
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -78,8 +89,14 @@ export default function UsersPage() {
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
   const [isCredentialsDialogOpen, setIsCredentialsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isCSVDialogOpen, setIsCSVDialogOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
+  
+  // CSV import state
+  const [csvData, setCsvData] = useState<CSVEmployee[]>([]);
+  const [csvImporting, setCsvImporting] = useState(false);
+  const [csvResults, setCsvResults] = useState<{ success: number; failed: number; errors: string[] }>({ success: 0, failed: 0, errors: [] });
   
   // Form state
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -285,6 +302,102 @@ export default function UsersPage() {
     }
   };
 
+  // CSV Import handlers
+  const handleCSVFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        const parsedData: CSVEmployee[] = results.data.map((row: any) => ({
+          first_name: row.first_name || row.firstName || row['First Name'] || '',
+          last_name: row.last_name || row.lastName || row['Last Name'] || '',
+          email: row.email || row.Email || '',
+          workforce_group: row.workforce_group || row.workforceGroup || row['Workforce Group'] || '',
+        })).filter((emp: CSVEmployee) => emp.email && emp.first_name && emp.last_name);
+
+        if (parsedData.length === 0) {
+          toast({
+            title: "Invalid CSV",
+            description: "No valid employee records found. Ensure columns: first_name, last_name, email",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        setCsvData(parsedData);
+        setIsCSVDialogOpen(true);
+        setCsvResults({ success: 0, failed: 0, errors: [] });
+      },
+      error: (error) => {
+        toast({
+          title: "CSV Parse Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      },
+    });
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleCSVImport = async () => {
+    setCsvImporting(true);
+    const results = { success: 0, failed: 0, errors: [] as string[] };
+
+    for (const emp of csvData) {
+      try {
+        // Map workforce group string to enum value
+        let workforceGroups: WorkforceGroup[] = [];
+        if (emp.workforce_group) {
+          const groupKey = Object.entries(WORKFORCE_GROUP_LABELS).find(
+            ([key, label]) => label.toLowerCase() === emp.workforce_group?.toLowerCase() || key === emp.workforce_group?.toLowerCase()
+          )?.[0] as WorkforceGroup | undefined;
+          if (groupKey) {
+            workforceGroups = [groupKey];
+          }
+        }
+
+        const response = await supabase.functions.invoke('manage-employee', {
+          body: {
+            action: 'create',
+            email: emp.email,
+            firstName: emp.first_name,
+            lastName: emp.last_name,
+            workforceGroups,
+            isContractor: false,
+          },
+        });
+
+        if (response.error || response.data?.error) {
+          results.failed++;
+          results.errors.push(`${emp.email}: ${response.data?.error || response.error?.message}`);
+        } else {
+          results.success++;
+        }
+      } catch (error: any) {
+        results.failed++;
+        results.errors.push(`${emp.email}: ${error.message}`);
+      }
+    }
+
+    setCsvResults(results);
+    setCsvImporting(false);
+
+    if (results.success > 0) {
+      fetchEmployees();
+      toast({
+        title: "Import Complete",
+        description: `Successfully imported ${results.success} employee(s). ${results.failed > 0 ? `${results.failed} failed.` : ''}`,
+      });
+    }
+  };
+
   return (
     <DashboardLayout userRole="org_admin" userName="Admin">
       <div className="space-y-6">
@@ -294,10 +407,23 @@ export default function UsersPage() {
             <h1 className="text-2xl font-bold">Employees</h1>
             <p className="text-muted-foreground">Manage your organization's workforce</p>
           </div>
-          <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2">
-            <UserPlus className="h-4 w-4" />
-            Add Employee
-          </Button>
+          <div className="flex gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept=".csv"
+              onChange={handleCSVFileSelect}
+              className="hidden"
+            />
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="gap-2">
+              <Upload className="h-4 w-4" />
+              Import CSV
+            </Button>
+            <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2">
+              <UserPlus className="h-4 w-4" />
+              Add Employee
+            </Button>
+          </div>
         </div>
 
         {/* Search */}
