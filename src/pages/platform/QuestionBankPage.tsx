@@ -105,6 +105,10 @@ export default function QuestionBankPage() {
   async function fetchData() {
     setLoading(true);
     try {
+      // First try with embedded join
+      let questionsData: QuizQuestion[] = [];
+      let topicsData: HipaaTopic[] = [];
+      
       const [questionsRes, quizzesRes, topicsRes] = await Promise.all([
         supabase
           .from("quiz_questions")
@@ -122,23 +126,62 @@ export default function QuestionBankPage() {
           .order("topic_name"),
       ]);
 
-      if (questionsRes.error) throw questionsRes.error;
-      if (quizzesRes.error) throw quizzesRes.error;
-      if (topicsRes.error) throw topicsRes.error;
+      if (quizzesRes.error) {
+        console.error("Error fetching quizzes:", quizzesRes.error);
+        toast.error(`Failed to load quizzes: ${quizzesRes.error.message}`);
+      }
+      
+      if (topicsRes.error) {
+        console.error("Error fetching topics:", topicsRes.error);
+        toast.error(`Failed to load topics: ${topicsRes.error.message}`);
+      } else {
+        topicsData = (topicsRes.data || []) as HipaaTopic[];
+      }
 
-      const typedQuestions = (questionsRes.data || []).map(q => ({
-        ...q,
-        options: q.options as { label: string; text: string }[],
-        hipaa_topic: q.hipaa_topics as HipaaTopic | null,
-        workforce_groups: (q.workforce_groups || []) as WorkforceGroup[],
-      }));
+      // If embedded join failed, try loading questions without join and merge manually
+      if (questionsRes.error) {
+        console.error("Error fetching questions with join:", questionsRes.error);
+        
+        // Fallback: load questions without the join
+        const fallbackRes = await supabase
+          .from("quiz_questions")
+          .select("*")
+          .order("quiz_id")
+          .order("question_number");
+          
+        if (fallbackRes.error) {
+          console.error("Fallback query also failed:", fallbackRes.error);
+          toast.error(`Failed to load questions: ${fallbackRes.error.message}`);
+        } else {
+          // Merge topics manually
+          const topicsMap = new Map(topicsData.map(t => [t.id, t]));
+          questionsData = (fallbackRes.data || []).map(q => ({
+            ...q,
+            options: q.options as { label: string; text: string }[],
+            hipaa_topic: q.hipaa_topic_id ? topicsMap.get(q.hipaa_topic_id) || null : null,
+            workforce_groups: (q.workforce_groups || []) as WorkforceGroup[],
+          }));
+        }
+      } else {
+        questionsData = (questionsRes.data || []).map(q => ({
+          ...q,
+          options: q.options as { label: string; text: string }[],
+          hipaa_topic: q.hipaa_topics as HipaaTopic | null,
+          workforce_groups: (q.workforce_groups || []) as WorkforceGroup[],
+        }));
+      }
 
-      setQuestions(typedQuestions);
+      setQuestions(questionsData);
       setQuizzes((quizzesRes.data || []) as Quiz[]);
-      setHipaaTopics((topicsRes.data || []) as HipaaTopic[]);
-    } catch (error) {
+      setHipaaTopics(topicsData);
+      
+      if (questionsData.length === 0 && !questionsRes.error) {
+        console.log("No questions returned - this may indicate an RLS policy issue");
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
       console.error("Error fetching data:", error);
-      toast.error("Failed to load questions");
+      toast.error(`Failed to load data: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
