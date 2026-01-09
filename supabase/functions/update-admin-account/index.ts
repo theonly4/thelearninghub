@@ -7,6 +7,7 @@ function getCorsHeaders(requestOrigin: string | null): Record<string, string> {
     "https://lovableproject.com",
   ];
   
+  // Add pattern matching for lovable subdomains
   const lovablePattern = /^https:\/\/[a-z0-9-]+\.lovableproject\.com$/;
   
   let origin = "*";
@@ -23,9 +24,11 @@ function getCorsHeaders(requestOrigin: string | null): Record<string, string> {
   };
 }
 
-interface ResetPasswordRequest {
+interface UpdateAdminRequest {
   userId: string;
-  newPassword: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
 }
 
 Deno.serve(async (req) => {
@@ -75,17 +78,31 @@ Deno.serve(async (req) => {
 
     if (!callerRole) {
       return new Response(
-        JSON.stringify({ error: "Only platform owners can reset admin passwords" }),
+        JSON.stringify({ error: "Only platform owners can update admin accounts" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const { userId, newPassword }: ResetPasswordRequest = await req.json();
+    const { userId, firstName, lastName, email }: UpdateAdminRequest = await req.json();
 
-    if (!userId || !newPassword) {
+    if (!userId) {
       return new Response(
-        JSON.stringify({ error: "userId and newPassword are required" }),
+        JSON.stringify({ error: "userId is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Get current profile data for audit log
+    const { data: currentProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("organization_id, email, first_name, last_name")
+      .eq("user_id", userId)
+      .single();
+
+    if (!currentProfile) {
+      return new Response(
+        JSON.stringify({ error: "User not found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -104,46 +121,79 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Reset the password using admin API
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-      userId,
-      { password: newPassword }
-    );
-
-    if (updateError) {
-      console.error("Error resetting password:", updateError);
-      return new Response(
-        JSON.stringify({ error: "Failed to reset password. Please try again." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    // If email is changing, update auth.users FIRST
+    if (email && email !== currentProfile.email) {
+      const { error: authUpdateError } = await supabaseAdmin.auth.admin.updateUserById(
+        userId,
+        { 
+          email: email,
+          user_metadata: {
+            first_name: firstName || currentProfile.first_name,
+            last_name: lastName || currentProfile.last_name,
+          }
+        }
       );
+
+      if (authUpdateError) {
+        console.error("Error updating auth user:", authUpdateError);
+        return new Response(
+          JSON.stringify({ error: `Failed to update email: ${authUpdateError.message}` }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Update profile
+    const profileUpdates: Record<string, string> = {};
+    if (firstName) profileUpdates.first_name = firstName;
+    if (lastName) profileUpdates.last_name = lastName;
+    if (email) profileUpdates.email = email;
+
+    if (Object.keys(profileUpdates).length > 0) {
+      const { error: profileError } = await supabaseAdmin
+        .from("profiles")
+        .update(profileUpdates)
+        .eq("user_id", userId);
+
+      if (profileError) {
+        console.error("Error updating profile:", profileError);
+        // If we updated auth email but profile failed, try to rollback
+        if (email && email !== currentProfile.email) {
+          await supabaseAdmin.auth.admin.updateUserById(userId, { email: currentProfile.email });
+        }
+        return new Response(
+          JSON.stringify({ error: `Failed to update profile: ${profileError.message}` }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // Log the action
-    const { data: targetProfile } = await supabaseAdmin
-      .from("profiles")
-      .select("organization_id, email")
-      .eq("user_id", userId)
-      .single();
-
-    if (targetProfile) {
-      await supabaseAdmin.from("audit_logs").insert({
-        user_id: caller.id,
-        organization_id: targetProfile.organization_id,
-        action: "reset_admin_password",
-        resource_type: "user",
-        resource_id: userId,
-        metadata: { target_email: targetProfile.email }
-      });
-    }
+    await supabaseAdmin.from("audit_logs").insert({
+      user_id: caller.id,
+      organization_id: currentProfile.organization_id,
+      action: "update_admin_account",
+      resource_type: "user",
+      resource_id: userId,
+      metadata: { 
+        old_email: currentProfile.email,
+        new_email: email || currentProfile.email,
+        old_first_name: currentProfile.first_name,
+        new_first_name: firstName || currentProfile.first_name,
+        old_last_name: currentProfile.last_name,
+        new_last_name: lastName || currentProfile.last_name,
+      }
+    });
 
     return new Response(
       JSON.stringify({ success: true }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: unknown) {
-    console.error("Error in reset-admin-password:", error);
+    console.error("Error in update-admin-account:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return new Response(
-      JSON.stringify({ error: "An unexpected error occurred" }),
+      JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

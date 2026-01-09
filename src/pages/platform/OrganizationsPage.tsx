@@ -301,16 +301,29 @@ export default function OrganizationsPage() {
     
     setAdminActionLoading(true);
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          first_name: values.firstName,
-          last_name: values.lastName,
-          email: values.email,
-        })
-        .eq("user_id", selectedAdmin.userId);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("You must be logged in");
+        return;
+      }
 
-      if (error) throw error;
+      // Use edge function to update BOTH auth.users AND profiles
+      const response = await supabase.functions.invoke("update-admin-account", {
+        body: {
+          userId: selectedAdmin.userId,
+          firstName: values.firstName,
+          lastName: values.lastName,
+          email: values.email,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || "Failed to update admin");
+      }
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
 
       toast.success("Admin details updated");
       setEditAdminDialogOpen(false);

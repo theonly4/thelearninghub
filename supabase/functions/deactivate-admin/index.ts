@@ -1,15 +1,35 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+function getCorsHeaders(requestOrigin: string | null): Record<string, string> {
+  const allowedOrigins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://lovableproject.com",
+  ];
+  
+  const lovablePattern = /^https:\/\/[a-z0-9-]+\.lovableproject\.com$/;
+  
+  let origin = "*";
+  if (requestOrigin) {
+    if (allowedOrigins.includes(requestOrigin) || lovablePattern.test(requestOrigin)) {
+      origin = requestOrigin;
+    }
+  }
+  
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+}
 
 interface DeactivateAdminRequest {
   userId: string;
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req.headers.get("Origin"));
+  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
