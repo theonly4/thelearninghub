@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { TrainingMaterialReader } from "@/components/training/TrainingMaterialReader";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,7 @@ interface UserProgress {
 }
 
 export default function EmployeeTrainingPage() {
+  const navigate = useNavigate();
   const [assignment, setAssignment] = useState<TrainingAssignment | null>(null);
   const [materials, setMaterials] = useState<TrainingMaterial[]>([]);
   const [progress, setProgress] = useState<UserProgress[]>([]);
@@ -364,14 +366,16 @@ export default function EmployeeTrainingPage() {
                 <span className="font-medium">
                   All materials complete! You can now take the quiz.
                 </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="ml-auto gap-1 border-success/30 text-success hover:bg-success/10"
-                >
-                  Start Quiz
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
+                <Link to="/dashboard/quizzes">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="ml-auto gap-1 border-success/30 text-success hover:bg-success/10"
+                  >
+                    Start Quiz
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
               </div>
             )}
           </CardContent>
