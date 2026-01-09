@@ -8,6 +8,8 @@ import { MfaGuard } from "@/components/MfaGuard";
 import { RoleGuard } from "@/components/RoleGuard";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import MfaEnrollPage from "./pages/MfaEnrollPage";
 import MfaVerifyPage from "./pages/MfaVerifyPage";
 import DemoPage from "./pages/DemoPage";
@@ -54,6 +56,8 @@ const App = () => (
             {/* Public routes */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/mfa-enroll" element={<MfaEnrollPage />} />
             <Route path="/mfa-verify" element={<MfaVerifyPage />} />
             <Route path="/demo" element={<DemoPage />} />
