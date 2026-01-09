@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/Logo";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Eye, EyeOff, Lock, CheckCircle2, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Lock, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
@@ -15,6 +16,11 @@ export default function ResetPasswordPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isValidSession, setIsValidSession] = useState<boolean | null>(null);
+  const [requiresMfa, setRequiresMfa] = useState(false);
+  const [mfaCode, setMfaCode] = useState("");
+  const [factorId, setFactorId] = useState<string | null>(null);
+  const [challengeId, setChallengeId] = useState<string | null>(null);
+  const [isVerifyingMfa, setIsVerifyingMfa] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -26,6 +32,8 @@ export default function ResetPasswordPage() {
       // The recovery link sets up a session automatically
       if (session) {
         setIsValidSession(true);
+        // Check if user has MFA enabled
+        await checkMfaFactors();
       } else {
         setIsValidSession(false);
       }
@@ -34,14 +42,83 @@ export default function ResetPasswordPage() {
     checkSession();
 
     // Listen for auth state changes (recovery link will trigger this)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === "PASSWORD_RECOVERY") {
         setIsValidSession(true);
+        await checkMfaFactors();
       }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const checkMfaFactors = async () => {
+    try {
+      const { data: factorsData, error } = await supabase.auth.mfa.listFactors();
+      if (error) {
+        console.error("Error checking MFA factors:", error);
+        return;
+      }
+      
+      // Check if user has verified TOTP factors
+      const verifiedFactors = factorsData?.totp?.filter(f => f.status === 'verified') || [];
+      if (verifiedFactors.length > 0) {
+        setFactorId(verifiedFactors[0].id);
+        // Check current AAL level
+        const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (aalData?.currentLevel !== 'aal2') {
+          setRequiresMfa(true);
+        }
+      }
+    } catch (err) {
+      console.error("MFA check error:", err);
+    }
+  };
+
+  const handleMfaVerify = async () => {
+    if (!factorId || mfaCode.length !== 6) return;
+    
+    setIsVerifyingMfa(true);
+    try {
+      // Create challenge if we don't have one
+      let currentChallengeId = challengeId;
+      if (!currentChallengeId) {
+        const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
+          factorId,
+        });
+        if (challengeError) throw challengeError;
+        currentChallengeId = challengeData.id;
+        setChallengeId(currentChallengeId);
+      }
+
+      // Verify the code
+      const { error: verifyError } = await supabase.auth.mfa.verify({
+        factorId,
+        challengeId: currentChallengeId,
+        code: mfaCode,
+      });
+
+      if (verifyError) throw verifyError;
+
+      // MFA verified, can now proceed with password reset
+      setRequiresMfa(false);
+      toast({
+        title: "MFA verified",
+        description: "You can now set your new password.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Verification failed",
+        description: error.message || "Invalid code. Please try again.",
+        variant: "destructive",
+      });
+      setMfaCode("");
+      // Reset challenge for retry
+      setChallengeId(null);
+    } finally {
+      setIsVerifyingMfa(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,7 +148,20 @@ export default function ResetPasswordPage() {
         password: password,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Check if it's an AAL2 requirement error
+        if (error.message.includes("AAL2") || error.message.includes("MFA")) {
+          setRequiresMfa(true);
+          await checkMfaFactors();
+          toast({
+            title: "MFA verification required",
+            description: "Please verify your authenticator app to continue.",
+            variant: "destructive",
+          });
+          return;
+        }
+        throw error;
+      }
 
       setIsSuccess(true);
       toast({
@@ -123,6 +213,71 @@ export default function ResetPasswordPage() {
               >
                 Request new link
               </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // MFA verification required
+  if (requiresMfa && factorId) {
+    return (
+      <div className="min-h-screen bg-gradient-hero">
+        <div className="container flex min-h-screen flex-col items-center justify-center px-4 py-8 md:px-6">
+          <div className="w-full max-w-md">
+            <div className="mb-8 text-center">
+              <div className="mb-6 inline-block">
+                <Logo size="lg" />
+              </div>
+              <h1 className="text-2xl font-bold tracking-tight">
+                Verify your identity
+              </h1>
+              <p className="mt-2 text-muted-foreground">
+                Your account has MFA enabled. Enter your authenticator code to continue.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-border bg-card p-8 shadow-lg">
+              <div className="flex justify-center mb-6">
+                <div className="rounded-full bg-primary/10 p-4">
+                  <ShieldCheck className="h-8 w-8 text-primary" />
+                </div>
+              </div>
+              
+              <div className="space-y-6">
+                <div className="flex justify-center">
+                  <InputOTP
+                    maxLength={6}
+                    value={mfaCode}
+                    onChange={(value) => setMfaCode(value)}
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                      <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
+
+                <Button
+                  className="w-full"
+                  onClick={handleMfaVerify}
+                  disabled={mfaCode.length !== 6 || isVerifyingMfa}
+                >
+                  {isVerifyingMfa ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Verifying...
+                    </>
+                  ) : (
+                    "Verify & Continue"
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
