@@ -35,3 +35,9 @@ verify_jwt = false
 
 [functions.update-admin-account]
 verify_jwt = false
+
+[functions.send-assignment-email]
+verify_jwt = false
+
+[functions.send-release-notification]
+verify_jwt = false

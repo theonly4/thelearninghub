@@ -24,6 +24,7 @@ interface DashboardLayoutProps {
 const adminNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/admin" },
   { icon: Users, label: "Users", href: "/admin/users" },
+  { icon: BookOpen, label: "Training Library", href: "/admin/training-library" },
   { icon: BarChart3, label: "Reports", href: "/admin/reports" },
   { icon: HelpCircle, label: "How To Guide", href: "/admin/help" },
 ];
