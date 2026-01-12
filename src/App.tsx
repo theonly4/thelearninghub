@@ -34,6 +34,8 @@ import SeedQuestionsPage from "./pages/platform/SeedQuestionsPage";
 import QuestionDistributionPage from "./pages/platform/QuestionDistributionPage";
 import PackageManagerPage from "./pages/platform/PackageManagerPage";
 import PlatformHelpGuidePage from "./pages/platform/HelpGuidePage";
+import AnalyticsPage from "./pages/platform/AnalyticsPage";
+import QuizBuilderPage from "./pages/platform/QuizBuilderPage";
 
 // Admin Pages
 import AdminHelpGuidePage from "./pages/admin/HelpGuidePage";
@@ -266,6 +268,26 @@ const App = () => (
                 <MfaGuard>
                   <RoleGuard allowedRoles={["platform_owner"]}>
                     <PackageManagerPage />
+                  </RoleGuard>
+                </MfaGuard>
+              }
+            />
+            <Route
+              path="/platform/analytics"
+              element={
+                <MfaGuard>
+                  <RoleGuard allowedRoles={["platform_owner"]}>
+                    <AnalyticsPage />
+                  </RoleGuard>
+                </MfaGuard>
+              }
+            />
+            <Route
+              path="/platform/quiz-builder"
+              element={
+                <MfaGuard>
+                  <RoleGuard allowedRoles={["platform_owner"]}>
+                    <QuizBuilderPage />
                   </RoleGuard>
                 </MfaGuard>
               }

@@ -281,7 +281,26 @@ Deno.serve(async (req) => {
 
     console.log("Role assigned: org_admin");
 
-    // Step 5: Create audit log
+    // Step 5: Create subscription with trial status
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+
+    const { error: subscriptionError } = await adminClient.from("subscriptions").insert({
+      organization_id: newOrg.id,
+      status: "trial",
+      tier: "basic",
+      users_limit: 10,
+      trial_ends_at: trialEndsAt.toISOString(),
+    });
+
+    if (subscriptionError) {
+      console.error("Failed to create subscription:", subscriptionError);
+      // Non-critical, continue without rolling back
+    } else {
+      console.log("Subscription created: trial with 30 days");
+    }
+
+    // Step 6: Create audit log
     await adminClient.from("audit_logs").insert({
       user_id: user.id,
       organization_id: newOrg.id,

@@ -563,6 +563,7 @@ export type Database = {
           id: string
           passing_score: number
           sequence_number: number
+          status: string | null
           title: string
           updated_at: string
           version: number
@@ -576,6 +577,7 @@ export type Database = {
           id?: string
           passing_score?: number
           sequence_number: number
+          status?: string | null
           title: string
           updated_at?: string
           version?: number
@@ -589,6 +591,7 @@ export type Database = {
           id?: string
           passing_score?: number
           sequence_number?: number
+          status?: string | null
           title?: string
           updated_at?: string
           version?: number

@@ -16,6 +16,8 @@ import {
   GitBranch,
   Package,
   HelpCircle,
+  BarChart3,
+  PenLine,
 } from "lucide-react";
 
 interface PlatformOwnerLayoutProps {
@@ -30,6 +32,8 @@ const platformOwnerNavItems = [
   { icon: BookOpen, label: "Training Materials", href: "/platform/materials" },
   { icon: Building2, label: "Organizations", href: "/platform/organizations" },
   { icon: Send, label: "Content Releases", href: "/platform/releases" },
+  { icon: BarChart3, label: "Analytics", href: "/platform/analytics" },
+  { icon: PenLine, label: "Quiz Builder", href: "/platform/quiz-builder" },
   { icon: HelpCircle, label: "How To Guide", href: "/platform/help" },
 ];
 
