@@ -659,6 +659,74 @@ function UnifiedReleaseForm({
         messages.push(`${materialReleasesCreated} material release(s)`);
       }
       toast.success(`Released: ${messages.join(" and ")}`);
+
+      // Send notification emails to org admins (in background)
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const selectedPkg = packages.find(p => p.id === selectedPackage);
+      const selectedMats = materials.filter(m => selectedMaterials.includes(m.id));
+      
+      for (const orgId of selectedOrgs) {
+        const org = organizations.find(o => o.id === orgId);
+        if (!org) continue;
+
+        // Find org admins
+        supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('organization_id', orgId)
+          .eq('role', 'org_admin')
+          .then(async ({ data: adminRoles }) => {
+            if (!adminRoles?.length) return;
+
+            for (const adminRole of adminRoles) {
+              const { data: adminProfile } = await supabase
+                .from('profiles')
+                .select('first_name, last_name, email')
+                .eq('user_id', adminRole.user_id)
+                .single();
+
+              if (!adminProfile?.email) continue;
+
+              // Notify about package
+              if (selectedPkg && packageReleasesCreated > 0) {
+                fetch(`${supabaseUrl}/functions/v1/send-release-notification`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    adminName: `${adminProfile.first_name} ${adminProfile.last_name}`,
+                    adminEmail: adminProfile.email,
+                    organizationName: org.name,
+                    contentType: 'package',
+                    contentTitle: selectedPkg.name,
+                    workforceGroup: WORKFORCE_GROUP_LABELS[workforceGroup],
+                    trainingYear,
+                    loginUrl: window.location.origin + '/login',
+                  }),
+                }).catch(console.error);
+              }
+
+              // Notify about materials
+              if (selectedMats.length > 0 && materialReleasesCreated > 0) {
+                fetch(`${supabaseUrl}/functions/v1/send-release-notification`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    adminName: `${adminProfile.first_name} ${adminProfile.last_name}`,
+                    adminEmail: adminProfile.email,
+                    organizationName: org.name,
+                    contentType: 'material',
+                    contentTitle: selectedMats.length === 1 
+                      ? selectedMats[0].title 
+                      : `${selectedMats.length} training materials`,
+                    workforceGroup: WORKFORCE_GROUP_LABELS[workforceGroup],
+                    loginUrl: window.location.origin + '/login',
+                  }),
+                }).catch(console.error);
+              }
+            }
+          });
+      }
+
       onSuccess();
     } catch (error: any) {
       console.error("Error releasing content:", error);
