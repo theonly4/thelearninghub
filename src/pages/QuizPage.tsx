@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { useProgress } from "@/contexts/ProgressContext";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { getQuizById } from "@/data/quizzes";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -15,8 +16,10 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   BookOpen,
   Loader2,
+  RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -50,6 +53,7 @@ export default function QuizPage() {
   const { quizId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { fullName } = useUserProfile();
   const { currentWorkforceGroup, recordQuizResult, canTakeQuiz } = useProgress();
   
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -78,7 +82,7 @@ export default function QuizPage() {
 
   if (!quiz) {
     return (
-      <DashboardLayout userRole="workforce_user" userName="Jane Smith">
+      <DashboardLayout userRole="workforce_user" userName={fullName || "User"}>
         <div className="flex min-h-[50vh] items-center justify-center">
           <div className="text-center">
             <p className="text-muted-foreground mb-4">Quiz not found</p>
@@ -218,7 +222,7 @@ export default function QuizPage() {
   // Loading state while submitting to server
   if (isSubmitting) {
     return (
-      <DashboardLayout userRole="workforce_user" userName="Jane Smith">
+      <DashboardLayout userRole="workforce_user" userName={fullName || "User"}>
         <div className="flex min-h-[50vh] items-center justify-center">
           <div className="text-center space-y-4">
             <Loader2 className="h-12 w-12 animate-spin mx-auto text-accent" />
@@ -230,11 +234,22 @@ export default function QuizPage() {
     );
   }
 
+  // Helper to reset quiz for retake
+  const handleRetakeQuiz = () => {
+    setCurrentQuestion(0);
+    setAnswers([]);
+    setSelectedOption(null);
+    setHasAnswered(false);
+    setShowResults(false);
+    setServerResult(null);
+    setQuestionStartTime(Date.now());
+  };
+
   if (showResults && serverResult) {
     const { score, passed, passingScore } = serverResult;
 
     return (
-      <DashboardLayout userRole="workforce_user" userName="Jane Smith">
+      <DashboardLayout userRole="workforce_user" userName={fullName || "User"}>
         <div className="mx-auto max-w-3xl space-y-8">
           {/* Results Header */}
           <div className="text-center">
@@ -264,6 +279,31 @@ export default function QuizPage() {
               </p>
             )}
           </div>
+
+          {/* Retake Quiz CTA for failed attempts */}
+          {!passed && (
+            <div className="rounded-xl border-2 border-warning/50 bg-warning/5 p-6 text-center">
+              <div className="flex flex-col items-center gap-4">
+                <div className="rounded-full bg-warning/20 p-3">
+                  <AlertTriangle className="h-8 w-8 text-warning" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg mb-1">Don't Give Up!</h3>
+                  <p className="text-muted-foreground mb-4 max-w-md">
+                    Review the materials below and try again. You can retake this quiz unlimited times until you pass.
+                  </p>
+                  <Button 
+                    size="lg" 
+                    className="gap-2"
+                    onClick={handleRetakeQuiz}
+                  >
+                    <RotateCcw className="h-5 w-5" />
+                    Retake Quiz Now
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Score Card */}
           <div className="rounded-xl border border-border bg-card p-8 text-center">
@@ -364,7 +404,7 @@ export default function QuizPage() {
   }
 
   return (
-    <DashboardLayout userRole="workforce_user" userName="Jane Smith">
+    <DashboardLayout userRole="workforce_user" userName={fullName || "User"}>
       <div className="mx-auto max-w-3xl space-y-6">
         {/* Quiz Header */}
         <div className="flex items-center justify-between">

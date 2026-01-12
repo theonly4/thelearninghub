@@ -5,6 +5,7 @@ import { StatCard } from "@/components/StatCard";
 import { WorkforceGroupBadge } from "@/components/WorkforceGroupBadge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { 
   Users, 
   TrendingUp,
@@ -25,6 +26,7 @@ interface WorkforceBreakdown {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const { fullName } = useUserProfile();
   const [stats, setStats] = useState({
     totalUsers: 0,
     completedTraining: 0,
@@ -151,7 +153,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <DashboardLayout userRole="org_admin" userName="Admin User">
+    <DashboardLayout userRole="org_admin" userName={fullName || "Admin"}>
       <div className="space-y-8">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

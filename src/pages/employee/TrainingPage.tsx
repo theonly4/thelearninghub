@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { WorkforceGroupBadge } from "@/components/WorkforceGroupBadge";
 import { HipaaLink } from "@/components/HipaaLink";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { format, differenceInDays, isPast, isToday } from "date-fns";
 import { toast } from "sonner";
 import {
@@ -52,6 +53,7 @@ interface UserProgress {
 
 export default function EmployeeTrainingPage() {
   const navigate = useNavigate();
+  const { fullName } = useUserProfile();
   const [assignment, setAssignment] = useState<TrainingAssignment | null>(null);
   const [materials, setMaterials] = useState<TrainingMaterial[]>([]);
   const [progress, setProgress] = useState<UserProgress[]>([]);
@@ -208,9 +210,16 @@ export default function EmployeeTrainingPage() {
   const isOverdue = dueDate ? isPast(dueDate) && !isToday(dueDate) : false;
   const isDueSoon = daysRemaining !== null && daysRemaining <= 7 && daysRemaining >= 0;
 
+  // Helper for color-coded progress
+  const getProgressColor = (percentage: number): string => {
+    if (percentage === 0) return "bg-destructive";
+    if (percentage === 100) return "bg-success";
+    return "bg-warning";
+  };
+
   if (loading) {
     return (
-      <DashboardLayout userRole="workforce_user" userName="Employee">
+      <DashboardLayout userRole="workforce_user" userName={fullName || "User"}>
         <div className="flex items-center justify-center min-h-[50vh]">
           <p className="text-muted-foreground">Loading training materials...</p>
         </div>
@@ -221,7 +230,7 @@ export default function EmployeeTrainingPage() {
   // Show material reader if one is selected
   if (selectedMaterial) {
     return (
-      <DashboardLayout userRole="workforce_user" userName="Employee">
+      <DashboardLayout userRole="workforce_user" userName={fullName || "User"}>
         <div className="space-y-4">
           <Button
             variant="ghost"
@@ -264,7 +273,7 @@ export default function EmployeeTrainingPage() {
   // No assignment
   if (!assignment) {
     return (
-      <DashboardLayout userRole="workforce_user" userName="Employee">
+      <DashboardLayout userRole="workforce_user" userName={fullName || "User"}>
         <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
           <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
           <h2 className="text-xl font-semibold mb-2">No Training Assigned</h2>
@@ -279,7 +288,7 @@ export default function EmployeeTrainingPage() {
   // No materials released
   if (materials.length === 0) {
     return (
-      <DashboardLayout userRole="workforce_user" userName="Employee">
+      <DashboardLayout userRole="workforce_user" userName={fullName || "User"}>
         <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
           <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
           <h2 className="text-xl font-semibold mb-2">Training Materials Pending</h2>
@@ -292,7 +301,7 @@ export default function EmployeeTrainingPage() {
   }
 
   return (
-    <DashboardLayout userRole="workforce_user" userName="Employee">
+    <DashboardLayout userRole="workforce_user" userName={fullName || "User"}>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

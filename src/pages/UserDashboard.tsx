@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatCard } from "@/components/StatCard";
 import { WorkforceGroupBadge } from "@/components/WorkforceGroupBadge";
@@ -5,18 +6,11 @@ import { ProgressIndicator } from "@/components/ProgressIndicator";
 import { LockedQuizCard } from "@/components/LockedQuizCard";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Link } from "react-router-dom";
 import { useProgress } from "@/contexts/ProgressContext";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { getMaterialsForWorkforceGroup } from "@/data/trainingMaterials";
 import { getQuizzesForWorkforceGroup } from "@/data/quizzes";
-import { WorkforceGroup, WORKFORCE_GROUP_LABELS } from "@/types/hipaa";
 import { 
   FileText, 
   Award, 
@@ -24,10 +18,10 @@ import {
   CheckCircle2,
   ArrowRight,
   BookOpen,
-  TestTube,
 } from "lucide-react";
 
 export default function UserDashboard() {
+  const { fullName, firstName, organizationName, workforceGroups } = useUserProfile();
   const {
     currentWorkforceGroup,
     getMaterialProgress,
@@ -36,14 +30,14 @@ export default function UserDashboard() {
     getQuizResult,
     getNextAction,
     setWorkforceGroup,
-    resetProgress,
   } = useProgress();
 
-  const workforceGroups: WorkforceGroup[] = ["all_staff", "clinical", "administrative", "management", "it"];
-
-  const handleWorkforceChange = (value: WorkforceGroup) => {
-    resetProgress(value); // Reset progress and set new workforce group in one call
-  };
+  // Set workforce group from user profile when available
+  useEffect(() => {
+    if (workforceGroups.length > 0 && !currentWorkforceGroup) {
+      setWorkforceGroup(workforceGroups[0]);
+    }
+  }, [workforceGroups, currentWorkforceGroup, setWorkforceGroup]);
 
   const materials = currentWorkforceGroup
     ? getMaterialsForWorkforceGroup(currentWorkforceGroup)
@@ -83,19 +77,19 @@ export default function UserDashboard() {
   const quiz3Passed = quizzes[2] ? getQuizResult(quizzes[2].id)?.passed || false : false;
 
   return (
-    <DashboardLayout userRole="workforce_user" userName="Jane Smith">
+    <DashboardLayout userRole="workforce_user" userName={fullName || "User"}>
       <div className="space-y-8">
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold tracking-tight">
-            Welcome back, Jane
+            Welcome back{firstName ? `, ${firstName}` : ""}
           </h1>
           <p className="text-muted-foreground">
             Continue your HIPAA compliance training
           </p>
         </div>
 
-        {/* User Info Card with Demo Selector */}
+        {/* User Info Card */}
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-3">
@@ -113,32 +107,9 @@ export default function UserDashboard() {
               <span className="text-sm text-muted-foreground">
                 Organization:
               </span>
-              <span className="text-sm font-medium">Demo Healthcare Inc.</span>
-            </div>
-          </div>
-          
-          {/* Demo Workforce Selector */}
-          <div className="mt-4 pt-4 border-t border-border">
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <TestTube className="h-4 w-4" />
-                <span>Demo Mode - Switch Workforce:</span>
-              </div>
-              <Select
-                value={currentWorkforceGroup || undefined}
-                onValueChange={(value) => handleWorkforceChange(value as WorkforceGroup)}
-              >
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Select group" />
-                </SelectTrigger>
-                <SelectContent>
-                  {workforceGroups.map((group) => (
-                    <SelectItem key={group} value={group}>
-                      {WORKFORCE_GROUP_LABELS[group]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <span className="text-sm font-medium">
+                {organizationName || "Not assigned"}
+              </span>
             </div>
           </div>
         </div>
@@ -272,7 +243,7 @@ export default function UserDashboard() {
             </div>
 
             <div className="divide-y divide-border">
-              {materials.slice(0, 3).map((material, index) => (
+              {materials.slice(0, 3).map((material) => (
                 <Link
                   key={material.id}
                   to={`/dashboard/training/${material.id}`}
