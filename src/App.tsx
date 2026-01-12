@@ -40,6 +40,8 @@ import QuizBuilderPage from "./pages/platform/QuizBuilderPage";
 // Admin Pages
 import AdminHelpGuidePage from "./pages/admin/HelpGuidePage";
 import ReportsPage from "./pages/admin/ReportsPage";
+import TrainingLibraryPage from "./pages/admin/TrainingLibraryPage";
+import EmployeeDetailPage from "./pages/admin/EmployeeDetailPage";
 
 // Employee Pages
 import EmployeeTrainingPage from "./pages/employee/TrainingPage";
@@ -102,6 +104,26 @@ const App = () => (
                 <MfaGuard>
                   <RoleGuard allowedRoles={["org_admin"]}>
                     <AdminHelpGuidePage />
+                  </RoleGuard>
+                </MfaGuard>
+              }
+            />
+            <Route
+              path="/admin/training-library"
+              element={
+                <MfaGuard>
+                  <RoleGuard allowedRoles={["org_admin"]}>
+                    <TrainingLibraryPage />
+                  </RoleGuard>
+                </MfaGuard>
+              }
+            />
+            <Route
+              path="/admin/employees/:userId"
+              element={
+                <MfaGuard>
+                  <RoleGuard allowedRoles={["org_admin"]}>
+                    <EmployeeDetailPage />
                   </RoleGuard>
                 </MfaGuard>
               }
