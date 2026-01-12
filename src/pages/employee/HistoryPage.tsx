@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { format } from "date-fns";
 import {
   History,
@@ -22,6 +23,7 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
+  BookOpen,
 } from "lucide-react";
 import { WorkforceGroup, WORKFORCE_GROUP_LABELS } from "@/types/hipaa";
 
@@ -45,9 +47,19 @@ interface Certificate {
   workforce_group: WorkforceGroup;
 }
 
+interface TrainingCompletion {
+  id: string;
+  material_id: string;
+  material_title: string;
+  completed_at: string;
+  version_at_completion: number;
+}
+
 export default function HistoryPage() {
+  const { fullName } = useUserProfile();
   const [quizAttempts, setQuizAttempts] = useState<QuizAttempt[]>([]);
   const [certificates, setCertificates] = useState<Certificate[]>([]);
+  const [trainings, setTrainings] = useState<TrainingCompletion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -82,7 +94,7 @@ export default function HistoryPage() {
       const { data: quizzes } = await supabase
         .from('quizzes')
         .select('id, title')
-        .in('id', quizIds);
+        .in('id', quizIds.length > 0 ? quizIds : ['none']);
 
       const quizMap = new Map(quizzes?.map(q => [q.id, q.title]) || []);
 
@@ -113,6 +125,37 @@ export default function HistoryPage() {
         issued_at: c.issued_at,
         valid_until: c.valid_until,
         workforce_group: c.workforce_group as WorkforceGroup,
+      })));
+
+      // Fetch training completions
+      const { data: trainingProgress, error: trainingError } = await supabase
+        .from('user_training_progress')
+        .select(`
+          id,
+          material_id,
+          completed_at,
+          version_at_completion
+        `)
+        .eq('user_id', user.id)
+        .order('completed_at', { ascending: false });
+
+      if (trainingError) throw trainingError;
+
+      // Fetch material titles
+      const materialIds = [...new Set(trainingProgress?.map(t => t.material_id) || [])];
+      const { data: materials } = await supabase
+        .from('training_materials')
+        .select('id, title')
+        .in('id', materialIds.length > 0 ? materialIds : ['none']);
+
+      const materialMap = new Map(materials?.map(m => [m.id, m.title]) || []);
+
+      setTrainings((trainingProgress || []).map(t => ({
+        id: t.id,
+        material_id: t.material_id,
+        material_title: materialMap.get(t.material_id) || 'Unknown Material',
+        completed_at: t.completed_at,
+        version_at_completion: t.version_at_completion,
       })));
 
     } catch (error) {
@@ -166,7 +209,7 @@ export default function HistoryPage() {
 
   if (isLoading) {
     return (
-      <DashboardLayout userRole="workforce_user" userName="Employee">
+      <DashboardLayout userRole="workforce_user" userName={fullName || "User"}>
         <div className="flex items-center justify-center min-h-[50vh]">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -175,7 +218,7 @@ export default function HistoryPage() {
   }
 
   return (
-    <DashboardLayout userRole="workforce_user" userName="Employee">
+    <DashboardLayout userRole="workforce_user" userName={fullName || "User"}>
       <div className="space-y-6">
         {/* Header */}
         <div>
@@ -184,16 +227,26 @@ export default function HistoryPage() {
             Training History
           </h1>
           <p className="text-muted-foreground">
-            View your quiz attempts and earned certificates
+            View your training completions, quiz attempts, and earned certificates
           </p>
         </div>
 
         {/* Summary Cards */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Attempts
+                Materials Completed
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{trainings.length}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Quiz Attempts
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -203,7 +256,7 @@ export default function HistoryPage() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Passed Quizzes
+                Quizzes Passed
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -227,8 +280,12 @@ export default function HistoryPage() {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="attempts">
+        <Tabs defaultValue="trainings">
           <TabsList>
+            <TabsTrigger value="trainings" className="gap-2">
+              <BookOpen className="h-4 w-4" />
+              Trainings
+            </TabsTrigger>
             <TabsTrigger value="attempts" className="gap-2">
               <FileText className="h-4 w-4" />
               Quiz Attempts
@@ -238,6 +295,49 @@ export default function HistoryPage() {
               Certificates
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="trainings" className="mt-4">
+            <Card>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Material</TableHead>
+                    <TableHead>Version</TableHead>
+                    <TableHead>Completed</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {trainings.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                        No training materials completed yet
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    trainings.map((training) => (
+                      <TableRow key={training.id}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <BookOpen className="h-4 w-4 text-muted-foreground" />
+                            {training.material_title}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">v{training.version_at_completion}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2 text-success">
+                            <CheckCircle2 className="h-4 w-4" />
+                            {format(new Date(training.completed_at), 'MMM d, yyyy h:mm a')}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="attempts" className="mt-4">
             <Card>
