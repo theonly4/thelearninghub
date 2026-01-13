@@ -578,6 +578,9 @@ export function TrainingMaterialReader({
   onComplete,
   isComplete,
 }: TrainingMaterialReaderProps) {
+  // Track which sections have been viewed (start with first section as viewed)
+  const [viewedSections, setViewedSections] = useState<Set<number>>(new Set([0]));
+  
   const currentSection = sections[currentSectionIndex];
   const progress = ((currentSectionIndex + 1) / sections.length) * 100;
   const isLastSection = currentSectionIndex === sections.length - 1;
@@ -586,14 +589,31 @@ export function TrainingMaterialReader({
     : Shield;
 
   function handleNext() {
+    // Mark current section as viewed
+    const newViewed = new Set(viewedSections);
+    newViewed.add(currentSectionIndex);
+    
     if (isLastSection) {
-      onComplete();
+      // Mark last section as viewed
+      newViewed.add(currentSectionIndex);
+      setViewedSections(newViewed);
+      
+      // Check if all sections have been viewed - auto-complete
+      const allViewed = sections.every((_, idx) => newViewed.has(idx));
+      if (allViewed || isComplete) {
+        onComplete();
+      }
     } else {
-      onSectionChange(currentSectionIndex + 1);
+      // Advance to next section and mark it as viewed
+      const nextIndex = currentSectionIndex + 1;
+      newViewed.add(nextIndex);
+      setViewedSections(newViewed);
+      onSectionChange(nextIndex);
     }
   }
 
   function handlePrevious() {
+    // Previous navigation doesn't undo completion - sections stay viewed
     if (currentSectionIndex > 0) {
       onSectionChange(currentSectionIndex - 1);
     }
@@ -616,28 +636,38 @@ export function TrainingMaterialReader({
         <Progress value={progress} className="h-2" />
       </div>
 
-      {/* Section Navigation Pills */}
+      {/* Section Navigation Pills - Only allow clicking viewed sections (no forward skipping) */}
       <div className="flex gap-1 overflow-x-auto pb-2">
-        {sections.map((section, index) => (
-          <button
-            key={index}
-            onClick={() => onSectionChange(index)}
-            className={cn(
-              "flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
-              index === currentSectionIndex
-                ? "bg-accent text-accent-foreground"
-                : index < currentSectionIndex
-                ? "bg-success/20 text-success"
-                : "bg-muted text-muted-foreground hover:bg-muted/80"
-            )}
-          >
-            {index < currentSectionIndex ? (
-              <CheckCircle2 className="h-3 w-3" />
-            ) : (
-              index + 1
-            )}
-          </button>
-        ))}
+        {sections.map((section, index) => {
+          const isViewed = viewedSections.has(index);
+          const canClick = isViewed; // Only allow clicking on viewed sections
+          
+          return (
+            <button
+              key={index}
+              onClick={() => {
+                if (canClick) {
+                  onSectionChange(index);
+                }
+              }}
+              disabled={!canClick}
+              className={cn(
+                "flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors",
+                index === currentSectionIndex
+                  ? "bg-accent text-accent-foreground"
+                  : isViewed
+                  ? "bg-success/20 text-success cursor-pointer"
+                  : "bg-muted text-muted-foreground cursor-not-allowed opacity-50"
+              )}
+            >
+              {isViewed && index !== currentSectionIndex ? (
+                <CheckCircle2 className="h-3 w-3" />
+              ) : (
+                index + 1
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Section Content */}
@@ -768,7 +798,7 @@ export function TrainingMaterialReader({
               </>
             ) : (
               <>
-                Mark Complete
+                Finish Training
                 <CheckCircle2 className="h-4 w-4" />
               </>
             )
