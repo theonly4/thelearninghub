@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { WorkforceGroupBadge } from "@/components/WorkforceGroupBadge";
 import { CredentialEmailTemplate } from "@/components/CredentialEmailTemplate";
 import { Button } from "@/components/ui/button";
@@ -80,6 +81,7 @@ interface CSVEmployee {
 
 export default function UsersPage() {
   const { toast } = useToast();
+  const { fullName } = useUserProfile();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -400,7 +402,7 @@ export default function UsersPage() {
   };
 
   return (
-    <DashboardLayout userRole="org_admin" userName="Admin">
+    <DashboardLayout userRole="org_admin" userName={fullName || "Admin"}>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

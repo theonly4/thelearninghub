@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { WorkforceGroupBadge } from "@/components/WorkforceGroupBadge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ interface QuizAttempt {
 
 export default function QuizzesPage() {
   const navigate = useNavigate();
+  const { fullName } = useUserProfile();
   const [loading, setLoading] = useState(true);
   const [quiz, setQuiz] = useState<ReleasedQuiz | null>(null);
   const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
@@ -185,7 +187,7 @@ export default function QuizzesPage() {
 
   if (loading) {
     return (
-      <DashboardLayout userRole="workforce_user" userName="Employee">
+      <DashboardLayout userRole="workforce_user" userName={fullName || "User"}>
         <div className="flex items-center justify-center min-h-[50vh]">
           <p className="text-muted-foreground">Loading quizzes...</p>
         </div>
@@ -195,7 +197,7 @@ export default function QuizzesPage() {
 
   if (!workforceGroup) {
     return (
-      <DashboardLayout userRole="workforce_user" userName="Employee">
+      <DashboardLayout userRole="workforce_user" userName={fullName || "User"}>
         <div className="flex min-h-[50vh] items-center justify-center">
           <p className="text-muted-foreground">
             No workforce group assigned. Contact your administrator.
@@ -207,7 +209,7 @@ export default function QuizzesPage() {
 
   if (!quiz) {
     return (
-      <DashboardLayout userRole="workforce_user" userName="Employee">
+      <DashboardLayout userRole="workforce_user" userName={fullName || "User"}>
         <div className="space-y-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -235,7 +237,7 @@ export default function QuizzesPage() {
   }
 
   return (
-    <DashboardLayout userRole="workforce_user" userName="Employee">
+    <DashboardLayout userRole="workforce_user" userName={fullName || "User"}>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

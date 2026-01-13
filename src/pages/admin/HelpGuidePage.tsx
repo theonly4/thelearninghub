@@ -1,4 +1,5 @@
 import { DashboardLayout } from "@/components/DashboardLayout";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
@@ -16,8 +17,10 @@ import {
 } from "lucide-react";
 
 export default function AdminHelpGuidePage() {
+  const { fullName } = useUserProfile();
+  
   return (
-    <DashboardLayout userName="Admin">
+    <DashboardLayout userRole="org_admin" userName={fullName || "Admin"}>
       <div className="space-y-6 max-w-4xl">
         <div>
           <h1 className="text-3xl font-bold text-foreground">How To Guide</h1>
