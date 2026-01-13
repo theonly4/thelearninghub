@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,7 @@ interface QuizCompletion {
 }
 
 export default function ReportsPage() {
+  const { fullName } = useUserProfile();
   const [trainingCompletions, setTrainingCompletions] = useState<TrainingCompletion[]>([]);
   const [quizCompletions, setQuizCompletions] = useState<QuizCompletion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -487,7 +489,7 @@ export default function ReportsPage() {
   }
 
   return (
-    <DashboardLayout userRole="org_admin" userName="Admin User">
+    <DashboardLayout userRole="org_admin" userName={fullName || "Admin"}>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
