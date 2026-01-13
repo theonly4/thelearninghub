@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { WorkforceGroupBadge } from "@/components/WorkforceGroupBadge";
 import { CredentialEmailTemplate } from "@/components/CredentialEmailTemplate";
@@ -471,10 +472,13 @@ export default function UsersPage() {
                           {emp.first_name.charAt(0)}{emp.last_name.charAt(0)}
                         </div>
                         <div>
-                          <p className="font-medium">
+                          <Link 
+                            to={`/admin/employees/${emp.user_id}`}
+                            className="font-medium text-primary hover:underline"
+                          >
                             {emp.first_name} {emp.last_name}
-                            {emp.is_contractor && <span className="ml-2 text-xs text-muted-foreground">(Contractor)</span>}
-                          </p>
+                          </Link>
+                          {emp.is_contractor && <span className="ml-2 text-xs text-muted-foreground">(Contractor)</span>}
                           <p className="text-sm text-muted-foreground">{emp.email}</p>
                         </div>
                       </div>
