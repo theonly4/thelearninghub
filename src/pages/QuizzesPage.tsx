@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { FileText, Lock, CheckCircle2, Clock, AlertCircle, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { type WorkforceGroup, WORKFORCE_GROUP_LABELS } from "@/types/hipaa";
+import { type WorkforceGroup } from "@/types/hipaa";
 
 interface QuizQuestion {
   id: string;
@@ -35,6 +35,12 @@ interface QuizAttempt {
   completed_at: string | null;
 }
 
+interface TrainingStatus {
+  total_materials: number;
+  completed_materials: number;
+  materials_complete: boolean;
+}
+
 export default function QuizzesPage() {
   const navigate = useNavigate();
   const { fullName } = useUserProfile();
@@ -42,9 +48,11 @@ export default function QuizzesPage() {
   const [quiz, setQuiz] = useState<ReleasedQuiz | null>(null);
   const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
   const [workforceGroup, setWorkforceGroup] = useState<WorkforceGroup | null>(null);
-  const [materialsComplete, setMaterialsComplete] = useState(false);
-  const [totalMaterials, setTotalMaterials] = useState(0);
-  const [completedMaterials, setCompletedMaterials] = useState(0);
+  const [trainingStatus, setTrainingStatus] = useState<TrainingStatus>({
+    total_materials: 0,
+    completed_materials: 0,
+    materials_complete: false,
+  });
 
   useEffect(() => {
     fetchData();
@@ -53,126 +61,67 @@ export default function QuizzesPage() {
   async function fetchData() {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
 
-      // Get user profile
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("organization_id, workforce_groups")
-        .eq("user_id", user.id)
-        .single();
+      // Call the backend function to get released package for this user
+      const { data: responseData, error: funcError } = await supabase.functions.invoke(
+        "get-quiz-questions",
+        {
+          body: { mode: "released_package_for_user" },
+        }
+      );
 
-      if (profileError) throw profileError;
-      if (!profile) return;
-
-      const userWorkforceGroups = (profile.workforce_groups || []) as WorkforceGroup[];
-      const primaryGroup = userWorkforceGroups[0];
-      setWorkforceGroup(primaryGroup || null);
-
-      if (!primaryGroup || !profile.organization_id) {
+      if (funcError) {
+        console.error("Error calling get-quiz-questions:", funcError);
         setLoading(false);
         return;
       }
 
-      // Fetch released package for this org and workforce group
-      const { data: packageRelease, error: releaseError } = await supabase
-        .from("package_releases")
-        .select(`
-          package_id,
-          workforce_group,
-          training_year,
-          question_packages (
-            name
-          )
-        `)
-        .eq("organization_id", profile.organization_id)
-        .eq("workforce_group", primaryGroup)
-        .order("training_year", { ascending: false })
-        .limit(1)
-        .single();
+      const { package: packageData, questions, training_status } = responseData;
 
-      if (releaseError && releaseError.code !== "PGRST116") {
-        throw releaseError;
-      }
+      // Set training status
+      setTrainingStatus(training_status || {
+        total_materials: 0,
+        completed_materials: 0,
+        materials_complete: false,
+      });
 
-      if (packageRelease) {
-        // Fetch questions for this package
-        const { data: packageQuestions, error: questionsError } = await supabase
-          .from("package_questions")
-          .select(`
-            question_id,
-            quiz_questions (
-              id,
-              question_text,
-              question_number,
-              hipaa_section
-            )
-          `)
-          .eq("package_id", packageRelease.package_id);
-
-        if (questionsError) throw questionsError;
-
-        const questions: QuizQuestion[] = (packageQuestions || [])
-          .map((pq: any) => ({
-            id: pq.quiz_questions?.id || pq.question_id,
-            question_text: pq.quiz_questions?.question_text || "",
-            question_number: pq.quiz_questions?.question_number || 0,
-            hipaa_section: pq.quiz_questions?.hipaa_section || "",
-          }))
-          .sort((a, b) => a.question_number - b.question_number);
-
+      if (packageData) {
+        setWorkforceGroup(packageData.workforce_group as WorkforceGroup);
+        
         setQuiz({
-          package_id: packageRelease.package_id,
-          package_name: (packageRelease.question_packages as any)?.name || "HIPAA Assessment",
-          workforce_group: packageRelease.workforce_group as WorkforceGroup,
-          training_year: packageRelease.training_year,
-          questions,
+          package_id: packageData.package_id,
+          package_name: packageData.package_name,
+          workforce_group: packageData.workforce_group as WorkforceGroup,
+          training_year: packageData.training_year,
+          questions: (questions || []).map((q: any) => ({
+            id: q.id,
+            question_text: q.question_text,
+            question_number: q.question_number,
+            hipaa_section: q.hipaa_section,
+          })),
         });
-      }
 
-      // Check training materials completion
-      const { data: releasedMaterials } = await supabase
-        .from("content_releases")
-        .select("content_id")
-        .eq("organization_id", profile.organization_id)
-        .eq("content_type", "training_material");
-
-      const releasedIds = releasedMaterials?.map(r => r.content_id) || [];
-
-      if (releasedIds.length > 0) {
-        const { data: materialsData } = await supabase
-          .from("training_materials")
-          .select("id")
-          .in("id", releasedIds)
-          .contains("workforce_groups", [primaryGroup]);
-
-        const materialIds = materialsData?.map(m => m.id) || [];
-        setTotalMaterials(materialIds.length);
-
-        if (materialIds.length > 0) {
-          const { data: progressData } = await supabase
-            .from("user_training_progress")
-            .select("material_id")
-            .eq("user_id", user.id)
-            .in("material_id", materialIds);
-
-          const completedCount = progressData?.length || 0;
-          setCompletedMaterials(completedCount);
-          setMaterialsComplete(completedCount >= materialIds.length && materialIds.length > 0);
-        }
-      }
-
-      // Fetch quiz attempts for this package
-      if (packageRelease) {
+        // Fetch quiz attempts for this package
         const { data: attemptsData } = await supabase
           .from("quiz_attempts")
           .select("id, quiz_id, score, passed, completed_at")
-          .eq("user_id", user.id)
-          .eq("quiz_id", packageRelease.package_id)
+          .eq("user_id", session.user.id)
+          .eq("quiz_id", packageData.package_id)
           .order("completed_at", { ascending: false });
 
         setAttempts((attemptsData || []) as QuizAttempt[]);
+      } else {
+        // No package released - try to get workforce group from profile for display
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("workforce_groups")
+          .eq("user_id", session.user.id)
+          .single();
+        
+        const groups = (profile?.workforce_groups || []) as WorkforceGroup[];
+        setWorkforceGroup(groups[0] || null);
       }
     } catch (error) {
       console.error("Error fetching quiz data:", error);
@@ -183,7 +132,7 @@ export default function QuizzesPage() {
 
   const latestAttempt = attempts[0];
   const hasPassed = attempts.some(a => a.passed);
-  const isLocked = !materialsComplete;
+  const isLocked = !trainingStatus.materials_complete;
 
   if (loading) {
     return (
@@ -251,7 +200,7 @@ export default function QuizzesPage() {
         </div>
 
         {/* Training Materials Requirement Notice */}
-        {!materialsComplete && totalMaterials > 0 && (
+        {!trainingStatus.materials_complete && trainingStatus.total_materials > 0 && (
           <div className="rounded-xl border border-warning/30 bg-warning/5 p-4">
             <div className="flex items-center gap-3">
               <FileText className="h-5 w-5 text-warning" />
@@ -265,10 +214,13 @@ export default function QuizzesPage() {
               </div>
               <div className="text-right">
                 <p className="text-sm font-medium">
-                  {completedMaterials} / {totalMaterials}
+                  {trainingStatus.completed_materials} / {trainingStatus.total_materials}
                 </p>
                 <Progress 
-                  value={totalMaterials > 0 ? (completedMaterials / totalMaterials) * 100 : 0} 
+                  value={trainingStatus.total_materials > 0 
+                    ? (trainingStatus.completed_materials / trainingStatus.total_materials) * 100 
+                    : 0
+                  } 
                   className="w-24 h-2 mt-1" 
                 />
               </div>
