@@ -17,7 +17,7 @@ function getCorsHeaders(requestOrigin: string | null): Record<string, string> {
 }
 
 interface ManageEmployeeRequest {
-  action: 'create' | 'reset_password' | 'delete';
+  action: 'create' | 'reset_password' | 'delete' | 'update_workforce_groups';
   email?: string;
   firstName?: string;
   lastName?: string;
@@ -76,18 +76,26 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Verify the user is an org_admin (use admin client to bypass RLS)
+    // Verify the user is an org_admin or platform_owner (use admin client to bypass RLS)
     const { data: roleData, error: roleError } = await adminClient
       .from("user_roles")
       .select("role, organization_id")
       .eq("user_id", user.id)
-      .eq("role", "org_admin")
       .single();
 
     if (roleError || !roleData) {
       console.log("Role check failed for user:", user.id, "Error:", roleError);
       return new Response(
-        JSON.stringify({ error: "Only organization admins can manage employees" }),
+        JSON.stringify({ error: "Only organization admins or platform owners can manage employees" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Check if user has appropriate role
+    const allowedRoles = ['org_admin', 'platform_owner'];
+    if (!allowedRoles.includes(roleData.role)) {
+      return new Response(
+        JSON.stringify({ error: "Only organization admins or platform owners can manage employees" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -326,6 +334,78 @@ Deno.serve(async (req) => {
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+
+      return new Response(
+        JSON.stringify({ success: true }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // UPDATE WORKFORCE GROUPS
+    if (action === 'update_workforce_groups') {
+      if (!employeeUserId || !workforceGroups) {
+        return new Response(
+          JSON.stringify({ error: "Employee user ID and workforce groups are required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Fetch employee profile
+      const { data: empProfile, error: empError } = await adminClient
+        .from("profiles")
+        .select("organization_id, email, workforce_groups")
+        .eq("user_id", employeeUserId)
+        .single();
+
+      if (empError || !empProfile) {
+        return new Response(
+          JSON.stringify({ error: "Employee not found" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // For org_admin, verify employee belongs to their org
+      // Platform owners can update any employee
+      if (roleData.role === 'org_admin' && empProfile.organization_id !== adminOrgId) {
+        return new Response(
+          JSON.stringify({ error: "Employee not found in your organization" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const previousGroups = empProfile.workforce_groups || [];
+
+      // Update workforce groups
+      const { error: updateError } = await adminClient
+        .from("profiles")
+        .update({ 
+          workforce_groups: workforceGroups,
+          status: workforceGroups.length > 0 ? "active" : "pending_assignment"
+        })
+        .eq("user_id", employeeUserId);
+
+      if (updateError) {
+        console.error("Update workforce groups error:", updateError);
+        return new Response(
+          JSON.stringify({ error: "Failed to update workforce groups" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Audit log
+      await adminClient.from("audit_logs").insert({
+        user_id: user.id,
+        organization_id: empProfile.organization_id,
+        resource_type: "employee",
+        resource_id: employeeUserId,
+        action: "workforce_groups_updated",
+        metadata: { 
+          employee_email: empProfile.email,
+          previous_groups: previousGroups,
+          new_groups: workforceGroups,
+          updated_by: user.email 
+        },
+      });
 
       return new Response(
         JSON.stringify({ success: true }),

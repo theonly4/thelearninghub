@@ -122,7 +122,7 @@ const App = () => (
               path="/admin/employees/:userId"
               element={
                 <MfaGuard>
-                  <RoleGuard allowedRoles={["org_admin"]}>
+                  <RoleGuard allowedRoles={["org_admin", "platform_owner"]}>
                     <EmployeeDetailPage />
                   </RoleGuard>
                 </MfaGuard>
