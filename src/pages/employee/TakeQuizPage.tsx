@@ -29,6 +29,7 @@ interface QuizQuestion {
   scenario: string | null;
   question_text: string;
   options: { label: string; text: string }[];
+  correct_answer: string;
   rationale: string;
   hipaa_section: string;
 }
@@ -247,13 +248,22 @@ export default function TakeQuizPage() {
       setHasAnswered(false);
       setQuestionStartTime(Date.now());
     } else {
-      // Submit quiz
-      const lastAnswer: Answer = {
-        questionId: question.id,
-        selectedOption: selectedOption!,
-        timeSpent: Math.floor((Date.now() - questionStartTime) / 1000),
-      };
-      const finalAnswers = [...answers, lastAnswer];
+      // Submit quiz - use existing answers (already recorded by handleSubmitAnswer)
+      // De-duplicate by questionId (keep the latest answer for each question)
+      const answerMap = new Map<string, Answer>();
+      answers.forEach(a => answerMap.set(a.questionId, a));
+      const finalAnswers = Array.from(answerMap.values());
+      
+      // Safety check: ensure we have exactly the right number of answers
+      if (finalAnswers.length !== questions.length) {
+        toast({
+          title: "Answer Collection Error",
+          description: `Expected ${questions.length} answers but found ${finalAnswers.length}. Please retake the quiz.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      
       submitQuizToServer(finalAnswers);
     }
   };
@@ -431,9 +441,14 @@ export default function TakeQuizPage() {
                               questionCorrect ? "text-success" : "text-destructive"
                             }
                           >
-                            {q.options.find((o) => o.label === userAnswer?.selectedOption)?.text || "Not answered"}
+                            {userAnswer?.selectedOption}. {q.options.find((o) => o.label === userAnswer?.selectedOption)?.text || "Not answered"}
                           </span>
                         </p>
+                        {!questionCorrect && (
+                          <p className="text-sm text-success">
+                            Correct answer: {q.correct_answer}. {q.options.find((o) => o.label === q.correct_answer)?.text}
+                          </p>
+                        )}
                         <div className="mt-2 rounded-lg bg-muted p-3">
                           <p className="text-xs font-medium mb-1">
                             <HipaaLink section={q.hipaa_section}>
@@ -555,15 +570,51 @@ export default function TakeQuizPage() {
             </div>
           </div>
 
-          {/* Feedback (after answering) */}
+          {/* Per-Question Feedback (after answering) */}
           {hasAnswered && (
-            <div className="border-t border-border bg-muted/30 p-5">
+            <div className={cn(
+              "border-t p-5",
+              selectedOption === question.correct_answer 
+                ? "bg-success/10 border-success/30" 
+                : "bg-destructive/10 border-destructive/30"
+            )}>
               <div className="flex items-start gap-3">
-                <Clock className="mt-0.5 h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-xs font-medium mb-1">Answer Recorded</p>
-                  <p className="text-sm text-muted-foreground">
-                    Click "Next" to continue. Your final results will be calculated after you complete all questions.
+                {selectedOption === question.correct_answer ? (
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 text-success shrink-0" />
+                ) : (
+                  <AlertCircle className="mt-0.5 h-5 w-5 text-destructive shrink-0" />
+                )}
+                <div className="flex-1 space-y-3">
+                  <div>
+                    <p className={cn(
+                      "text-sm font-semibold",
+                      selectedOption === question.correct_answer ? "text-success" : "text-destructive"
+                    )}>
+                      {selectedOption === question.correct_answer ? "Correct!" : "Incorrect"}
+                    </p>
+                    {selectedOption !== question.correct_answer && (
+                      <p className="text-sm mt-1">
+                        <span className="text-muted-foreground">Correct answer: </span>
+                        <span className="font-medium">
+                          {question.options.find(o => o.label === question.correct_answer)?.label}. {question.options.find(o => o.label === question.correct_answer)?.text}
+                        </span>
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div className="rounded-lg bg-background/50 p-3 border border-border/50">
+                    <p className="text-xs font-medium text-accent mb-1">
+                      <HipaaLink section={question.hipaa_section}>
+                        {question.hipaa_section}
+                      </HipaaLink>
+                    </p>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {question.rationale}
+                    </p>
+                  </div>
+                  
+                  <p className="text-xs text-muted-foreground">
+                    Click "{currentQuestion < questions.length - 1 ? 'Next' : 'Complete Quiz'}" to continue.
                   </p>
                 </div>
               </div>
