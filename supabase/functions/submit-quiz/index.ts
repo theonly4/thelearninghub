@@ -104,7 +104,7 @@ serve(async (req) => {
     let quizTitle = "HIPAA Assessment";
     let passingScore = 80;
     let hipaa_citations: string[] = [];
-    let questions: { id: string; question_number: number; question_text: string; correct_answer: string; hipaa_section: string }[] = [];
+    let questions: { id: string; question_number: number; question_text: string; options: { label: string; text: string }[]; correct_answer: string; hipaa_section: string }[] = [];
     let quizIdForRecord: string;
 
     // Handle package-based submission (new flow)
@@ -190,7 +190,7 @@ serve(async (req) => {
       // Fetch question details with correct answers AND question text for audit trail
       const { data: questionsData, error: questionsError } = await supabaseAdmin
         .from('quiz_questions')
-        .select('id, question_number, question_text, correct_answer, hipaa_section')
+        .select('id, question_number, question_text, options, correct_answer, hipaa_section')
         .in('id', questionIds)
         .order('question_number', { ascending: true });
 
@@ -234,7 +234,7 @@ serve(async (req) => {
       // Fetch quiz questions from database with correct answers AND question text
       const { data: questionsData, error: questionsError } = await supabaseAdmin
         .from('quiz_questions')
-        .select('id, question_number, question_text, correct_answer, hipaa_section')
+        .select('id, question_number, question_text, options, correct_answer, hipaa_section')
         .eq('quiz_id', quizId)
         .order('question_number', { ascending: true });
 
@@ -281,11 +281,19 @@ serve(async (req) => {
         correctCount++;
       }
 
+      // Look up the full text for both selected and correct answers
+      const selectedOptionData = question.options?.find((opt: { label: string; text: string }) => opt.label === answer.selectedOption);
+      const selectedAnswerText = selectedOptionData?.text || answer.selectedOption;
+      const correctOptionData = question.options?.find((opt: { label: string; text: string }) => opt.label === question.correct_answer);
+      const correctAnswerText = correctOptionData?.text || question.correct_answer;
+
       gradedAnswers.push({
         questionId: answer.questionId,
         question_text: question.question_text,
-        selected_answer: answer.selectedOption,
-        correct_answer: question.correct_answer,
+        selected_answer: selectedAnswerText,
+        correct_answer: correctAnswerText,
+        selected_option_letter: answer.selectedOption,
+        correct_option_letter: question.correct_answer,
         is_correct: isCorrect,
         timeSpent: answer.timeSpent,
         hipaaSection: question.hipaa_section
