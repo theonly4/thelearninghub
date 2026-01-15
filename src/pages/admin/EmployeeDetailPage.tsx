@@ -87,11 +87,14 @@ interface QuizAttempt {
 }
 
 interface QuizAnswer {
-  question_id?: string;
+  questionId?: string;
   question_text?: string;
-  selected_answer: string;
+  selected_answer?: string;
   correct_answer?: string;
-  is_correct: boolean;
+  is_correct?: boolean;
+  // Legacy fields for backward compatibility
+  selectedOption?: string;
+  isCorrect?: boolean;
 }
 
 interface Certificate {
@@ -1022,29 +1025,43 @@ export default function EmployeeDetailPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[60%]">Question</TableHead>
-                    <TableHead>Answer</TableHead>
+                    <TableHead className="w-[50%]">Question</TableHead>
+                    <TableHead>Employee Answer</TableHead>
+                    <TableHead>Correct Answer</TableHead>
                     <TableHead className="text-center">Result</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {selectedAttempt.answers.map((answer, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="text-sm">
-                        {answer.question_text || `Question ${idx + 1}`}
-                      </TableCell>
-                      <TableCell className="text-sm font-medium">
-                        {answer.selected_answer}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {answer.is_correct ? (
-                          <CheckCircle2 className="h-5 w-5 text-success mx-auto" />
-                        ) : (
-                          <XCircle className="h-5 w-5 text-destructive mx-auto" />
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {selectedAttempt.answers.map((answer, idx) => {
+                    // Support both new and legacy field names
+                    const selectedAnswer = answer.selected_answer || answer.selectedOption || '-';
+                    const correctAnswer = answer.correct_answer || '-';
+                    const isCorrect = answer.is_correct ?? answer.isCorrect ?? false;
+                    
+                    return (
+                      <TableRow key={idx}>
+                        <TableCell className="text-sm">
+                          {answer.question_text || `Question ${idx + 1}`}
+                        </TableCell>
+                        <TableCell className={cn(
+                          "text-sm font-medium",
+                          !isCorrect && "text-destructive"
+                        )}>
+                          {selectedAnswer}
+                        </TableCell>
+                        <TableCell className="text-sm text-success font-medium">
+                          {correctAnswer}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {isCorrect ? (
+                            <CheckCircle2 className="h-5 w-5 text-success mx-auto" />
+                          ) : (
+                            <XCircle className="h-5 w-5 text-destructive mx-auto" />
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             ) : (
