@@ -23,6 +23,7 @@ interface QuestionPublic {
   scenario: string | null;
   question_text: string;
   options: { label: string; text: string }[];
+  correct_answer: string;
   rationale: string;
   hipaa_section: string;
   hipaa_topic_id: string | null;
@@ -243,7 +244,7 @@ async function handleReleasedPackageForUser(
 
     const questionIds = packageQuestions?.map((pq: any) => pq.question_id) || [];
 
-    // 6. Fetch full question data (without correct_answer)
+    // 6. Fetch full question data (including correct_answer for per-question feedback)
     let questions: QuestionPublic[] = [];
     if (questionIds.length > 0) {
       const { data: questionsData, error: qError } = await adminClient
@@ -255,6 +256,7 @@ async function handleReleasedPackageForUser(
           scenario,
           question_text,
           options,
+          correct_answer,
           rationale,
           hipaa_section,
           hipaa_topic_id,
@@ -275,6 +277,7 @@ async function handleReleasedPackageForUser(
           scenario: q.scenario,
           question_text: q.question_text,
           options: q.options,
+          correct_answer: q.correct_answer,
           rationale: q.rationale,
           hipaa_section: q.hipaa_section,
           hipaa_topic_id: q.hipaa_topic_id,
