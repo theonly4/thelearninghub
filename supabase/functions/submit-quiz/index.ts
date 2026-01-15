@@ -111,10 +111,10 @@ serve(async (req) => {
     if (packageId) {
       console.log(`Processing package-based submission for package: ${packageId}`);
 
-      // Fetch the package details
+      // Fetch the package details including workforce_group and sequence_number
       const { data: packageData, error: packageError } = await supabaseAdmin
         .from('question_packages')
-        .select('id, name')
+        .select('id, name, workforce_group, sequence_number')
         .eq('id', packageId)
         .single();
 
@@ -127,6 +127,48 @@ serve(async (req) => {
       }
 
       quizTitle = packageData.name;
+
+      // Check if a quizzes record already exists for this package
+      const { data: existingQuiz, error: quizCheckError } = await supabaseAdmin
+        .from('quizzes')
+        .select('id')
+        .eq('id', packageId)
+        .maybeSingle();
+
+      if (quizCheckError) {
+        console.error('Error checking for existing quiz:', quizCheckError);
+      }
+
+      // If no quizzes record exists, create one using the package ID
+      if (!existingQuiz) {
+        console.log(`Creating quizzes record for package: ${packageId}`);
+        
+        const { error: quizInsertError } = await supabaseAdmin
+          .from('quizzes')
+          .insert({
+            id: packageId, // Use package ID as quiz ID
+            title: packageData.name,
+            description: `Auto-generated from question package: ${packageData.name}`,
+            workforce_groups: [packageData.workforce_group],
+            passing_score: 80,
+            sequence_number: packageData.sequence_number,
+            effective_date: new Date().toISOString().split('T')[0],
+            status: 'published',
+            version: 1,
+            hipaa_citations: []
+          });
+
+        if (quizInsertError) {
+          console.error('Failed to create quizzes record:', quizInsertError);
+          return new Response(
+            JSON.stringify({ error: 'Failed to initialize quiz record' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        console.log(`Quizzes record created successfully for package: ${packageId}`);
+      }
+
       quizIdForRecord = packageId; // Use package ID as the quiz ID for recording
 
       // Fetch questions linked to this package
