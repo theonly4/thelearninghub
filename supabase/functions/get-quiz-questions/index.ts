@@ -184,13 +184,19 @@ async function handleReleasedPackageForUser(
     let completedMaterials = 0;
 
     if (releasedIds.length > 0) {
+      // Include materials that match EITHER the assigned workforce group OR all_staff
       const { data: materialsData } = await adminClient
         .from("training_materials")
-        .select("id")
-        .in("id", releasedIds)
-        .contains("workforce_groups", [resolvedWorkforceGroup]);
+        .select("id, workforce_groups")
+        .in("id", releasedIds);
 
-      const materialIds = materialsData?.map((m: any) => m.id) || [];
+      // Filter to materials that apply to this user (specific group OR all_staff)
+      const applicableMaterials = (materialsData || []).filter((m: any) => 
+        m.workforce_groups?.includes(resolvedWorkforceGroup) || 
+        m.workforce_groups?.includes("all_staff")
+      );
+      
+      const materialIds = applicableMaterials.map((m: any) => m.id);
       totalMaterials = materialIds.length;
 
       if (materialIds.length > 0) {
