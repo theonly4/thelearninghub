@@ -29,7 +29,8 @@ interface SubmittedAnswer {
 }
 
 interface QuizSubmission {
-  quizId: string;
+  quizId?: string;       // Traditional quiz ID (from quizzes table)
+  packageId?: string;    // Package ID (from question_packages table)
   answers: SubmittedAnswer[];
   workforceGroup: string;
 }
@@ -75,12 +76,12 @@ serve(async (req) => {
 
     // Parse the request body
     const submission: QuizSubmission = await req.json();
-    const { quizId, answers, workforceGroup } = submission;
+    const { quizId, packageId, answers, workforceGroup } = submission;
 
-    if (!quizId || !answers || !Array.isArray(answers) || !workforceGroup) {
-      console.error('Invalid submission data:', { quizId, answersLength: answers?.length, workforceGroup });
+    if ((!quizId && !packageId) || !answers || !Array.isArray(answers) || !workforceGroup) {
+      console.error('Invalid submission data:', { quizId, packageId, answersLength: answers?.length, workforceGroup });
       return new Response(
-        JSON.stringify({ error: 'Invalid submission data' }),
+        JSON.stringify({ error: 'Invalid submission data - quizId or packageId required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -100,39 +101,113 @@ serve(async (req) => {
       );
     }
 
-    // Fetch the quiz from database
-    const { data: quiz, error: quizError } = await supabaseAdmin
-      .from('quizzes')
-      .select('id, title, passing_score, version, hipaa_citations')
-      .eq('id', quizId)
-      .single();
+    let quizTitle = "HIPAA Assessment";
+    let passingScore = 80;
+    let hipaa_citations: string[] = [];
+    let questions: { id: string; question_number: number; correct_answer: string; hipaa_section: string }[] = [];
+    let quizIdForRecord: string;
 
-    if (quizError || !quiz) {
-      console.error('Quiz error:', quizError);
-      return new Response(
-        JSON.stringify({ error: 'Quiz not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Handle package-based submission (new flow)
+    if (packageId) {
+      console.log(`Processing package-based submission for package: ${packageId}`);
+
+      // Fetch the package details
+      const { data: packageData, error: packageError } = await supabaseAdmin
+        .from('question_packages')
+        .select('id, name')
+        .eq('id', packageId)
+        .single();
+
+      if (packageError || !packageData) {
+        console.error('Package error:', packageError);
+        return new Response(
+          JSON.stringify({ error: 'Question package not found' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      quizTitle = packageData.name;
+      quizIdForRecord = packageId; // Use package ID as the quiz ID for recording
+
+      // Fetch questions linked to this package
+      const { data: packageQuestions, error: pqError } = await supabaseAdmin
+        .from('package_questions')
+        .select('question_id')
+        .eq('package_id', packageId);
+
+      if (pqError || !packageQuestions || packageQuestions.length === 0) {
+        console.error('Package questions error:', pqError);
+        return new Response(
+          JSON.stringify({ error: 'No questions found in package' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const questionIds = packageQuestions.map(pq => pq.question_id);
+
+      // Fetch question details with correct answers
+      const { data: questionsData, error: questionsError } = await supabaseAdmin
+        .from('quiz_questions')
+        .select('id, question_number, correct_answer, hipaa_section')
+        .in('id', questionIds)
+        .order('question_number', { ascending: true });
+
+      if (questionsError || !questionsData || questionsData.length === 0) {
+        console.error('Questions error:', questionsError);
+        return new Response(
+          JSON.stringify({ error: 'Questions not found' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      questions = questionsData;
+      
+      // Collect unique HIPAA sections as citations
+      hipaa_citations = [...new Set(questions.map(q => q.hipaa_section))];
+
+    } else if (quizId) {
+      // Handle traditional quiz-based submission (legacy flow)
+      console.log(`Processing traditional quiz submission for quiz: ${quizId}`);
+
+      // Fetch the quiz from database
+      const { data: quiz, error: quizError } = await supabaseAdmin
+        .from('quizzes')
+        .select('id, title, passing_score, version, hipaa_citations')
+        .eq('id', quizId)
+        .single();
+
+      if (quizError || !quiz) {
+        console.error('Quiz error:', quizError);
+        return new Response(
+          JSON.stringify({ error: 'Quiz not found' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      quizTitle = quiz.title;
+      passingScore = quiz.passing_score;
+      hipaa_citations = quiz.hipaa_citations || [];
+      quizIdForRecord = quizId;
+
+      // Fetch quiz questions from database with correct answers
+      const { data: questionsData, error: questionsError } = await supabaseAdmin
+        .from('quiz_questions')
+        .select('id, question_number, correct_answer, hipaa_section')
+        .eq('quiz_id', quizId)
+        .order('question_number', { ascending: true });
+
+      if (questionsError || !questionsData || questionsData.length === 0) {
+        console.error('Questions error:', questionsError);
+        return new Response(
+          JSON.stringify({ error: 'Quiz questions not found' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      questions = questionsData;
     }
 
-    console.log(`Processing quiz: ${quiz.title}`);
-
-    // Fetch quiz questions from database with correct answers
-    const { data: questions, error: questionsError } = await supabaseAdmin
-      .from('quiz_questions')
-      .select('id, question_number, correct_answer, hipaa_section')
-      .eq('quiz_id', quizId)
-      .order('question_number', { ascending: true });
-
-    if (questionsError || !questions || questions.length === 0) {
-      console.error('Questions error:', questionsError);
-      return new Response(
-        JSON.stringify({ error: 'Quiz questions not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log(`Found ${questions.length} questions for quiz`);
+    console.log(`Processing quiz: ${quizTitle} with ${questions.length} questions`);
 
     // Validate submission integrity
     if (answers.length !== questions.length) {
@@ -175,7 +250,7 @@ serve(async (req) => {
 
     // Calculate score server-side
     const score = Math.round((correctCount / questions.length) * 100);
-    const passed = score >= quiz.passing_score;
+    const passed = score >= passingScore;
 
     console.log(`Quiz scored: ${score}% (${correctCount}/${questions.length}), passed: ${passed}`);
 
@@ -194,7 +269,7 @@ serve(async (req) => {
       .insert({
         user_id: user.id,
         organization_id: profile.organization_id,
-        quiz_id: quizId,
+        quiz_id: quizIdForRecord!,
         workforce_group_at_time: workforceGroup,
         started_at: new Date(Date.now() - (totalTimeSpent * 1000)).toISOString(),
         completed_at: new Date().toISOString(),
@@ -236,7 +311,7 @@ serve(async (req) => {
           score,
           certificate_number: certNumber,
           valid_until: validUntil.toISOString(),
-          hipaa_citations: quiz.hipaa_citations || []
+          hipaa_citations: hipaa_citations
         })
         .select('id, certificate_number, valid_until')
         .single();
@@ -260,8 +335,9 @@ serve(async (req) => {
         resource_id: attempt.id,
         action: 'quiz_submitted',
         metadata: {
-          quiz_id: quizId,
-          quiz_title: quiz.title,
+          quiz_id: quizIdForRecord!,
+          quiz_title: quizTitle,
+          package_id: packageId || null,
           score,
           passed,
           total_questions: questions.length,
@@ -281,7 +357,7 @@ serve(async (req) => {
         passed,
         correctCount,
         totalQuestions: questions.length,
-        passingScore: quiz.passing_score,
+        passingScore,
         certificate,
         gradedAnswers: gradedAnswers.map(a => ({
           questionId: a.questionId,

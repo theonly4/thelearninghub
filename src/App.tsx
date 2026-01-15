@@ -45,6 +45,7 @@ import EmployeeDetailPage from "./pages/admin/EmployeeDetailPage";
 
 // Employee Pages
 import EmployeeTrainingPage from "./pages/employee/TrainingPage";
+import TakeQuizPage from "./pages/employee/TakeQuizPage";
 import HistoryPage from "./pages/employee/HistoryPage";
 
 const queryClient = new QueryClient();
@@ -160,12 +161,13 @@ const App = () => (
                 </MfaGuard>
               }
             />
+            {/* Redirect legacy training routes to database-backed training */}
             <Route
               path="/dashboard/training"
               element={
                 <MfaGuard>
                   <RoleGuard allowedRoles={["workforce_user"]}>
-                    <TrainingMaterialsPage />
+                    <EmployeeTrainingPage />
                   </RoleGuard>
                 </MfaGuard>
               }
@@ -175,7 +177,17 @@ const App = () => (
               element={
                 <MfaGuard>
                   <RoleGuard allowedRoles={["workforce_user"]}>
-                    <TrainingMaterialPage />
+                    <EmployeeTrainingPage />
+                  </RoleGuard>
+                </MfaGuard>
+              }
+            />
+            <Route
+              path="/dashboard/quizzes/take"
+              element={
+                <MfaGuard>
+                  <RoleGuard allowedRoles={["workforce_user"]}>
+                    <TakeQuizPage />
                   </RoleGuard>
                 </MfaGuard>
               }

@@ -1,16 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatCard } from "@/components/StatCard";
 import { WorkforceGroupBadge } from "@/components/WorkforceGroupBadge";
 import { ProgressIndicator } from "@/components/ProgressIndicator";
-import { LockedQuizCard } from "@/components/LockedQuizCard";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Link } from "react-router-dom";
-import { useProgress } from "@/contexts/ProgressContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import { getMaterialsForWorkforceGroup } from "@/data/trainingMaterials";
-import { getQuizzesForWorkforceGroup } from "@/data/quizzes";
+import { supabase } from "@/integrations/supabase/client";
+import { type WorkforceGroup } from "@/types/hipaa";
 import { 
   FileText, 
   Award, 
@@ -18,63 +16,113 @@ import {
   CheckCircle2,
   ArrowRight,
   BookOpen,
+  Lock,
 } from "lucide-react";
+
+interface QuizData {
+  package_id: string;
+  package_name: string;
+  workforce_group: WorkforceGroup;
+  training_year: number;
+  question_count: number;
+}
+
+interface TrainingStatus {
+  total_materials: number;
+  completed_materials: number;
+  materials_complete: boolean;
+}
 
 export default function UserDashboard() {
   const { fullName, firstName, organizationName, workforceGroups } = useUserProfile();
-  const {
-    currentWorkforceGroup,
-    getMaterialProgress,
-    areAllMaterialsComplete,
-    getQuizStatus,
-    getQuizResult,
-    getNextAction,
-    setWorkforceGroup,
-  } = useProgress();
+  const [loading, setLoading] = useState(true);
+  const [currentWorkforceGroup, setCurrentWorkforceGroup] = useState<WorkforceGroup | null>(null);
+  const [quizData, setQuizData] = useState<QuizData | null>(null);
+  const [trainingStatus, setTrainingStatus] = useState<TrainingStatus>({
+    total_materials: 0,
+    completed_materials: 0,
+    materials_complete: false,
+  });
+  const [quizPassed, setQuizPassed] = useState(false);
+  const [lastQuizScore, setLastQuizScore] = useState<number | null>(null);
 
-  // Set workforce group from user profile when available
   useEffect(() => {
-    if (workforceGroups.length > 0 && !currentWorkforceGroup) {
-      setWorkforceGroup(workforceGroups[0]);
+    fetchDashboardData();
+  }, []);
+
+  async function fetchDashboardData() {
+    setLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      // Fetch quiz data and training status from backend
+      const { data: responseData, error } = await supabase.functions.invoke(
+        "get-quiz-questions",
+        { body: { mode: "released_package_for_user" } }
+      );
+
+      if (!error && responseData) {
+        const { package: pkg, questions, training_status } = responseData;
+        
+        setTrainingStatus(training_status || {
+          total_materials: 0,
+          completed_materials: 0,
+          materials_complete: false,
+        });
+
+        if (pkg) {
+          setCurrentWorkforceGroup(pkg.workforce_group as WorkforceGroup);
+          setQuizData({
+            package_id: pkg.package_id,
+            package_name: pkg.package_name,
+            workforce_group: pkg.workforce_group as WorkforceGroup,
+            training_year: pkg.training_year,
+            question_count: questions?.length || 0,
+          });
+
+          // Fetch quiz attempts
+          const { data: attemptsData } = await supabase
+            .from("quiz_attempts")
+            .select("score, passed")
+            .eq("user_id", session.user.id)
+            .eq("quiz_id", pkg.package_id)
+            .order("completed_at", { ascending: false })
+            .limit(1);
+
+          if (attemptsData && attemptsData.length > 0) {
+            setLastQuizScore(attemptsData[0].score);
+            setQuizPassed(attemptsData[0].passed);
+          }
+        } else {
+          // No package released - use profile workforce groups
+          if (workforceGroups.length > 0) {
+            setCurrentWorkforceGroup(workforceGroups[0]);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+    } finally {
+      setLoading(false);
     }
-  }, [workforceGroups, currentWorkforceGroup, setWorkforceGroup]);
+  }
 
-  const materials = currentWorkforceGroup
-    ? getMaterialsForWorkforceGroup(currentWorkforceGroup)
-    : [];
-  const quizzes = currentWorkforceGroup
-    ? getQuizzesForWorkforceGroup(currentWorkforceGroup)
-    : [];
+  const materialProgress = trainingStatus.total_materials > 0
+    ? Math.round((trainingStatus.completed_materials / trainingStatus.total_materials) * 100)
+    : 0;
 
-  const materialProgress = getMaterialProgress();
-  const nextAction = getNextAction();
+  const isQuizLocked = !trainingStatus.materials_complete;
 
-  // Calculate stats
-  const completedQuizzes = quizzes.filter(q => getQuizResult(q.id)?.passed).length;
-  const pendingQuizzes = quizzes.length - completedQuizzes;
-  const avgScore = quizzes.reduce((acc, q) => {
-    const result = getQuizResult(q.id);
-    return result ? acc + result.score : acc;
-  }, 0) / (completedQuizzes || 1);
-
-  // Get lock reasons
-  const getLockReason = (quizIndex: number): string => {
-    if (!areAllMaterialsComplete()) {
-      return "Complete all training materials first";
-    }
-    if (quizIndex === 0) return "";
-    const prevQuiz = quizzes[quizIndex - 1];
-    const prevResult = getQuizResult(prevQuiz.id);
-    if (!prevResult?.passed) {
-      return `Pass Quiz ${quizIndex} first`;
-    }
-    return "";
-  };
-
-  // Check quiz progress for ProgressIndicator
-  const quiz1Passed = quizzes[0] ? getQuizResult(quizzes[0].id)?.passed || false : false;
-  const quiz2Passed = quizzes[1] ? getQuizResult(quizzes[1].id)?.passed || false : false;
-  const quiz3Passed = quizzes[2] ? getQuizResult(quizzes[2].id)?.passed || false : false;
+  if (loading) {
+    return (
+      <DashboardLayout userRole="workforce_user" userName={fullName || "User"}>
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <p className="text-muted-foreground">Loading dashboard...</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout userRole="workforce_user" userName={fullName || "User"}>
@@ -116,36 +164,33 @@ export default function UserDashboard() {
 
         {/* Progress Indicator */}
         <ProgressIndicator
-          materialsComplete={areAllMaterialsComplete()}
-          quiz1Passed={quiz1Passed}
-          quiz2Passed={quiz2Passed}
-          quiz3Passed={quiz3Passed}
+          materialsComplete={trainingStatus.materials_complete}
+          quiz1Passed={quizPassed}
+          quiz2Passed={false}
+          quiz3Passed={false}
         />
 
         {/* Next Action Card */}
-        {nextAction.type !== 'complete' && (
+        {!quizPassed && (
           <div className="rounded-xl border border-accent/30 bg-accent/5 p-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
-                {nextAction.type === 'material' ? (
+                {!trainingStatus.materials_complete ? (
                   <BookOpen className="h-6 w-6 text-accent" />
                 ) : (
                   <FileText className="h-6 w-6 text-accent" />
                 )}
                 <div>
                   <p className="font-medium">Next Step</p>
-                  <p className="text-sm text-muted-foreground">{nextAction.message}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {!trainingStatus.materials_complete
+                      ? `Complete training materials (${trainingStatus.completed_materials}/${trainingStatus.total_materials} done)`
+                      : "Take the assessment quiz"
+                    }
+                  </p>
                 </div>
               </div>
-              <Link
-                to={
-                  nextAction.type === 'material'
-                    ? nextAction.id
-                      ? `/dashboard/training/${nextAction.id}`
-                      : '/dashboard/training'
-                    : `/dashboard/quiz/${nextAction.id}`
-                }
-              >
+              <Link to={!trainingStatus.materials_complete ? "/employee/training" : "/dashboard/quizzes"}>
                 <Button className="gap-2">
                   Continue
                   <ArrowRight className="h-4 w-4" />
@@ -155,14 +200,14 @@ export default function UserDashboard() {
           </div>
         )}
 
-        {nextAction.type === 'complete' && (
+        {quizPassed && (
           <div className="rounded-xl border border-success/30 bg-success/5 p-5">
             <div className="flex items-center gap-3">
               <CheckCircle2 className="h-6 w-6 text-success" />
               <div>
                 <p className="font-medium text-success">Training Complete!</p>
                 <p className="text-sm text-muted-foreground">
-                  You have completed all training materials and passed all quizzes.
+                  You have completed all training materials and passed the quiz.
                 </p>
               </div>
             </div>
@@ -173,60 +218,86 @@ export default function UserDashboard() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             title="Training Progress"
-            value={`${materialProgress.percentage}%`}
+            value={`${materialProgress}%`}
             icon={BookOpen}
-            variant={materialProgress.percentage === 100 ? "success" : "info"}
+            variant={materialProgress === 100 ? "success" : "info"}
           />
           <StatCard
-            title="Quizzes Passed"
-            value={`${completedQuizzes}/${quizzes.length}`}
-            icon={CheckCircle2}
-            variant={completedQuizzes === quizzes.length ? "success" : "default"}
+            title="Quiz Status"
+            value={quizPassed ? "Passed" : isQuizLocked ? "Locked" : "Available"}
+            icon={quizPassed ? CheckCircle2 : isQuizLocked ? Lock : FileText}
+            variant={quizPassed ? "success" : "default"}
           />
           <StatCard
-            title="Pending Quizzes"
-            value={pendingQuizzes}
-            icon={Clock}
-            variant={pendingQuizzes > 0 ? "warning" : "success"}
-          />
-          <StatCard
-            title="Average Score"
-            value={completedQuizzes > 0 ? `${Math.round(avgScore)}%` : "-"}
+            title="Last Score"
+            value={lastQuizScore !== null ? `${lastQuizScore}%` : "-"}
             icon={Award}
+          />
+          <StatCard
+            title="Time Remaining"
+            value={trainingStatus.materials_complete ? "Quiz Ready" : "In Progress"}
+            icon={Clock}
+            variant={trainingStatus.materials_complete ? "success" : "warning"}
           />
         </div>
 
         {/* Main Content Grid */}
         <div className="grid gap-6 lg:grid-cols-3">
-          {/* Quizzes Section */}
+          {/* Quiz Section */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Quizzes</h2>
+              <h2 className="text-lg font-semibold">Assessment Quiz</h2>
               <span className="text-sm text-muted-foreground">
-                Pass 80% to proceed
+                Pass 80% to complete
               </span>
             </div>
             
-            {quizzes.map((quiz, index) => {
-              const status = getQuizStatus(quiz.id);
-              const result = getQuizResult(quiz.id);
-              
-              return (
-                <LockedQuizCard
-                  key={quiz.id}
-                  quizId={quiz.id}
-                  title={quiz.title}
-                  description={quiz.description}
-                  sequenceNumber={quiz.sequence_number}
-                  totalQuizzes={quizzes.length}
-                  workforceGroup={currentWorkforceGroup || "all_staff"}
-                  status={status}
-                  score={result?.score}
-                  lockReason={getLockReason(index)}
-                  questionCount={quiz.questions.length}
-                />
-              );
-            })}
+            {quizData ? (
+              <div className={`rounded-xl border bg-card p-5 ${quizPassed ? 'border-success/30 bg-success/5' : isQuizLocked ? 'opacity-75' : ''}`}>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-full ${
+                      quizPassed ? 'bg-success text-success-foreground' :
+                      isQuizLocked ? 'bg-muted text-muted-foreground' :
+                      'bg-primary text-primary-foreground'
+                    }`}>
+                      {quizPassed ? <CheckCircle2 className="h-6 w-6" /> :
+                       isQuizLocked ? <Lock className="h-6 w-6" /> :
+                       <FileText className="h-6 w-6" />}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">{quizData.package_name}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {quizData.question_count} questions • {quizData.training_year}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {isQuizLocked && (
+                  <div className="mt-4 rounded-lg border border-warning/30 bg-warning/5 p-3">
+                    <p className="text-sm text-warning flex items-center gap-2">
+                      <Lock className="h-4 w-4" />
+                      Complete all training materials first
+                    </p>
+                  </div>
+                )}
+                
+                <Link to="/dashboard/quizzes">
+                  <Button className="w-full mt-4" disabled={isQuizLocked}>
+                    {quizPassed ? "View Results" : isQuizLocked ? "Complete Training First" : "Start Quiz"}
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="rounded-xl border bg-card p-8 text-center">
+                <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="font-semibold mb-2">No Quiz Assigned</h3>
+                <p className="text-sm text-muted-foreground">
+                  Your organization has not yet released a quiz.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Training Materials Sidebar */}
@@ -234,42 +305,22 @@ export default function UserDashboard() {
             <div className="flex items-center justify-between border-b border-border p-5">
               <h2 className="font-semibold">Training Materials</h2>
               <span className="text-sm text-muted-foreground">
-                {materialProgress.completed}/{materialProgress.total}
+                {trainingStatus.completed_materials}/{trainingStatus.total_materials}
               </span>
             </div>
             
             <div className="p-4">
-              <Progress value={materialProgress.percentage} className="h-2 mb-4" />
+              <Progress value={materialProgress} className="h-2 mb-4" />
+              <p className="text-sm text-muted-foreground text-center">
+                {materialProgress}% complete
+              </p>
             </div>
 
-            <div className="divide-y divide-border">
-              {materials.slice(0, 3).map((material) => (
-                <Link
-                  key={material.id}
-                  to={`/dashboard/training/${material.id}`}
-                  className="block p-4 hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="rounded-lg bg-accent/10 p-2 text-accent">
-                      <BookOpen className="h-4 w-4" />
-                    </div>
-                    <div className="flex-1 space-y-1">
-                      <h3 className="text-sm font-medium line-clamp-1">
-                        {material.title}
-                      </h3>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>{material.estimated_minutes} min</span>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
             <div className="border-t border-border p-4">
-              <Link to="/dashboard/training">
+              <Link to="/employee/training">
                 <Button variant="outline" className="w-full gap-2">
                   <BookOpen className="h-4 w-4" />
-                  View All Materials
+                  {trainingStatus.materials_complete ? "Review Materials" : "Continue Training"}
                 </Button>
               </Link>
             </div>

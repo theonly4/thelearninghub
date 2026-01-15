@@ -206,42 +206,56 @@ serve(async (req) => {
       });
 
     // Check if all materials for the assignment are complete
+    // IMPORTANT: Only check against materials that are RELEASED to this organization
     if (assignment) {
-      // Get all materials for this workforce group
-      const { data: allMaterials } = await supabaseAdmin
-        .from('training_materials')
-        .select('id')
-        .contains('workforce_groups', [assignment.workforce_group]);
+      // Get released training material IDs for this organization
+      const { data: releasedMaterialsData } = await supabaseAdmin
+        .from('content_releases')
+        .select('content_id')
+        .eq('organization_id', profile.organization_id)
+        .eq('content_type', 'training_material');
 
-      const totalMaterials = allMaterials?.length || 0;
+      const releasedMaterialIds = releasedMaterialsData?.map(r => r.content_id) || [];
 
-      // Get completed materials count
-      const { count: completedCount } = await supabaseAdmin
-        .from('user_training_progress')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('organization_id', profile.organization_id);
+      if (releasedMaterialIds.length > 0) {
+        // Get materials that are released AND match the assignment's workforce group
+        const { data: allMaterials } = await supabaseAdmin
+          .from('training_materials')
+          .select('id')
+          .in('id', releasedMaterialIds)
+          .contains('workforce_groups', [assignment.workforce_group]);
 
-      const allComplete = completedCount && completedCount >= totalMaterials;
+        const totalMaterials = allMaterials?.length || 0;
+        const materialIdsToCheck = allMaterials?.map(m => m.id) || [];
 
-      if (allComplete && assignment.status !== 'completed') {
-        // Update assignment status to completed
-        await supabaseAdmin
-          .from('training_assignments')
-          .update({ 
-            status: 'completed', 
-            completed_at: new Date().toISOString() 
-          })
-          .eq('id', assignment.id);
+        // Get completed materials count (only for released materials)
+        const { count: completedCount } = await supabaseAdmin
+          .from('user_training_progress')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('organization_id', profile.organization_id)
+          .in('material_id', materialIdsToCheck);
 
-        console.log(`Training assignment ${assignment.id} marked as completed`);
-      } else if (assignment.status === 'assigned') {
-        // Update to in_progress
-        await supabaseAdmin
-          .from('training_assignments')
-          .update({ status: 'in_progress' })
-          .eq('id', assignment.id);
-      }
+        const allComplete = completedCount && completedCount >= totalMaterials && totalMaterials > 0;
+
+        if (allComplete && assignment.status !== 'completed') {
+          // Update assignment status to completed
+          await supabaseAdmin
+            .from('training_assignments')
+            .update({ 
+              status: 'completed', 
+              completed_at: new Date().toISOString() 
+            })
+            .eq('id', assignment.id);
+
+          console.log(`Training assignment ${assignment.id} marked as completed`);
+        } else if (assignment.status === 'assigned') {
+          // Update to in_progress
+          await supabaseAdmin
+            .from('training_assignments')
+            .update({ status: 'in_progress' })
+            .eq('id', assignment.id);
+        }
     }
 
     return new Response(

@@ -303,7 +303,7 @@ export default function QuizzesPage() {
             <Button
               className="w-full"
               disabled={isLocked}
-              onClick={() => navigate(`/quiz/${quiz.package_id}`)}
+              onClick={() => navigate('/dashboard/quizzes/take')}
             >
               {hasPassed ? (
                 <>
