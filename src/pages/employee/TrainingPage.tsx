@@ -164,18 +164,27 @@ export default function EmployeeTrainingPage() {
 
       // Update local state
       if (!data.already_completed) {
-        setProgress([...progress, { material_id: materialId, completed_at: new Date().toISOString() }]);
+        const newProgress = [...progress, { material_id: materialId, completed_at: new Date().toISOString() }];
+        setProgress(newProgress);
         
         toast.success("Material completed", {
           description: `You've completed "${material.title}"`,
         });
 
-        // Check if all materials are complete
-        const completedCount = progress.length + 1;
-        if (completedCount >= materials.length && assignment) {
+        // Check if all materials are complete and auto-navigate to quizzes
+        const newCompletedCount = newProgress.filter((p) =>
+          materials.some((m) => m.id === p.material_id)
+        ).length;
+        
+        if (newCompletedCount >= materials.length && assignment) {
           toast.success("Training Complete!", {
-            description: "You can now take the quiz.",
+            description: "Redirecting to your quiz...",
           });
+          // Auto-navigate to quizzes page
+          setTimeout(() => {
+            navigate("/dashboard/quizzes");
+          }, 1500);
+          return; // Don't reset selected material, let navigation happen
         }
       } else {
         toast.info("Material already completed");
