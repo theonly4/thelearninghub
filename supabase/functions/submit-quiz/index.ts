@@ -104,7 +104,7 @@ serve(async (req) => {
     let quizTitle = "HIPAA Assessment";
     let passingScore = 80;
     let hipaa_citations: string[] = [];
-    let questions: { id: string; question_number: number; correct_answer: string; hipaa_section: string }[] = [];
+    let questions: { id: string; question_number: number; question_text: string; correct_answer: string; hipaa_section: string }[] = [];
     let quizIdForRecord: string;
 
     // Handle package-based submission (new flow)
@@ -187,10 +187,10 @@ serve(async (req) => {
 
       const questionIds = packageQuestions.map(pq => pq.question_id);
 
-      // Fetch question details with correct answers
+      // Fetch question details with correct answers AND question text for audit trail
       const { data: questionsData, error: questionsError } = await supabaseAdmin
         .from('quiz_questions')
-        .select('id, question_number, correct_answer, hipaa_section')
+        .select('id, question_number, question_text, correct_answer, hipaa_section')
         .in('id', questionIds)
         .order('question_number', { ascending: true });
 
@@ -231,10 +231,10 @@ serve(async (req) => {
       hipaa_citations = quiz.hipaa_citations || [];
       quizIdForRecord = quizId;
 
-      // Fetch quiz questions from database with correct answers
+      // Fetch quiz questions from database with correct answers AND question text
       const { data: questionsData, error: questionsError } = await supabaseAdmin
         .from('quiz_questions')
-        .select('id, question_number, correct_answer, hipaa_section')
+        .select('id, question_number, question_text, correct_answer, hipaa_section')
         .eq('quiz_id', quizId)
         .order('question_number', { ascending: true });
 
@@ -283,9 +283,11 @@ serve(async (req) => {
 
       gradedAnswers.push({
         questionId: answer.questionId,
-        selectedOption: answer.selectedOption,
+        question_text: question.question_text,
+        selected_answer: answer.selectedOption,
+        correct_answer: question.correct_answer,
+        is_correct: isCorrect,
         timeSpent: answer.timeSpent,
-        isCorrect,
         hipaaSection: question.hipaa_section
       });
     }
@@ -403,7 +405,7 @@ serve(async (req) => {
         certificate,
         gradedAnswers: gradedAnswers.map(a => ({
           questionId: a.questionId,
-          isCorrect: a.isCorrect,
+          is_correct: a.is_correct,
           hipaaSection: a.hipaaSection
         }))
       }),
