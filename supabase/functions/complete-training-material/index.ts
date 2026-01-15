@@ -256,6 +256,7 @@ serve(async (req) => {
             .update({ status: 'in_progress' })
             .eq('id', assignment.id);
         }
+      }
     }
 
     return new Response(
