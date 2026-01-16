@@ -5,32 +5,31 @@ interface ProgressStep {
   id: string;
   label: string;
   status: "complete" | "current" | "upcoming";
-  icon: "materials" | "quiz1" | "quiz2" | "quiz3" | "certificate";
+  icon: "materials" | "quiz" | "certificate";
 }
 
 interface ProgressIndicatorProps {
   materialsComplete: boolean;
-  quiz1Passed: boolean;
-  quiz2Passed: boolean;
-  quiz3Passed: boolean;
+  assignedQuizCount: number;
+  passedQuizCount: number;
   className?: string;
 }
 
 const iconMap = {
   materials: BookOpen,
-  quiz1: FileText,
-  quiz2: FileText,
-  quiz3: FileText,
+  quiz: FileText,
   certificate: Award,
 };
 
 export function ProgressIndicator({
   materialsComplete,
-  quiz1Passed,
-  quiz2Passed,
-  quiz3Passed,
+  assignedQuizCount,
+  passedQuizCount,
   className,
 }: ProgressIndicatorProps) {
+  const allQuizzesPassed = assignedQuizCount > 0 && passedQuizCount >= assignedQuizCount;
+  
+  // Build steps dynamically based on assigned quiz count
   const steps: ProgressStep[] = [
     {
       id: "materials",
@@ -38,31 +37,28 @@ export function ProgressIndicator({
       status: materialsComplete ? "complete" : "current",
       icon: "materials",
     },
-    {
-      id: "quiz1",
-      label: "Quiz 1",
-      status: quiz1Passed ? "complete" : materialsComplete ? "current" : "upcoming",
-      icon: "quiz1",
-    },
-    {
-      id: "quiz2",
-      label: "Quiz 2",
-      status: quiz2Passed ? "complete" : quiz1Passed ? "current" : "upcoming",
-      icon: "quiz2",
-    },
-    {
-      id: "quiz3",
-      label: "Quiz 3",
-      status: quiz3Passed ? "complete" : quiz2Passed ? "current" : "upcoming",
-      icon: "quiz3",
-    },
-    {
-      id: "certificate",
-      label: "Certificate",
-      status: quiz3Passed ? "complete" : "upcoming",
-      icon: "certificate",
-    },
   ];
+
+  // Add quiz steps based on assigned count (typically 1 for most employees)
+  for (let i = 1; i <= assignedQuizCount; i++) {
+    const quizPassed = passedQuizCount >= i;
+    const previousQuizPassed = i === 1 ? materialsComplete : passedQuizCount >= (i - 1);
+    
+    steps.push({
+      id: `quiz${i}`,
+      label: assignedQuizCount === 1 ? "Quiz" : `Quiz ${i}`,
+      status: quizPassed ? "complete" : previousQuizPassed ? "current" : "upcoming",
+      icon: "quiz",
+    });
+  }
+
+  // Add certificate step
+  steps.push({
+    id: "certificate",
+    label: "Certificate",
+    status: allQuizzesPassed ? "complete" : "upcoming",
+    icon: "certificate",
+  });
 
   return (
     <div className={cn("rounded-xl border border-border bg-card p-5", className)}>
