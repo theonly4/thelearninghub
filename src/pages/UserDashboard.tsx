@@ -45,6 +45,8 @@ export default function UserDashboard() {
   });
   const [quizPassed, setQuizPassed] = useState(false);
   const [lastQuizScore, setLastQuizScore] = useState<number | null>(null);
+  const [assignedQuizCount, setAssignedQuizCount] = useState(0);
+  const [passedQuizCount, setPassedQuizCount] = useState(0);
 
   useEffect(() => {
     fetchDashboardData();
@@ -81,6 +83,9 @@ export default function UserDashboard() {
             question_count: questions?.length || 0,
           });
 
+          // Set assigned quiz count (currently 1 quiz per package release)
+          setAssignedQuizCount(1);
+
           // Fetch quiz attempts
           const { data: attemptsData } = await supabase
             .from("quiz_attempts")
@@ -93,6 +98,9 @@ export default function UserDashboard() {
           if (attemptsData && attemptsData.length > 0) {
             setLastQuizScore(attemptsData[0].score);
             setQuizPassed(attemptsData[0].passed);
+            if (attemptsData[0].passed) {
+              setPassedQuizCount(1);
+            }
           }
         } else {
           // No package released - use profile workforce groups
@@ -165,9 +173,8 @@ export default function UserDashboard() {
         {/* Progress Indicator */}
         <ProgressIndicator
           materialsComplete={trainingStatus.materials_complete}
-          quiz1Passed={quizPassed}
-          quiz2Passed={false}
-          quiz3Passed={false}
+          assignedQuizCount={assignedQuizCount}
+          passedQuizCount={passedQuizCount}
         />
 
         {/* Next Action Card */}
