@@ -1,11 +1,11 @@
-import { CheckCircle2, BookOpen, FileText, Award } from "lucide-react";
+import { CheckCircle2, BookOpen, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ProgressStep {
   id: string;
   label: string;
   status: "complete" | "current" | "upcoming";
-  icon: "materials" | "quiz" | "certificate";
+  icon: "materials" | "quiz" | "complete";
 }
 
 interface ProgressIndicatorProps {
@@ -18,7 +18,7 @@ interface ProgressIndicatorProps {
 const iconMap = {
   materials: BookOpen,
   quiz: FileText,
-  certificate: Award,
+  complete: CheckCircle2,
 };
 
 export function ProgressIndicator({
@@ -54,10 +54,10 @@ export function ProgressIndicator({
 
   // Add completion step
   steps.push({
-    id: "certificate",
+    id: "complete",
     label: "Complete",
     status: allQuizzesPassed ? "complete" : "upcoming",
-    icon: "certificate",
+    icon: "complete",
   });
 
   return (

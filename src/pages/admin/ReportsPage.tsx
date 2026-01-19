@@ -803,10 +803,7 @@ export default function ReportsPage() {
                                 </TableCell>
                                 <TableCell>
                                   <span className="font-medium">
-                                    {q.score}/{q.totalQuestions}
-                                  </span>
-                                  <span className="text-muted-foreground ml-1">
-                                    ({Math.round((q.score / q.totalQuestions) * 100)}%)
+                                    {q.score}%
                                   </span>
                                 </TableCell>
                                 <TableCell>
