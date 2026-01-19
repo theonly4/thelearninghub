@@ -12,7 +12,6 @@ import {
   ClipboardCheck,
   CheckCircle2,
   AlertCircle,
-  Shield,
   CalendarClock
 } from "lucide-react";
 
@@ -220,15 +219,14 @@ export default function AdminHelpGuidePage() {
                   </p>
                 </div>
                 
-                <div>
-                  <h4 className="font-medium mb-2">What You Can Track</h4>
-                  <ul className="space-y-2 text-muted-foreground">
-                    <li><strong>Completion Rate</strong> - Percentage of employees who have finished all required training</li>
-                    <li><strong>Quiz Scores</strong> - Average scores and individual results for each quiz</li>
-                    <li><strong>Training Materials</strong> - Which educational content has been read</li>
-                    <li><strong>Certificates</strong> - Valid certificates earned by employees</li>
-                  </ul>
-                </div>
+                  <div>
+                    <h4 className="font-medium mb-2">What You Can Track</h4>
+                    <ul className="space-y-2 text-muted-foreground">
+                      <li><strong>Completion Rate</strong> - Percentage of employees who have finished all required training</li>
+                      <li><strong>Quiz Scores</strong> - Average scores and individual results for each quiz</li>
+                      <li><strong>Training Materials</strong> - Which educational content has been read</li>
+                    </ul>
+                  </div>
 
                 <div>
                   <h4 className="font-medium mb-2">Finding Individual Progress</h4>
@@ -284,51 +282,6 @@ export default function AdminHelpGuidePage() {
                     <li><strong>Recommendations</strong> - Suggested actions to improve compliance</li>
                     <li><strong>Trends</strong> - How your organization's performance is changing over time</li>
                   </ul>
-                </div>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-
-          {/* Certificates */}
-          <AccordionItem value="certificates" className="border rounded-lg px-4">
-            <AccordionTrigger className="hover:no-underline">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <FileText className="h-5 w-5 text-primary" />
-                </div>
-                <div className="text-left">
-                  <p className="font-medium">How to View and Manage Certificates</p>
-                  <p className="text-sm text-muted-foreground font-normal">Track compliance documentation</p>
-                </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pt-4 pb-6">
-              <div className="space-y-4 text-sm">
-                <div>
-                  <h4 className="font-medium mb-2">What are Certificates?</h4>
-                  <p className="text-muted-foreground">
-                    When an employee passes all required quizzes, they receive a certificate of completion. These certificates serve as proof of training for compliance audits and are stored for the required retention period.
-                  </p>
-                </div>
-                
-                <div>
-                  <h4 className="font-medium mb-2">Certificate Information</h4>
-                  <ul className="space-y-2 text-muted-foreground">
-                    <li><strong>Certificate Number</strong> - Unique identifier for audit purposes</li>
-                    <li><strong>Issue Date</strong> - When the certificate was earned</li>
-                    <li><strong>Valid Until</strong> - Expiration date (typically one year)</li>
-                    <li><strong>Score</strong> - Final quiz score achieved</li>
-                    <li><strong>HIPAA Citations</strong> - Specific regulations covered</li>
-                  </ul>
-                </div>
-
-                <div className="p-3 bg-muted rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <Shield className="h-4 w-4 text-success mt-0.5" />
-                    <p className="text-muted-foreground">
-                      <strong>Compliance Note:</strong> All certificates are retained for six years as required by HIPAA regulations. This ensures you have documentation available for any audits.
-                    </p>
-                  </div>
                 </div>
               </div>
             </AccordionContent>
@@ -450,7 +403,7 @@ export default function AdminHelpGuidePage() {
 
                 <div className="p-3 bg-muted rounded-lg">
                   <div className="flex items-start gap-2">
-                    <Shield className="h-4 w-4 text-info mt-0.5" />
+                    <AlertCircle className="h-4 w-4 text-info mt-0.5" />
                     <p className="text-muted-foreground">
                       <strong>Note:</strong> All HIPAA section references are automatically linked to the Cornell Law Legal Information Institute, allowing employees to read the full regulatory text for deeper understanding.
                     </p>

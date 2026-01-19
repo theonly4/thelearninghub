@@ -497,7 +497,7 @@ export default function HelpGuidePage() {
                     <li><strong>Step 2 - Customer Admin</strong>: Views released content and assigns training to employees by workforce group, setting a completion deadline</li>
                     <li><strong>Step 3 - Employee</strong>: Receives training assignment with deadline, completes materials at their own pace</li>
                     <li><strong>Step 4 - Quiz Unlock</strong>: When all materials are complete, the quiz is automatically unlocked</li>
-                    <li><strong>Step 5 - Certification</strong>: Passing the quiz generates a certificate for compliance records</li>
+                    <li><strong>Step 5 - Completion</strong>: Passing the quiz completes the training program</li>
                   </ol>
                 </div>
                 
@@ -509,7 +509,6 @@ export default function HelpGuidePage() {
                     <li>Set completion deadlines for training assignments</li>
                     <li>Monitor employee progress and completion status</li>
                     <li>Run workforce analysis to identify training gaps</li>
-                    <li>View and download employee certificates</li>
                   </ul>
                 </div>
 
