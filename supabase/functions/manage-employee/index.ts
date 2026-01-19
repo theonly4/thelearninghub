@@ -227,11 +227,42 @@ Deno.serve(async (req) => {
         metadata: { employee_email: email, created_by: user.email },
       });
 
+      // Fetch organization name for welcome email
+      const { data: orgData } = await adminClient
+        .from("organizations")
+        .select("name")
+        .eq("id", adminOrgId)
+        .single();
+
+      // Send welcome email with credentials
+      try {
+        await fetch(`${supabaseUrl}/functions/v1/send-welcome-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({
+            recipientName: `${firstName} ${lastName}`,
+            email,
+            temporaryPassword: tempPassword,
+            organizationName: orgData?.name || "Your Organization",
+            loginUrl: "https://thelearninghub.lovable.app/login",
+            isPasswordReset: false,
+          }),
+        });
+        console.log("Welcome email sent to:", email);
+      } catch (emailError) {
+        console.error("Failed to send welcome email:", emailError);
+        // Don't fail the employee creation if email fails
+      }
+
       return new Response(
         JSON.stringify({
           success: true,
           employee: { id: newUser.user.id, email, firstName, lastName },
           temporaryPassword: tempPassword,
+          emailSent: true,
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -285,8 +316,44 @@ Deno.serve(async (req) => {
         metadata: { employee_email: empProfile.email, reset_by: user.email },
       });
 
+      // Fetch employee's full name and organization name for email
+      const { data: fullProfile } = await adminClient
+        .from("profiles")
+        .select("first_name, last_name")
+        .eq("user_id", employeeUserId)
+        .single();
+
+      const { data: orgData } = await adminClient
+        .from("organizations")
+        .select("name")
+        .eq("id", adminOrgId)
+        .single();
+
+      // Send password reset email
+      try {
+        await fetch(`${supabaseUrl}/functions/v1/send-welcome-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({
+            recipientName: fullProfile ? `${fullProfile.first_name} ${fullProfile.last_name}` : "Employee",
+            email: empProfile.email,
+            temporaryPassword: newPassword,
+            organizationName: orgData?.name || "Your Organization",
+            loginUrl: "https://thelearninghub.lovable.app/login",
+            isPasswordReset: true,
+          }),
+        });
+        console.log("Password reset email sent to:", empProfile.email);
+      } catch (emailError) {
+        console.error("Failed to send password reset email:", emailError);
+        // Don't fail the password reset if email fails
+      }
+
       return new Response(
-        JSON.stringify({ success: true, newPassword, email: empProfile.email }),
+        JSON.stringify({ success: true, newPassword, email: empProfile.email, emailSent: true }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

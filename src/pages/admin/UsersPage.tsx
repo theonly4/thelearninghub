@@ -645,18 +645,19 @@ export default function UsersPage() {
               {newEmployee.firstName ? "Employee Created Successfully" : "Password Reset Complete"}
             </DialogTitle>
             <DialogDescription>
-              Login credentials have been generated for the employee.
+              Login credentials have been emailed to the employee automatically.
             </DialogDescription>
           </DialogHeader>
           {credentials && (
             <div className="space-y-4 py-4">
               <div className="p-4 bg-success/10 border border-success/30 rounded-lg">
                 <p className="text-sm text-center">
-                  Credentials have been prepared for <strong>{credentials.email}</strong>
+                  ✉️ A welcome email with login instructions has been sent to <strong>{credentials.email}</strong>
                 </p>
               </div>
               
               <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">Backup copy of credentials (in case email didn't arrive):</p>
                 <div className="space-y-2">
                   <Label>Email</Label>
                   <div className="flex gap-2">
@@ -677,8 +678,8 @@ export default function UsersPage() {
                 </div>
               </div>
 
-              <div className="p-3 bg-warning/10 border border-warning/30 rounded-lg text-sm text-warning">
-                ⚠️ Copy and share these credentials with the employee. The password cannot be retrieved later.
+              <div className="p-3 bg-muted border rounded-lg text-sm text-muted-foreground">
+                💡 The employee will receive an email with these credentials and instructions to set up MFA.
               </div>
             </div>
           )}
