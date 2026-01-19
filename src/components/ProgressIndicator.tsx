@@ -52,10 +52,10 @@ export function ProgressIndicator({
     });
   }
 
-  // Add certificate step
+  // Add completion step
   steps.push({
     id: "certificate",
-    label: "Certificate",
+    label: "Complete",
     status: allQuizzesPassed ? "complete" : "upcoming",
     icon: "certificate",
   });
