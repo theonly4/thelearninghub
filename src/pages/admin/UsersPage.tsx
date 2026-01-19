@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { WorkforceGroupBadge } from "@/components/WorkforceGroupBadge";
-import { CredentialEmailTemplate } from "@/components/CredentialEmailTemplate";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -638,45 +638,47 @@ export default function UsersPage() {
 
       {/* Credentials Dialog */}
       <Dialog open={isCredentialsDialogOpen} onOpenChange={setIsCredentialsDialogOpen}>
-        <DialogContent className="sm:max-w-[550px]">
+        <DialogContent className="sm:max-w-[450px]">
           <DialogHeader>
-            <DialogTitle>Employee Credentials</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-success" />
+              {newEmployee.firstName ? "Employee Created Successfully" : "Password Reset Complete"}
+            </DialogTitle>
             <DialogDescription>
-              Share these credentials with the employee. They should change their password after first login.
+              Login credentials have been generated for the employee.
             </DialogDescription>
           </DialogHeader>
           {credentials && (
             <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <div className="flex gap-2">
-                  <Input value={credentials.email} readOnly className="bg-muted" />
-                  <Button variant="outline" size="icon" onClick={() => copyToClipboard(credentials.email)}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Temporary Password</Label>
-                <div className="flex gap-2">
-                  <Input value={credentials.password} readOnly className="bg-muted font-mono" />
-                  <Button variant="outline" size="icon" onClick={() => copyToClipboard(credentials.password)}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              <div className="p-3 bg-warning/10 border border-warning/30 rounded-lg text-sm text-warning">
-                ⚠️ Save these credentials now. The password cannot be retrieved later.
+              <div className="p-4 bg-success/10 border border-success/30 rounded-lg">
+                <p className="text-sm text-center">
+                  Credentials have been prepared for <strong>{credentials.email}</strong>
+                </p>
               </div>
               
-              {/* Email Template */}
-              <div className="border-t pt-4">
-                <CredentialEmailTemplate
-                  recipientName={newEmployee.firstName || credentials.email.split('@')[0]}
-                  email={credentials.email}
-                  password={credentials.password}
-                  isPasswordReset={!newEmployee.firstName}
-                />
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <div className="flex gap-2">
+                    <Input value={credentials.email} readOnly className="bg-muted" />
+                    <Button variant="outline" size="icon" onClick={() => copyToClipboard(credentials.email)}>
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Temporary Password</Label>
+                  <div className="flex gap-2">
+                    <Input value={credentials.password} readOnly className="bg-muted font-mono" />
+                    <Button variant="outline" size="icon" onClick={() => copyToClipboard(credentials.password)}>
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 bg-warning/10 border border-warning/30 rounded-lg text-sm text-warning">
+                ⚠️ Copy and share these credentials with the employee. The password cannot be retrieved later.
               </div>
             </div>
           )}

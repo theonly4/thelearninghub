@@ -81,6 +81,7 @@ export default function ReportsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterGroup, setFilterGroup] = useState<string>("all");
   const [activeTab, setActiveTab] = useState("training");
+  const [organizationName, setOrganizationName] = useState<string>("");
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -90,6 +91,28 @@ export default function ReportsPage() {
   async function fetchReportData() {
     setLoading(true);
     try {
+      // Fetch current user's organization name
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("organization_id")
+          .eq("user_id", user.id)
+          .single();
+        
+        if (profile) {
+          const { data: org } = await supabase
+            .from("organizations")
+            .select("name")
+            .eq("id", profile.organization_id)
+            .single();
+          
+          if (org) {
+            setOrganizationName(org.name);
+          }
+        }
+      }
+
       // Fetch training progress with profiles and materials
       const { data: trainingData, error: trainingError } = await supabase
         .from("user_training_progress")
@@ -232,7 +255,7 @@ export default function ReportsPage() {
       return;
     }
 
-    const title = activeTab === "training" ? "Training Completion Report" : "Quiz Completion Report";
+    const title = activeTab === "training" ? "Training Materials Completion Report" : "Quiz Completion Report";
     const dateGenerated = format(new Date(), "MMMM d, yyyy 'at' h:mm a");
 
     printWindow.document.write(`
@@ -248,6 +271,7 @@ export default function ReportsPage() {
               color: #1a1a1a;
             }
             .header { margin-bottom: 30px; border-bottom: 2px solid #0066cc; padding-bottom: 20px; }
+            .header .org-name { font-size: 16px; font-weight: 600; color: #333; margin-bottom: 5px; }
             .header h1 { font-size: 24px; color: #0066cc; margin-bottom: 5px; }
             .header p { color: #666; font-size: 12px; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
@@ -276,6 +300,7 @@ export default function ReportsPage() {
             .badge-pass { background: #dcfce7; color: #166534; }
             .badge-fail { background: #fee2e2; color: #991b1b; }
             .badge-group { background: #e0e7ff; color: #3730a3; }
+            .badge-complete { background: #dcfce7; color: #166534; }
             .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 10px; color: #666; }
             @media print {
               body { padding: 20px; }
@@ -285,6 +310,7 @@ export default function ReportsPage() {
         </head>
         <body>
           <div class="header">
+            ${organizationName ? `<div class="org-name">${escapeHtml(organizationName)}</div>` : ""}
             <h1>${title}</h1>
             <p>Generated on ${dateGenerated}</p>
             ${filterGroup !== "all" ? `<p>Filtered by: ${WORKFORCE_GROUP_LABELS[filterGroup as WorkforceGroup]}</p>` : ""}
@@ -313,6 +339,7 @@ export default function ReportsPage() {
         <td>${escapeHtml(t.email)}</td>
         <td><span class="badge badge-group">${escapeHtml(t.workforceGroups.map(g => WORKFORCE_GROUP_LABELS[g]).join(", ") || "Unassigned")}</span></td>
         <td>${escapeHtml(t.materialTitle)}</td>
+        <td><span class="badge badge-complete">Complete</span></td>
         <td>${escapeHtml(format(new Date(t.completedAt), "MMM d, yyyy 'at' h:mm a"))}</td>
       </tr>
     `).join("");
@@ -325,14 +352,21 @@ export default function ReportsPage() {
             <th>Email</th>
             <th>Workforce Group</th>
             <th>Training Material</th>
+            <th>Status</th>
             <th>Completed Date/Time</th>
           </tr>
         </thead>
         <tbody>
-          ${rows || "<tr><td colspan='5' style='text-align: center; padding: 20px;'>No training completions found</td></tr>"}
+          ${rows || "<tr><td colspan='6' style='text-align: center; padding: 20px;'>No training completions found</td></tr>"}
         </tbody>
       </table>
     `;
+  }
+
+  // Helper to format quiz score correctly (score is stored as percentage in DB)
+  function formatQuizScore(score: number, totalQuestions: number): string {
+    // Score is stored as percentage (0-100), not raw count
+    return `${score}%`;
   }
 
   function generateQuizTable() {
@@ -342,7 +376,7 @@ export default function ReportsPage() {
         <td>${escapeHtml(q.email)}</td>
         <td><span class="badge badge-group">${escapeHtml(q.workforceGroups.map(g => WORKFORCE_GROUP_LABELS[g]).join(", ") || "Unassigned")}</span></td>
         <td>${escapeHtml(q.quizTitle)}</td>
-        <td>${q.score}/${q.totalQuestions} (${Math.round((q.score / q.totalQuestions) * 100)}%)</td>
+        <td>${formatQuizScore(q.score, q.totalQuestions)}</td>
         <td><span class="badge ${q.passed ? "badge-pass" : "badge-fail"}">${q.passed ? "PASSED" : "FAILED"}</span></td>
         <td>${escapeHtml(q.completedAt ? format(new Date(q.completedAt), "MMM d, yyyy 'at' h:mm a") : "In Progress")}</td>
       </tr>
@@ -390,8 +424,7 @@ export default function ReportsPage() {
         "Email": q.email,
         "Workforce Group": q.workforceGroups.map(g => WORKFORCE_GROUP_LABELS[g]).join(", "),
         "Quiz Title": q.quizTitle,
-        "Score": `${q.score}/${q.totalQuestions}`,
-        "Percentage": `${Math.round((q.score / q.totalQuestions) * 100)}%`,
+        "Score": `${q.score}%`,
         "Result": q.passed ? "PASSED" : "FAILED",
         "Completed At": q.completedAt ? format(new Date(q.completedAt), "yyyy-MM-dd HH:mm:ss") : "In Progress",
       }));
@@ -469,7 +502,7 @@ export default function ReportsPage() {
         }
         doc.text(q.userName.substring(0, 18), 17, yPos);
         doc.text(q.quizTitle.substring(0, 25), 55, yPos);
-        doc.text(`${q.score}/${q.totalQuestions} (${Math.round((q.score / q.totalQuestions) * 100)}%)`, 110, yPos);
+        doc.text(`${q.score}%`, 110, yPos);
         doc.setTextColor(q.passed ? 0 : 150, q.passed ? 128 : 0, 0);
         doc.text(q.passed ? "PASS" : "FAIL", 135, yPos);
         doc.setTextColor(0);
