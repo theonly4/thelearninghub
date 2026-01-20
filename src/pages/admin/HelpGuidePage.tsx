@@ -397,7 +397,7 @@ export default function AdminHelpGuidePage() {
                 <div>
                   <h4 className="font-medium mb-2">Viewing Available Content</h4>
                   <p className="text-muted-foreground">
-                    Go to <strong>Knowledge Base</strong> to see what content has been made available to your organization. You can review the materials yourself to understand what your employees are learning.
+                    Go to <strong>Training Library</strong> to see what content has been made available to your organization. You can review the materials yourself to understand what your employees are learning.
                   </p>
                 </div>
 
