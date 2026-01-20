@@ -28,6 +28,11 @@ interface QuestionPackage {
   question_count?: number;
 }
 
+interface QuestionOption {
+  label: string;
+  text: string;
+}
+
 interface PackageQuestion {
   id: string;
   package_id: string;
@@ -37,6 +42,8 @@ interface PackageQuestion {
     question_number: number;
     hipaa_section: string;
     scenario: string | null;
+    options: QuestionOption[];
+    correct_answer: string;
   };
 }
 
@@ -273,7 +280,7 @@ export default function PackageManagerPage() {
   const handleViewPackage = async (pkg: QuestionPackage) => {
     setViewingPackage(pkg);
     
-    // Fetch questions for this package
+    // Fetch questions for this package with full details
     const { data } = await supabase
       .from("package_questions")
       .select(`
@@ -284,7 +291,9 @@ export default function PackageManagerPage() {
           question_text,
           question_number,
           hipaa_section,
-          scenario
+          scenario,
+          options,
+          correct_answer
         )
       `)
       .eq("package_id", pkg.id);
@@ -485,23 +494,55 @@ export default function PackageManagerPage() {
             
             <ScrollArea className="h-[500px] pr-4">
               {viewingPackage && packageQuestions[viewingPackage.id] ? (
-                <div className="space-y-2">
+                <div className="space-y-4">
                   {packageQuestions[viewingPackage.id].map((pq, index) => (
-                    <div key={pq.id} className="p-3 border rounded-lg">
+                    <div key={pq.id} className="p-4 border rounded-lg space-y-3">
                       <div className="flex items-start gap-3">
                         <Badge variant="outline" className="shrink-0">
-                          {index + 1}
+                          Q{index + 1}
                         </Badge>
-                        <div className="flex-1 space-y-2">
+                        <div className="flex-1 space-y-3">
                           {pq.question?.scenario && (
                             <p className="text-sm text-muted-foreground italic border-l-2 border-muted pl-3">
                               {pq.question.scenario}
                             </p>
                           )}
-                          <p className="text-sm">{pq.question?.question_text || "Question not found"}</p>
+                          <p className="text-sm font-medium">{pq.question?.question_text || "Question not found"}</p>
+                          
+                          {/* Answer Options */}
+                          {pq.question?.options && Array.isArray(pq.question.options) && (
+                            <div className="space-y-1.5 pl-2">
+                              {pq.question.options.map((option: QuestionOption) => {
+                                const isCorrect = option.label === pq.question?.correct_answer;
+                                return (
+                                  <div 
+                                    key={option.label} 
+                                    className={`flex items-start gap-2 text-sm p-2 rounded ${
+                                      isCorrect 
+                                        ? 'bg-accent/20 border border-accent' 
+                                        : 'bg-muted/30'
+                                    }`}
+                                  >
+                                    <span className={`font-medium shrink-0 ${isCorrect ? 'text-accent' : ''}`}>
+                                      {option.label}.
+                                    </span>
+                                    <span className={isCorrect ? 'text-accent' : ''}>
+                                      {option.text}
+                                    </span>
+                                    {isCorrect && (
+                                      <span className="ml-auto text-accent text-xs font-medium">
+                                        ✓ Correct
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                          
                           {pq.question?.hipaa_section && (
                             <Badge variant="secondary" className="text-xs">
-                              {pq.question.hipaa_section}
+                              § {pq.question.hipaa_section}
                             </Badge>
                           )}
                         </div>

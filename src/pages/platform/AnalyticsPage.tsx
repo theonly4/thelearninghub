@@ -102,6 +102,24 @@ export default function AnalyticsPage() {
 
       if (profilesError) throw profilesError;
 
+      // Fetch user roles to identify workforce users (employees only, not admins)
+      const { data: userRoles, error: rolesError } = await supabase
+        .from("user_roles")
+        .select("user_id, organization_id, role");
+
+      if (rolesError) throw rolesError;
+
+      // Get set of workforce user IDs per organization
+      const workforceUsersByOrg: Record<string, Set<string>> = {};
+      (userRoles || []).forEach(role => {
+        if (role.role === "workforce_user") {
+          if (!workforceUsersByOrg[role.organization_id]) {
+            workforceUsersByOrg[role.organization_id] = new Set();
+          }
+          workforceUsersByOrg[role.organization_id].add(role.user_id);
+        }
+      });
+
       // Fetch training progress within date range
       const { data: trainingProgress, error: trainingError } = await supabase
         .from("user_training_progress")
@@ -122,7 +140,8 @@ export default function AnalyticsPage() {
 
       // Calculate stats per organization
       const stats: OrgStats[] = (orgs || []).map(org => {
-        const orgProfiles = profiles?.filter(p => p.organization_id === org.id) || [];
+        // Count only workforce users (employees), not admins
+        const employeeCount = workforceUsersByOrg[org.id]?.size || 0;
         const orgTraining = trainingProgress?.filter(t => t.organization_id === org.id) || [];
         const orgQuizzes = quizAttempts?.filter(q => q.organization_id === org.id) || [];
         const passedQuizzes = orgQuizzes.filter(q => q.passed).length;
@@ -131,7 +150,7 @@ export default function AnalyticsPage() {
           id: org.id,
           name: org.name,
           slug: org.slug,
-          employeeCount: orgProfiles.length,
+          employeeCount,
           trainingCompletions: orgTraining.length,
           quizAttempts: orgQuizzes.length,
           passedQuizzes,
