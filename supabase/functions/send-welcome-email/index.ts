@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 
@@ -19,6 +20,19 @@ function getCorsHeaders(requestOrigin: string | null): Record<string, string> {
   };
 }
 
+// HTML entity encoding to prevent XSS in email templates
+function escapeHtml(text: string): string {
+  if (!text) return '';
+  const map: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return String(text).replace(/[&<>"']/g, m => map[m]);
+}
+
 interface WelcomeEmailRequest {
   recipientName: string;
   email: string;
@@ -37,6 +51,51 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Authentication check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Authorization required" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Verify user authentication
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user }, error: userError } = await authClient.auth.getUser();
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Verify user has admin role using service client
+    const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    const { data: roleData } = await adminClient
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .in("role", ["org_admin", "platform_owner"])
+      .single();
+
+    if (!roleData) {
+      return new Response(
+        JSON.stringify({ error: "Insufficient permissions" }),
+        { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     const {
       recipientName,
       email,
@@ -45,6 +104,13 @@ const handler = async (req: Request): Promise<Response> => {
       loginUrl,
       isPasswordReset,
     }: WelcomeEmailRequest = await req.json();
+
+    // Escape all user-controlled content to prevent XSS
+    const safeRecipientName = escapeHtml(recipientName);
+    const safeOrganizationName = escapeHtml(organizationName);
+    const safeEmail = escapeHtml(email);
+    const safeTemporaryPassword = escapeHtml(temporaryPassword);
+    const safeLoginUrl = escapeHtml(loginUrl);
 
     const subject = isPasswordReset 
       ? "Your Password Has Been Reset - HIPAA Learning Hub"
@@ -69,11 +135,11 @@ const handler = async (req: Request): Promise<Response> => {
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #1a1a1a; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); border-radius: 12px; padding: 32px; margin-bottom: 24px; text-align: center;">
           <h1 style="color: white; margin: 0; font-size: 24px;">${headerTitle}</h1>
-          <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;">${organizationName}</p>
+          <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;">${safeOrganizationName}</p>
         </div>
         
         <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
-          <h2 style="margin: 0 0 16px 0; font-size: 20px; color: #1e3a8a;">Hello ${recipientName},</h2>
+          <h2 style="margin: 0 0 16px 0; font-size: 20px; color: #1e3a8a;">Hello ${safeRecipientName},</h2>
           <p style="margin: 0 0 16px 0;">${introText}</p>
           
           <div style="background: white; border-radius: 8px; padding: 16px; margin: 16px 0; border-left: 4px solid #3b82f6;">
@@ -81,15 +147,15 @@ const handler = async (req: Request): Promise<Response> => {
             <table style="width: 100%; border-collapse: collapse;">
               <tr>
                 <td style="padding: 8px 0; color: #6b7280; width: 120px;">Login URL:</td>
-                <td style="padding: 8px 0;"><a href="${loginUrl}" style="color: #3b82f6; text-decoration: none;">${loginUrl}</a></td>
+                <td style="padding: 8px 0;"><a href="${safeLoginUrl}" style="color: #3b82f6; text-decoration: none;">${safeLoginUrl}</a></td>
               </tr>
               <tr>
                 <td style="padding: 8px 0; color: #6b7280;">Email:</td>
-                <td style="padding: 8px 0; font-weight: 500;">${email}</td>
+                <td style="padding: 8px 0; font-weight: 500;">${safeEmail}</td>
               </tr>
               <tr>
                 <td style="padding: 8px 0; color: #6b7280;">Password:</td>
-                <td style="padding: 8px 0; font-family: monospace; font-weight: 500; background: #f1f5f9; padding: 4px 8px; border-radius: 4px;">${temporaryPassword}</td>
+                <td style="padding: 8px 0; font-family: monospace; font-weight: 500; background: #f1f5f9; padding: 4px 8px; border-radius: 4px;">${safeTemporaryPassword}</td>
               </tr>
             </table>
           </div>
@@ -102,7 +168,7 @@ const handler = async (req: Request): Promise<Response> => {
         </div>
         
         <div style="text-align: center; margin-bottom: 24px;">
-          <a href="${loginUrl}" style="display: inline-block; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">Log In Now</a>
+          <a href="${safeLoginUrl}" style="display: inline-block; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">Log In Now</a>
         </div>
         
         <div style="border-top: 1px solid #e5e7eb; padding-top: 16px; text-align: center; font-size: 12px; color: #6b7280;">
