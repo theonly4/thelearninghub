@@ -243,23 +243,30 @@ export function TrainingAssignmentDialog({
         `Training assigned to ${filteredEmployees.length} employee${filteredEmployees.length > 1 ? "s" : ""}`
       );
 
-      // Send email notifications to all assigned employees (in background)
+      // Send email notifications to all assigned employees (in background) - requires authentication
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      filteredEmployees.forEach((emp) => {
-        fetch(`${supabaseUrl}/functions/v1/send-assignment-email`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            employeeName: `${emp.first_name} ${emp.last_name}`,
-            employeeEmail: emp.email,
-            dueDate: dueDate.toISOString(),
-            assignedMaterials: filteredMaterials.map(m => m.title),
-            assignedPackages: packageForGroup ? [packageForGroup.package_name] : [],
-            totalMinutes,
-            loginUrl: window.location.origin + '/login',
-          }),
-        }).catch((emailError) => {
-          console.error('Failed to send email to', emp.email, emailError);
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session?.access_token) return;
+        
+        filteredEmployees.forEach((emp) => {
+          fetch(`${supabaseUrl}/functions/v1/send-assignment-email`, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+              employeeName: `${emp.first_name} ${emp.last_name}`,
+              employeeEmail: emp.email,
+              dueDate: dueDate.toISOString(),
+              assignedMaterials: filteredMaterials.map(m => m.title),
+              assignedPackages: packageForGroup ? [packageForGroup.package_name] : [],
+              totalMinutes,
+              loginUrl: window.location.origin + '/login',
+            }),
+          }).catch((emailError) => {
+            console.error('Failed to send email to', emp.email, emailError);
+          });
         });
       });
       

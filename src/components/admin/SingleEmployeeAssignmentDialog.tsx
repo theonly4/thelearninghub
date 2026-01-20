@@ -209,33 +209,40 @@ export function SingleEmployeeAssignmentDialog({
         `Training assigned to ${employee.first_name} ${employee.last_name}`
       );
 
-      // Send email notification to employee (in background)
+      // Send email notification to employee (in background) - requires authentication
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      // Get employee email from profiles
-      supabase
-        .from('profiles')
-        .select('email')
-        .eq('user_id', employee.user_id)
-        .single()
-        .then(({ data: profileData }) => {
-          if (profileData?.email) {
-            fetch(`${supabaseUrl}/functions/v1/send-assignment-email`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                employeeName: `${employee.first_name} ${employee.last_name}`,
-                employeeEmail: profileData.email,
-                dueDate: dueDate.toISOString(),
-                assignedMaterials: filteredMaterials.map(m => m.title),
-                assignedPackages: packagesForEmployee.map(p => p.package_name),
-                totalMinutes,
-                loginUrl: window.location.origin + '/login',
-              }),
-            }).catch((emailError) => {
-              console.error('Failed to send assignment email:', emailError);
-            });
-          }
-        });
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session?.access_token) return;
+        
+        // Get employee email from profiles
+        supabase
+          .from('profiles')
+          .select('email')
+          .eq('user_id', employee.user_id)
+          .single()
+          .then(({ data: profileData }) => {
+            if (profileData?.email) {
+              fetch(`${supabaseUrl}/functions/v1/send-assignment-email`, {
+                method: 'POST',
+                headers: { 
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({
+                  employeeName: `${employee.first_name} ${employee.last_name}`,
+                  employeeEmail: profileData.email,
+                  dueDate: dueDate.toISOString(),
+                  assignedMaterials: filteredMaterials.map(m => m.title),
+                  assignedPackages: packagesForEmployee.map(p => p.package_name),
+                  totalMinutes,
+                  loginUrl: window.location.origin + '/login',
+                }),
+              }).catch((emailError) => {
+                console.error('Failed to send assignment email:', emailError);
+              });
+            }
+          });
+      });
 
       // Reset form
       setDueDate(addDays(new Date(), 30));
