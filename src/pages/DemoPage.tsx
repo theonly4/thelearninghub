@@ -38,25 +38,39 @@ export default function DemoPage() {
     e.preventDefault();
     setIsLoading(true);
 
-    // Build mailto link with form data
-    const subject = encodeURIComponent(`Demo Request from ${formData.firstName} ${formData.lastName}`);
-    const body = encodeURIComponent(
-      `Name: ${formData.firstName} ${formData.lastName}\n` +
-      `Email: ${formData.email}\n` +
-      `Organization: ${formData.organization}\n` +
-      `Role: ${formData.role}\n` +
-      `Workforce Size: ${formData.workforceSize}\n` +
-      `Message: ${formData.message || 'N/A'}`
-    );
-    
-    window.location.href = `mailto:yiplawcenter@protonmail.com?subject=${subject}&body=${body}`;
-    
-    setIsLoading(false);
-    setIsSubmitted(true);
-    toast({
-      title: "Demo Request Submitted",
-      description: "We'll be in touch within 24 hours.",
-    });
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-demo-request`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to submit demo request');
+      }
+
+      setIsSubmitted(true);
+      toast({
+        title: "Demo Request Submitted",
+        description: "We'll be in touch within 24 hours.",
+      });
+    } catch (error: any) {
+      console.error('Demo request error:', error);
+      toast({
+        title: "Submission Failed",
+        description: error.message || "Please try again or contact us directly.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (isSubmitted) {

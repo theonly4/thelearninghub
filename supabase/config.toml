@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.send-release-notification]
 verify_jwt = false
+
+[functions.send-demo-request]
+verify_jwt = false
