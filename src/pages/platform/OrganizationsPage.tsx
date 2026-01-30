@@ -482,7 +482,7 @@ export default function OrganizationsPage() {
     if (!createdCredentials) return;
     
     const loginUrl = `${window.location.origin}/login`;
-    const text = `HIPAA Learning Hub - Admin Account Credentials
+    const text = `The Learning Hub - Admin Account Credentials
 ================================================
 Organization: ${createdCredentials.organizationName}
 Login URL: ${loginUrl}

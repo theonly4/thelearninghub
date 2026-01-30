@@ -1,5 +1,5 @@
-import { Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
+import logoImage from "@/assets/logo-the-learning-hub.png";
 
 interface LogoProps {
   variant?: "default" | "light" | "dark";
@@ -8,10 +8,10 @@ interface LogoProps {
   className?: string;
 }
 
-const sizeClasses = {
-  sm: "h-6 w-6",
-  md: "h-8 w-8",
-  lg: "h-10 w-10",
+const imageSizeClasses = {
+  sm: "h-8 w-8",
+  md: "h-10 w-10",
+  lg: "h-12 w-12",
 };
 
 const textSizeClasses = {
@@ -26,25 +26,17 @@ export function Logo({
   showText = true,
   className 
 }: LogoProps) {
-  const iconColor = variant === "light" 
-    ? "text-white" 
-    : variant === "dark" 
-      ? "text-primary" 
-      : "text-accent";
-
   const textColor = variant === "light" 
     ? "text-white" 
     : "text-foreground";
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <div className={cn(
-        "relative flex items-center justify-center rounded-lg p-1.5",
-        variant === "light" ? "bg-white/10" : "bg-accent/10"
-      )}>
-        <Shield className={cn(sizeClasses[size], iconColor, "fill-current opacity-20")} />
-        <Shield className={cn(sizeClasses[size], iconColor, "absolute")} />
-      </div>
+      <img 
+        src={logoImage} 
+        alt="The Learning Hub Logo" 
+        className={cn(imageSizeClasses[size], "object-contain")}
+      />
       {showText && (
         <div className="flex flex-col">
           <span className={cn(
@@ -52,14 +44,14 @@ export function Logo({
             textSizeClasses[size],
             textColor
           )}>
-            HIPAA Learning Hub
+            The Learning Hub
           </span>
           {size !== "sm" && (
             <span className={cn(
               "text-xs tracking-wide",
               variant === "light" ? "text-white/70" : "text-muted-foreground"
             )}>
-              Compliance Training Platform
+              Compliance Learning Platform
             </span>
           )}
         </div>

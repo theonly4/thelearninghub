@@ -1,5 +1,5 @@
-// HIPAA Learning Hub Type Definitions
-// Multi-tenant HIPAA Training Platform
+// The Learning Hub Type Definitions
+// Multi-tenant Compliance Learning Platform
 
 export type WorkforceGroup = 
   | 'all_staff'
@@ -224,9 +224,9 @@ export const WORKFORCE_GROUP_LABELS: Record<WorkforceGroup, string> = {
 };
 
 export const WORKFORCE_GROUP_DESCRIPTIONS: Record<WorkforceGroup, string> = {
-  all_staff: 'Core HIPAA training applicable to all workforce members',
+  all_staff: 'Core compliance learning applicable to all workforce members',
   clinical: 'Healthcare providers including physicians, nurses, and clinical support',
-  administrative: 'Administrative and billing personnel handling PHI',
+  administrative: 'Administrative and billing personnel handling sensitive information',
   management: 'Leadership responsible for organizational compliance',
   it: 'Information technology and security professionals',
 };

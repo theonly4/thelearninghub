@@ -40,7 +40,7 @@ export default function PlatformDashboard() {
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Platform Overview</h2>
           <p className="text-muted-foreground">
-            Manage your HIPAA training content and organization deployments.
+            Manage your compliance learning content and organization deployments.
           </p>
         </div>
 
@@ -53,7 +53,7 @@ export default function PlatformDashboard() {
             trend={{ value: 15, isPositive: true }}
           />
           <StatCard
-            title="Training Materials"
+            title="Learning Materials"
             value={platformStats.totalMaterials}
             icon={BookOpen}
           />

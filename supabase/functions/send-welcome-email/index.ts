@@ -113,12 +113,12 @@ const handler = async (req: Request): Promise<Response> => {
     const safeLoginUrl = escapeHtml(loginUrl);
 
     const subject = isPasswordReset 
-      ? "Your Password Has Been Reset - HIPAA Learning Hub"
-      : "Welcome to HIPAA Learning Hub - Your Account Credentials";
+      ? "Your Password Has Been Reset - The Learning Hub"
+      : "Welcome to The Learning Hub - Your Account Credentials";
 
     const headerTitle = isPasswordReset 
       ? "Password Reset"
-      : "Welcome to HIPAA Learning Hub";
+      : "Welcome to The Learning Hub";
 
     const introText = isPasswordReset
       ? "Your password has been reset by your administrator. Please use the credentials below to log in:"
@@ -172,7 +172,7 @@ const handler = async (req: Request): Promise<Response> => {
         </div>
         
         <div style="border-top: 1px solid #e5e7eb; padding-top: 16px; text-align: center; font-size: 12px; color: #6b7280;">
-          <p style="margin: 0;">This is an automated message from your organization's HIPAA compliance training system.</p>
+          <p style="margin: 0;">This is an automated message from your organization's compliance learning system.</p>
           <p style="margin: 8px 0 0 0;">If you did not expect this email, please contact your administrator.</p>
         </div>
       </body>
@@ -180,7 +180,7 @@ const handler = async (req: Request): Promise<Response> => {
     `;
 
     const emailPayload = {
-      from: "HIPAA Learning Hub <onboarding@resend.dev>",
+      from: "The Learning Hub <onboarding@resend.dev>",
       to: [email],
       subject,
       html: emailHtml,

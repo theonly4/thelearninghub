@@ -230,7 +230,7 @@ export default function EmployeeTrainingPage() {
     return (
       <DashboardLayout userRole="workforce_user" userName={fullName || "User"}>
         <div className="flex items-center justify-center min-h-[50vh]">
-          <p className="text-muted-foreground">Loading training materials...</p>
+          <p className="text-muted-foreground">Loading learning materials...</p>
         </div>
       </DashboardLayout>
     );
@@ -285,9 +285,9 @@ export default function EmployeeTrainingPage() {
       <DashboardLayout userRole="workforce_user" userName={fullName || "User"}>
         <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
           <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
-          <h2 className="text-xl font-semibold mb-2">No Training Assigned</h2>
+          <h2 className="text-xl font-semibold mb-2">No Learning Assigned</h2>
           <p className="text-muted-foreground max-w-md">
-            Your administrator has not yet assigned training materials. Please check back later or contact your administrator.
+            Your administrator has not yet assigned learning materials. Please check back later or contact your administrator.
           </p>
         </div>
       </DashboardLayout>
@@ -300,9 +300,9 @@ export default function EmployeeTrainingPage() {
       <DashboardLayout userRole="workforce_user" userName={fullName || "User"}>
         <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
           <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Training Materials Pending</h2>
+          <h2 className="text-xl font-semibold mb-2">Learning Materials Pending</h2>
           <p className="text-muted-foreground max-w-md">
-            Training has been assigned, but the training materials are not yet available. Please check back later.
+            Learning has been assigned, but the learning materials are not yet available. Please check back later.
           </p>
         </div>
       </DashboardLayout>
@@ -315,7 +315,7 @@ export default function EmployeeTrainingPage() {
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Training Materials</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Learning Materials</h1>
             <p className="text-muted-foreground">
               Complete all materials to unlock your assessment quiz
             </p>
@@ -496,13 +496,11 @@ export default function EmployeeTrainingPage() {
           })}
         </div>
 
-        {/* HIPAA Notice */}
+        {/* Compliance Notice */}
         <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
           <p>
-            Training materials are provided pursuant to{" "}
-            <HipaaLink section="45 CFR §164.530(b)" showIcon={false} />, which
-            requires covered entities to train workforce members on policies and
-            procedures with respect to Protected Health Information.
+            Learning materials are provided to ensure workforce members understand policies and
+            procedures with respect to protected or sensitive information.
           </p>
         </div>
       </div>

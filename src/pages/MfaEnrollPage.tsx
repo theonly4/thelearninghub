@@ -63,8 +63,8 @@ export default function MfaEnrollPage() {
       // Enroll new TOTP factor with unique friendly name to avoid conflicts
       const { data, error } = await supabase.auth.mfa.enroll({
         factorType: 'totp',
-        issuer: 'HIPAA Learning Hub',
-        friendlyName: `HIPAA-${Date.now()}`,
+        issuer: 'The Learning Hub',
+        friendlyName: `TLH-${Date.now()}`,
       });
 
       if (error) throw error;
@@ -76,7 +76,7 @@ export default function MfaEnrollPage() {
       // Build the TOTP URI for QR code generation
       // Format: otpauth://totp/LABEL?secret=SECRET&issuer=ISSUER
       const totpUriValue = data.totp.uri || 
-        `otpauth://totp/HIPAA%20Learning%20Hub:${encodeURIComponent(session.user.email || 'user')}?secret=${data.totp.secret}&issuer=HIPAA%20Learning%20Hub`;
+        `otpauth://totp/The%20Learning%20Hub:${encodeURIComponent(session.user.email || 'user')}?secret=${data.totp.secret}&issuer=The%20Learning%20Hub`;
       
       setTotpUri(totpUriValue);
       setSecret(data.totp.secret);
@@ -327,7 +327,7 @@ export default function MfaEnrollPage() {
             <div className="mt-6 flex items-center justify-center gap-2 text-center text-xs text-muted-foreground">
               <Shield className="h-3.5 w-3.5" />
               <span>
-                Required per 45 CFR §164.312(d) for HIPAA compliance.
+                Multi-factor authentication required for compliance.
               </span>
             </div>
           </div>

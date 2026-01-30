@@ -16,7 +16,7 @@ export default function PendingSetupPage() {
           <div className="space-y-2">
             <h1 className="text-2xl font-bold">Account Setup Pending</h1>
             <p className="text-muted-foreground">
-              Your administrator needs to assign your workforce group before you can begin HIPAA training.
+              Your administrator needs to assign your workforce group before you can begin compliance learning.
             </p>
           </div>
 
@@ -53,18 +53,9 @@ export default function PendingSetupPage() {
             </Button>
           </div>
 
-          {/* HIPAA Reference */}
+          {/* Compliance Reference */}
           <p className="text-xs text-muted-foreground">
-            Per{" "}
-            <a
-              href="https://www.law.cornell.edu/cfr/text/45/164.530"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-accent hover:underline"
-            >
-              45 CFR §164.530(b)
-            </a>
-            , workforce members must receive training appropriate to their job functions.
+            Workforce members must receive learning appropriate to their job functions.
           </p>
         </div>
       </div>

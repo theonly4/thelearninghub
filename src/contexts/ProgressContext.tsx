@@ -259,7 +259,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
       return { 
         type: 'material', 
         id: incompleteMaterial, 
-        message: 'Complete training materials to unlock quizzes.' 
+        message: 'Complete learning materials to unlock quizzes.' 
       };
     }
 
