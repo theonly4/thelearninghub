@@ -29,7 +29,7 @@ const platformOwnerNavItems = [
   { icon: LayoutDashboard, label: "Overview", href: "/platform" },
   { icon: FileQuestion, label: "Question Bank", href: "/platform/questions" },
   { icon: Package, label: "Question Packages", href: "/platform/packages" },
-  { icon: BookOpen, label: "Training Materials", href: "/platform/materials" },
+  { icon: BookOpen, label: "Learning Materials", href: "/platform/materials" },
   { icon: Building2, label: "Organizations", href: "/platform/organizations" },
   { icon: Send, label: "Content Releases", href: "/platform/releases" },
   { icon: BarChart3, label: "Analytics", href: "/platform/analytics" },

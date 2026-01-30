@@ -141,7 +141,7 @@ export default function UserDashboard() {
             Welcome back{firstName ? `, ${firstName}` : ""}
           </h1>
           <p className="text-muted-foreground">
-            Continue your HIPAA compliance training
+            Continue your compliance learning
           </p>
         </div>
 

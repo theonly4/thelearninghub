@@ -255,14 +255,14 @@ export default function ReportsPage() {
       return;
     }
 
-    const title = activeTab === "training" ? "Training Materials Completion Report" : "Quiz Completion Report";
+    const title = activeTab === "training" ? "Learning Materials Completion Report" : "Quiz Completion Report";
     const dateGenerated = format(new Date(), "MMMM d, yyyy 'at' h:mm a");
 
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
-          <title>${title} - HIPAA Training</title>
+          <title>${title} - Compliance Learning</title>
           <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body { 
@@ -647,7 +647,7 @@ export default function ReportsPage() {
             <TabsList className="grid w-full grid-cols-2 max-w-md">
               <TabsTrigger value="training" className="gap-2">
                 <BookOpen className="h-4 w-4" />
-                Training Materials
+                Learning Materials
               </TabsTrigger>
               <TabsTrigger value="quizzes" className="gap-2">
                 <ClipboardCheck className="h-4 w-4" />
@@ -660,10 +660,10 @@ export default function ReportsPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <BookOpen className="h-5 w-5" />
-                    Training Material Completions
+                    Learning Material Completions
                   </CardTitle>
                   <CardDescription>
-                    Record of all training materials completed by employees
+                    Record of all learning materials completed by employees
                   </CardDescription>
                 </CardHeader>
                 <CardContent>

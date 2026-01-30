@@ -121,8 +121,8 @@ export default function TakeQuizPage() {
 
       if (!training_status?.materials_complete) {
         toast({
-          title: "Training Incomplete",
-          description: "Complete all training materials before taking the quiz.",
+          title: "Learning Incomplete",
+          description: "Complete all learning materials before taking the quiz.",
           variant: "destructive",
         });
         navigate("/dashboard/quizzes");

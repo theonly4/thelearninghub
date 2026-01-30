@@ -28,13 +28,13 @@ export function CredentialEmailTemplate({
   const loginUrl = `${window.location.origin}/login`;
   
   const emailSubject = isPasswordReset
-    ? "Your HIPAA Learning Hub Password Has Been Reset"
-    : "Welcome to HIPAA Learning Hub - Your Account Credentials";
+    ? "Your The Learning Hub Password Has Been Reset"
+    : "Welcome to The Learning Hub - Your Account Credentials";
   
   const emailBody = isPasswordReset
     ? `Hi ${recipientName},
 
-Your password has been reset for HIPAA Learning Hub${organizationName ? ` (${organizationName})` : ""}.
+Your password has been reset for The Learning Hub${organizationName ? ` (${organizationName})` : ""}.
 
 Please use the following credentials to log in:
 
@@ -52,10 +52,10 @@ After logging in:
 If you did not request this password reset, please contact your administrator immediately.
 
 Best regards,
-HIPAA Learning Hub Team`
+The Learning Hub Team`
     : `Hi ${recipientName},
 
-Welcome to HIPAA Learning Hub${organizationName ? ` - ${organizationName}` : ""}!
+Welcome to The Learning Hub${organizationName ? ` - ${organizationName}` : ""}!
 
 Your account has been created. Please use the following credentials to log in:
 
@@ -69,12 +69,12 @@ After logging in:
 1. You will be prompted to set a new password
 2. Choose a strong password that you haven't used before
 3. Set up Multi-Factor Authentication (MFA) for additional security
-4. Complete your required HIPAA training
+4. Complete your required compliance learning
 
 If you have any questions, please contact your administrator.
 
 Best regards,
-HIPAA Learning Hub Team`;
+The Learning Hub Team`;
 
   const copyEmailTemplate = async () => {
     try {

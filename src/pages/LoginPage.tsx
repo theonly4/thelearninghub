@@ -248,7 +248,7 @@ export default function LoginPage() {
                 {isSignUp ? "Create your account" : "Sign in to your account"}
               </h1>
               <p className="mt-2 text-muted-foreground">
-                Access your HIPAA compliance training portal
+                Access your compliance learning portal
               </p>
             </div>
 

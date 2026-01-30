@@ -100,7 +100,7 @@ Message: ${data.message?.trim() || "N/A"}
 Reply directly to this email to respond to the requester.`;
 
     const emailPayload = {
-      from: "HIPAA Learning Hub <onboarding@resend.dev>",
+      from: "The Learning Hub <onboarding@resend.dev>",
       to: ["yiplawcenter@protonmail.com"],
       reply_to: data.email.trim(),
       subject: `Demo Request from ${data.firstName.trim()} ${data.lastName.trim()}`,

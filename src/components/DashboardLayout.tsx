@@ -24,7 +24,7 @@ interface DashboardLayoutProps {
 const adminNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/admin" },
   { icon: Users, label: "Users", href: "/admin/users" },
-  { icon: BookOpen, label: "Training Library", href: "/admin/training-library" },
+  { icon: BookOpen, label: "Learning Library", href: "/admin/training-library" },
   { icon: BarChart3, label: "Reports", href: "/admin/reports" },
   { icon: HelpCircle, label: "How To Guide", href: "/admin/help" },
 ];
@@ -32,7 +32,7 @@ const adminNavItems = [
 const userNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
   { icon: FileText, label: "My Quizzes", href: "/dashboard/quizzes" },
-  { icon: BookOpen, label: "Training Materials", href: "/dashboard/training" },
+  { icon: BookOpen, label: "Learning Materials", href: "/dashboard/training" },
 ];
 
 export function DashboardLayout({ 

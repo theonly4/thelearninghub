@@ -13,6 +13,8 @@ import ResetPasswordPage from "./pages/ResetPasswordPage";
 import MfaEnrollPage from "./pages/MfaEnrollPage";
 import MfaVerifyPage from "./pages/MfaVerifyPage";
 import DemoPage from "./pages/DemoPage";
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import TermsOfServicePage from "./pages/TermsOfServicePage";
 import AdminDashboard from "./pages/AdminDashboard";
 import UserDashboard from "./pages/UserDashboard";
 import QuizPage from "./pages/QuizPage";
@@ -66,6 +68,8 @@ const App = () => (
             <Route path="/mfa-enroll" element={<MfaEnrollPage />} />
             <Route path="/mfa-verify" element={<MfaVerifyPage />} />
             <Route path="/demo" element={<DemoPage />} />
+            <Route path="/privacy" element={<PrivacyPolicyPage />} />
+            <Route path="/terms" element={<TermsOfServicePage />} />
             <Route path="/pending-setup" element={<PendingSetupPage />} />
             
             {/* Protected Admin Routes */}

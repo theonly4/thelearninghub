@@ -83,7 +83,7 @@ export default function DemoPage() {
             </div>
             <h1 className="mb-4 text-2xl font-bold">Demo Request Received</h1>
             <p className="mb-8 text-muted-foreground">
-              Thank you for your interest in HIPAA Learning Hub. Our team will contact 
+              Thank you for your interest in The Learning Hub. Our team will contact 
               you within 24 hours to schedule your personalized demo.
             </p>
             <Link to="/">
@@ -115,11 +115,11 @@ export default function DemoPage() {
             <div className="flex flex-col justify-center">
               <Logo size="lg" className="mb-8" />
               <h1 className="mb-4 text-3xl font-bold tracking-tight">
-                See HIPAA Learning Hub in Action
+                See The Learning Hub in Action
               </h1>
               <p className="mb-8 text-lg text-muted-foreground">
                 Schedule a personalized demo to see how our platform delivers 
-                OCR-audit defensible HIPAA compliance training.
+                audit-defensible compliance learning.
               </p>
 
               <div className="space-y-6">
@@ -130,7 +130,7 @@ export default function DemoPage() {
                   <div>
                     <h3 className="font-semibold">Multi-Tenant Platform</h3>
                     <p className="text-sm text-muted-foreground">
-                      See how organizations manage workforce training with 
+                      See how organizations manage workforce learning with 
                       strict tenant isolation.
                     </p>
                   </div>
@@ -140,9 +140,9 @@ export default function DemoPage() {
                     <Users className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="font-semibold">Role-Based Training</h3>
+                    <h3 className="font-semibold">Role-Based Learning</h3>
                     <p className="text-sm text-muted-foreground">
-                      Explore how quizzes are mapped to workforce groups for 
+                      Explore how learning content is mapped to workforce groups for 
                       regulatory alignment.
                     </p>
                   </div>
@@ -210,7 +210,7 @@ export default function DemoPage() {
                       <SelectItem value="compliance">Compliance Officer</SelectItem>
                       <SelectItem value="privacy">Privacy Officer</SelectItem>
                       <SelectItem value="security">Security Officer</SelectItem>
-                      <SelectItem value="hr">HR / Training Manager</SelectItem>
+                      <SelectItem value="hr">HR / Learning Manager</SelectItem>
                       <SelectItem value="executive">Executive Leadership</SelectItem>
                       <SelectItem value="it">IT Administrator</SelectItem>
                       <SelectItem value="other">Other</SelectItem>
@@ -241,7 +241,7 @@ export default function DemoPage() {
                   <Label htmlFor="message">Additional information (optional)</Label>
                   <Textarea
                     id="message"
-                    placeholder="Tell us about your compliance training needs..."
+                    placeholder="Tell us about your compliance learning needs..."
                     value={formData.message}
                     onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                     rows={3}

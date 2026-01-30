@@ -64,7 +64,7 @@ export default function PackageManagerPage() {
   usePageMeta({
     title: "Question Packages | Platform Owner",
     description:
-      "Create and manage 25-question HIPAA training question packages by workforce group.",
+      "Create and manage 25-question compliance learning question packages by workforce group.",
     canonicalPath: "/platform/packages",
   });
 

@@ -33,7 +33,7 @@ export function ProgressIndicator({
   const steps: ProgressStep[] = [
     {
       id: "materials",
-      label: "Training Materials",
+      label: "Learning Materials",
       status: materialsComplete ? "complete" : "current",
       icon: "materials",
     },
