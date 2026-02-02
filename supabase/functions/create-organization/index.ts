@@ -318,11 +318,11 @@ Deno.serve(async (req) => {
 
     // Step 7: Send welcome email to the new admin
     try {
-      await fetch(`${supabaseUrl}/functions/v1/send-welcome-email`, {
+      const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-welcome-email`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${supabaseServiceKey}`,
+          "Authorization": authHeader,
         },
         body: JSON.stringify({
           recipientName: `${adminFirstName} ${adminLastName}`,
@@ -333,7 +333,12 @@ Deno.serve(async (req) => {
           isPasswordReset: false,
         }),
       });
-      console.log("Welcome email sent to admin:", adminEmail);
+      if (!emailResponse.ok) {
+        const errorText = await emailResponse.text();
+        console.error("Welcome email failed:", emailResponse.status, errorText);
+      } else {
+        console.log("Welcome email sent to admin:", adminEmail);
+      }
     } catch (emailError) {
       console.error("Failed to send admin welcome email:", emailError);
     }
