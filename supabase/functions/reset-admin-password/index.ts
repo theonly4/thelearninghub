@@ -149,11 +149,11 @@ Deno.serve(async (req) => {
           .eq("id", targetProfile.organization_id)
           .single();
 
-        await fetch(`${supabaseUrl}/functions/v1/send-welcome-email`, {
+        const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-welcome-email`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${supabaseServiceKey}`,
+            "Authorization": authHeader,
           },
           body: JSON.stringify({
             recipientName: adminProfile 
@@ -166,7 +166,12 @@ Deno.serve(async (req) => {
             isPasswordReset: true,
           }),
         });
-        console.log("Password reset email sent to:", targetProfile.email);
+        if (!emailResponse.ok) {
+          const errorText = await emailResponse.text();
+          console.error("Password reset email failed:", emailResponse.status, errorText);
+        } else {
+          console.log("Password reset email sent to:", targetProfile.email);
+        }
       } catch (emailError) {
         console.error("Failed to send password reset email:", emailError);
       }

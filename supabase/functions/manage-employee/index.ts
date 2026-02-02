@@ -236,11 +236,11 @@ Deno.serve(async (req) => {
 
       // Send welcome email with credentials
       try {
-        await fetch(`${supabaseUrl}/functions/v1/send-welcome-email`, {
+        const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-welcome-email`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${supabaseServiceKey}`,
+            "Authorization": authHeader,
           },
           body: JSON.stringify({
             recipientName: `${firstName} ${lastName}`,
@@ -251,7 +251,12 @@ Deno.serve(async (req) => {
             isPasswordReset: false,
           }),
         });
-        console.log("Welcome email sent to:", email);
+        if (!emailResponse.ok) {
+          const errorText = await emailResponse.text();
+          console.error("Welcome email failed:", emailResponse.status, errorText);
+        } else {
+          console.log("Welcome email sent to:", email);
+        }
       } catch (emailError) {
         console.error("Failed to send welcome email:", emailError);
         // Don't fail the employee creation if email fails
@@ -331,11 +336,11 @@ Deno.serve(async (req) => {
 
       // Send password reset email
       try {
-        await fetch(`${supabaseUrl}/functions/v1/send-welcome-email`, {
+        const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-welcome-email`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${supabaseServiceKey}`,
+            "Authorization": authHeader,
           },
           body: JSON.stringify({
             recipientName: fullProfile ? `${fullProfile.first_name} ${fullProfile.last_name}` : "Employee",
@@ -346,7 +351,12 @@ Deno.serve(async (req) => {
             isPasswordReset: true,
           }),
         });
-        console.log("Password reset email sent to:", empProfile.email);
+        if (!emailResponse.ok) {
+          const errorText = await emailResponse.text();
+          console.error("Password reset email failed:", emailResponse.status, errorText);
+        } else {
+          console.log("Password reset email sent to:", empProfile.email);
+        }
       } catch (emailError) {
         console.error("Failed to send password reset email:", emailError);
         // Don't fail the password reset if email fails
