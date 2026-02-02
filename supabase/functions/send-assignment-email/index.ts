@@ -125,45 +125,45 @@ const handler = async (req: Request): Promise<Response> => {
     const safeMaterialCount = Number(materialCount) || 0;
 
     const emailPayload = {
-      from: "HIPAA Training <onboarding@resend.dev>",
+      from: "The Learning Hub <support@learninghub.zone>",
       to: [employeeEmail],
-      subject: `New Training Assignment - Due ${formattedDueDate}`,
+      subject: `New Learning Assignment - Due ${formattedDueDate}`,
       html: `
         <!DOCTYPE html>
         <html>
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Training Assignment</title>
+          <title>Learning Assignment</title>
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #1a1a1a; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); border-radius: 12px; padding: 32px; margin-bottom: 24px; text-align: center;">
-            <h1 style="color: white; margin: 0; font-size: 24px;">HIPAA Compliance Training</h1>
+            <h1 style="color: white; margin: 0; font-size: 24px;">The Learning Hub</h1>
             <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;">${safeOrganizationName}</p>
           </div>
           
           <div style="background: #f8fafc; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
             <h2 style="margin: 0 0 16px 0; font-size: 20px; color: #1e3a8a;">Hello ${safeEmployeeName},</h2>
-            <p style="margin: 0 0 16px 0;">You have been assigned new HIPAA compliance training. Please complete the following by <strong>${formattedDueDate}</strong>.</p>
+            <p style="margin: 0 0 16px 0;">You have been assigned new compliance learning. Please complete the following by <strong>${formattedDueDate}</strong>.</p>
             
             <div style="background: white; border-radius: 8px; padding: 16px; margin: 16px 0; border-left: 4px solid #3b82f6;">
               <p style="margin: 0 0 8px 0; font-weight: 600; color: #1e3a8a;">Assignment Details:</p>
               <ul style="margin: 0; padding-left: 20px; color: #4b5563;">
                 <li><strong>Workforce Group:</strong> ${safeWorkforceGroup}</li>
-                <li><strong>Training Materials:</strong> ${safeMaterialCount} module${safeMaterialCount !== 1 ? 's' : ''}</li>
+                <li><strong>Learning Materials:</strong> ${safeMaterialCount} module${safeMaterialCount !== 1 ? 's' : ''}</li>
                 <li><strong>Due Date:</strong> ${formattedDueDate}</li>
               </ul>
             </div>
             
-            <p style="margin: 0;">Please log in to your account to begin your training.</p>
+            <p style="margin: 0;">Please log in to your account to begin your learning.</p>
           </div>
           
           <div style="text-align: center; margin-bottom: 24px;">
-            <a href="${safeLoginUrl}" style="display: inline-block; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">Start Training</a>
+            <a href="${safeLoginUrl}" style="display: inline-block; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">Start Learning</a>
           </div>
           
           <div style="border-top: 1px solid #e5e7eb; padding-top: 16px; text-align: center; font-size: 12px; color: #6b7280;">
-            <p style="margin: 0;">This is an automated message from your organization's HIPAA compliance training system.</p>
+            <p style="margin: 0;">This is an automated message from your organization's compliance learning system.</p>
             <p style="margin: 8px 0 0 0;">If you have questions, please contact your administrator.</p>
           </div>
         </body>
