@@ -180,7 +180,7 @@ const handler = async (req: Request): Promise<Response> => {
     `;
 
     const emailPayload = {
-      from: "The Learning Hub <onboarding@resend.dev>",
+      from: "The Learning Hub <support@learninghub.zone>",
       to: [email],
       subject,
       html: emailHtml,

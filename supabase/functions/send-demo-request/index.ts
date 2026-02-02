@@ -100,8 +100,8 @@ Message: ${data.message?.trim() || "N/A"}
 Reply directly to this email to respond to the requester.`;
 
     const emailPayload = {
-      from: "The Learning Hub <onboarding@resend.dev>",
-      to: ["yiplawcenter@protonmail.com"],
+      from: "The Learning Hub <support@learninghub.zone>",
+      to: ["support@learninghub.zone"],
       reply_to: data.email.trim(),
       subject: `Demo Request from ${data.firstName.trim()} ${data.lastName.trim()}`,
       text: emailBody,

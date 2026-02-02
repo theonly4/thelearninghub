@@ -1,5 +1,6 @@
 import { Logo } from "@/components/Logo";
 import { Link } from "react-router-dom";
+import { NewsletterSignup } from "@/components/NewsletterSignup";
 
 const footerLinks = {
   product: [
@@ -17,7 +18,7 @@ export function Footer() {
       <div className="container px-4 py-12 md:px-6 md:py-16">
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
           {/* Brand Column */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-1">
             <Logo size="md" />
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
               Professional-grade compliance learning platform. 
@@ -26,6 +27,11 @@ export function Footer() {
             <p className="mt-6 text-xs text-muted-foreground">
               © {new Date().getFullYear()} The Learning Hub. All rights reserved.
             </p>
+          </div>
+
+          {/* Newsletter Column */}
+          <div className="lg:col-span-1">
+            <NewsletterSignup />
           </div>
 
           {/* Links Columns */}
