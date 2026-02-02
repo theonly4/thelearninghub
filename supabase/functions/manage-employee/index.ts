@@ -247,7 +247,7 @@ Deno.serve(async (req) => {
             email,
             temporaryPassword: tempPassword,
             organizationName: orgData?.name || "Your Organization",
-            loginUrl: "https://thelearninghub.lovable.app/login",
+            loginUrl: "https://learninghub.zone/login",
             isPasswordReset: false,
           }),
         });
@@ -342,7 +342,7 @@ Deno.serve(async (req) => {
             email: empProfile.email,
             temporaryPassword: newPassword,
             organizationName: orgData?.name || "Your Organization",
-            loginUrl: "https://thelearninghub.lovable.app/login",
+            loginUrl: "https://learninghub.zone/login",
             isPasswordReset: true,
           }),
         });

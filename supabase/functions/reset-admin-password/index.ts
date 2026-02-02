@@ -134,6 +134,42 @@ Deno.serve(async (req) => {
         resource_id: userId,
         metadata: { target_email: targetProfile.email }
       });
+
+      // Send password reset notification email
+      try {
+        const { data: adminProfile } = await supabaseAdmin
+          .from("profiles")
+          .select("first_name, last_name")
+          .eq("user_id", userId)
+          .single();
+
+        const { data: orgData } = await supabaseAdmin
+          .from("organizations")
+          .select("name")
+          .eq("id", targetProfile.organization_id)
+          .single();
+
+        await fetch(`${supabaseUrl}/functions/v1/send-welcome-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({
+            recipientName: adminProfile 
+              ? `${adminProfile.first_name} ${adminProfile.last_name}` 
+              : "Administrator",
+            email: targetProfile.email,
+            temporaryPassword: newPassword,
+            organizationName: orgData?.name || "Your Organization",
+            loginUrl: "https://learninghub.zone/login",
+            isPasswordReset: true,
+          }),
+        });
+        console.log("Password reset email sent to:", targetProfile.email);
+      } catch (emailError) {
+        console.error("Failed to send password reset email:", emailError);
+      }
     }
 
     return new Response(

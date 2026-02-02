@@ -316,6 +316,28 @@ Deno.serve(async (req) => {
 
     console.log("Audit log created");
 
+    // Step 7: Send welcome email to the new admin
+    try {
+      await fetch(`${supabaseUrl}/functions/v1/send-welcome-email`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${supabaseServiceKey}`,
+        },
+        body: JSON.stringify({
+          recipientName: `${adminFirstName} ${adminLastName}`,
+          email: adminEmail,
+          temporaryPassword: adminPassword,
+          organizationName: organizationName,
+          loginUrl: "https://learninghub.zone/login",
+          isPasswordReset: false,
+        }),
+      });
+      console.log("Welcome email sent to admin:", adminEmail);
+    } catch (emailError) {
+      console.error("Failed to send admin welcome email:", emailError);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
