@@ -1,184 +1,211 @@
 
 
-# Plan: Automate Demo Request Submissions
+# Plan: Set Up Resend Email Integration with learninghub.zone
 
 ## Overview
 
-Replace the current `mailto:` link in `DemoPage.tsx` with a server-side Edge Function that automatically sends demo request notifications to the administrator via email using Resend. This eliminates the need for the user's email client and ensures reliable delivery.
+Update the email system to use your verified domain (`learninghub.zone`) and add new functionality for newsletter signups and admin notifications. All emails will be sent from `support@learninghub.zone`.
+
+---
 
 ## Current State
 
-- Demo form at `/demo` collects: first name, last name, email, organization, role, workforce size, and optional message
-- Currently uses `window.location.href = mailto:yiplawcenter@protonmail.com...` which relies on the user's local email client
-- This approach is unreliable as it depends on the user's email client configuration
+| Component | Status | Issue |
+|-----------|--------|-------|
+| RESEND_API_KEY | Configured | May need update with new key |
+| send-welcome-email | Exists | Uses `onboarding@resend.dev` |
+| send-assignment-email | Exists | Uses `onboarding@resend.dev` + "HIPAA" branding |
+| send-demo-request | Exists | Uses `onboarding@resend.dev` |
+| Newsletter signup | Does not exist | Needs to be created |
+| Admin notifications | Partial | Demo requests go to admin, but others don't |
 
-## Proposed Solution
+---
+
+## Implementation Plan
+
+### Step 1: Update RESEND_API_KEY Secret
+
+Your new API key will be securely stored in project secrets (encrypted, not in code).
+
+### Step 2: Update Existing Email Functions
+
+**All 3 functions need the `from` address updated:**
+
+| Function | Current From | Updated From |
+|----------|-------------|--------------|
+| send-welcome-email | `The Learning Hub <onboarding@resend.dev>` | `The Learning Hub <support@learninghub.zone>` |
+| send-assignment-email | `HIPAA Training <onboarding@resend.dev>` | `The Learning Hub <support@learninghub.zone>` |
+| send-demo-request | `The Learning Hub <onboarding@resend.dev>` | `The Learning Hub <support@learninghub.zone>` |
+
+**Additional fixes for send-assignment-email:**
+- Replace "HIPAA Compliance Training" with "The Learning Hub"
+- Replace "HIPAA compliance training" with "compliance learning"
+
+### Step 3: Create Newsletter Signup System
+
+**New database table:** `newsletter_subscribers`
+```text
++------------------------+
+| newsletter_subscribers |
++------------------------+
+| id (uuid, PK)          |
+| email (text, unique)   |
+| created_at             |
+| confirmed_at           |
++------------------------+
+```
+
+**New edge function:** `send-newsletter-welcome`
+- Sends welcome email to new subscribers
+- Notifies admin of new signup
+
+**New UI component:** Newsletter signup form in Footer
+
+### Step 4: Add Admin Notification System
+
+**New edge function:** `send-admin-notification`
+- Centralized function for all admin alerts
+- Sends to `support@learninghub.zone`
+
+**Triggers admin notifications for:**
+1. New newsletter signups
+2. Password reset requests
+3. Demo/contact form submissions
+
+---
+
+## Email Workflows After Implementation
 
 ```text
-+------------------+     +------------------------+     +------------------+
-|   Demo Form      | --> | send-demo-request      | --> | Resend API       |
-|   (DemoPage.tsx) |     | Edge Function          |     | (admin email)    |
-+------------------+     +------------------------+     +------------------+
+NEW ACCOUNT CREATED
+Admin creates employee → manage-employee → send-welcome-email
+                                          (from: support@learninghub.zone)
+                                                    ↓
+                                          Employee receives credentials
+
+TRAINING ASSIGNED  
+Admin assigns training → TrainingAssignmentDialog → send-assignment-email
+                                                    (from: support@learninghub.zone)
+                                                              ↓
+                                                    Employee receives notification
+
+NEWSLETTER SIGNUP
+User submits email → send-newsletter-welcome → User receives welcome email
+                                             → Admin receives notification at support@
+
+DEMO REQUEST
+User submits form → send-demo-request → Admin receives demo request at support@
+                                       (from: support@learninghub.zone)
 ```
-
----
-
-## Detailed Steps
-
-### 1. Frontend Changes (`DemoPage.tsx`)
-
-**Modify `handleSubmit` function:**
-- Remove the `window.location.href = mailto:...` line
-- Implement a `fetch` call to the new `send-demo-request` Edge Function
-- **Refinement 1:** Explicitly include `headers: {'Content-Type': 'application/json'}` in the fetch request options so the Edge Function can reliably parse the JSON body
-- Send the form data as a JSON string in the request body
-- Implement loading and error states to provide user feedback
-
-**Updated fetch call structure:**
-```typescript
-const response = await fetch(
-  `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-demo-request`,
-  {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(formData),
-  }
-);
-```
-
-**States to Handle:**
-- `isLoading`: Show "Submitting..." on button, disable form
-- Success: Navigate to existing confirmation screen
-- Error: Show toast with error message
-
-### 2. Backend: Edge Function (`send-demo-request`)
-
-**Location:** `supabase/functions/send-demo-request/index.ts`
-
-**Configuration:** Add to `supabase/config.toml`:
-```toml
-[functions.send-demo-request]
-verify_jwt = false
-```
-
-**Input Validation (Refinement 2):**
-- **Simple validation only** - no `escapeHtml()` or complex HTML escaping since the email is plain text
-- Check for required fields (firstName, lastName, email, organization)
-- Enforce maximum length constraints on text fields
-- Use basic regex for email format validation
-- Return 400 Bad Request if validation fails
-
-**Request Payload:**
-```typescript
-interface DemoRequest {
-  firstName: string;
-  lastName: string;
-  email: string;
-  organization: string;
-  role: string;
-  workforceSize: string;
-  message?: string;
-}
-```
-
-**Email Sending:**
-- Retrieve `RESEND_API_KEY` from environment (already configured)
-- Construct plain text email body using validated form data
-- Send to `yiplawcenter@protonmail.com`
-- Set reply-to as the requester's email for easy follow-up
-
-**Email Format (Simple Text):**
-```
-Subject: Demo Request from [First] [Last]
-
-Demo Request Details
---------------------
-Name: [First Name] [Last Name]
-Email: [Email]
-Organization: [Organization]
-Role: [Role]
-Workforce Size: [Size]
-Message: [Message or N/A]
-
-Reply directly to this email to respond to the requester.
-```
-
-### 3. Security Considerations
-
-- **CORS:** Dynamic origin validation matching existing Edge Function pattern (whitelist Lovable domains, localhost, custom `ALLOWED_ORIGIN`)
-- **API Key Protection:** `RESEND_API_KEY` stored securely in environment, never exposed client-side
-- **Input Validation:** Simple validation (required fields, max length, email regex) prevents malformed data
-- **No JWT Required:** Public endpoint for form submissions
-
----
-
-## Deferred Features
-
-| Item | Reason |
-|------|--------|
-| Requester confirmation email | Future enhancement |
-| `demo_requests` database table | Future CRM functionality |
-| Complex HTML email templates | Start simple, iterate later |
-
----
-
-## Implementation Steps
-
-| Step | Description | Estimate |
-|------|-------------|----------|
-| 1 | Create `send-demo-request` Edge Function with simple validation | 2-3 min |
-| 2 | Add function config to `supabase/config.toml` | 1 min |
-| 3 | Update `DemoPage.tsx` with fetch call and Content-Type header | 2-3 min |
-| 4 | Test end-to-end | 1-2 min |
-| **Total** | | **6-9 min** |
-
-**Estimated Credits:** 2-3 credits
 
 ---
 
 ## Files to Create/Modify
 
-| File | Action |
-|------|--------|
-| `supabase/functions/send-demo-request/index.ts` | Create |
-| `supabase/config.toml` | Modify (add function config) |
-| `src/pages/DemoPage.tsx` | Modify (replace mailto with fetch) |
+| File | Action | Description |
+|------|--------|-------------|
+| `supabase/functions/send-welcome-email/index.ts` | Modify | Update from address to support@ |
+| `supabase/functions/send-assignment-email/index.ts` | Modify | Update from address + fix branding |
+| `supabase/functions/send-demo-request/index.ts` | Modify | Update from address + recipient to support@ |
+| `supabase/functions/send-newsletter-welcome/index.ts` | Create | Welcome email for newsletter signups |
+| `supabase/functions/send-admin-notification/index.ts` | Create | Centralized admin alerts |
+| `supabase/config.toml` | Modify | Add new function configs |
+| `src/components/NewsletterSignup.tsx` | Create | Newsletter form component |
+| `src/components/Footer.tsx` | Modify | Add newsletter signup |
+| Database migration | Create | Add newsletter_subscribers table |
 
 ---
 
-## Technical Details
+## Detailed Changes
 
-### Edge Function Validation Logic
-
+### 1. send-welcome-email (Line 183)
 ```typescript
-// Simple validation - no escapeHtml needed for plain text email
-const validateRequest = (data: DemoRequest): string | null => {
-  // Required fields
-  if (!data.firstName?.trim()) return "First name is required";
-  if (!data.lastName?.trim()) return "Last name is required";
-  if (!data.email?.trim()) return "Email is required";
-  if (!data.organization?.trim()) return "Organization is required";
-  
-  // Max length checks
-  if (data.firstName.length > 100) return "First name too long";
-  if (data.lastName.length > 100) return "Last name too long";
-  if (data.email.length > 255) return "Email too long";
-  if (data.organization.length > 200) return "Organization name too long";
-  if (data.message && data.message.length > 2000) return "Message too long";
-  
-  // Basic email regex
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(data.email)) return "Invalid email format";
-  
-  return null; // Valid
-};
+// Before
+from: "The Learning Hub <onboarding@resend.dev>"
+
+// After  
+from: "The Learning Hub <support@learninghub.zone>"
 ```
 
-### Existing Resources Used
+### 2. send-assignment-email (Multiple lines)
+```typescript
+// Line 128: Update from address
+from: "The Learning Hub <support@learninghub.zone>"
 
-- `RESEND_API_KEY` - Already configured in project secrets
-- CORS pattern from `send-assignment-email` Edge Function
-- Existing loading/success states in `DemoPage.tsx`
+// Line 130: Update subject
+subject: `New Learning Assignment - Due ${formattedDueDate}`
+
+// Line 141: Update header
+<h1>The Learning Hub</h1>
+
+// Line 147: Update text
+"You have been assigned new compliance learning..."
+
+// Line 166: Update footer
+"compliance learning system"
+```
+
+### 3. send-demo-request (Lines 103-104)
+```typescript
+// Update from address
+from: "The Learning Hub <support@learninghub.zone>"
+
+// Update recipient (currently yiplawcenter@protonmail.com)
+to: ["support@learninghub.zone"]
+```
+
+### 4. New: send-newsletter-welcome
+- Accept email address
+- Validate email format  
+- Send branded welcome email to subscriber from `support@learninghub.zone`
+- Call send-admin-notification with "new_signup" type
+- Store in newsletter_subscribers table
+
+### 5. New: send-admin-notification
+- Accept notification type and data payload
+- Support types: `new_signup`, `password_reset`, `demo_request`
+- Send formatted email to `support@learninghub.zone`
+- Used by other functions for centralized notifications
+
+### 6. Newsletter UI Component
+- Email input field with submit button
+- Success/error toast messages
+- Placed in Footer component
+
+---
+
+## Security Considerations
+
+1. **API Key Storage**: Stored encrypted in project secrets, never in code
+2. **Email Validation**: All inputs validated before sending
+3. **CORS**: All functions use dynamic origin validation
+4. **No JWT for public forms**: Newsletter and demo requests are public endpoints
+
+---
+
+## Estimated Implementation
+
+| Step | Time Estimate |
+|------|--------------|
+| Update RESEND_API_KEY secret | 1 min |
+| Update 3 existing email functions | 3 min |
+| Create newsletter_subscribers table | 1 min |
+| Create send-newsletter-welcome function | 3 min |
+| Create send-admin-notification function | 3 min |
+| Create NewsletterSignup component | 2 min |
+| Update Footer with newsletter | 1 min |
+| Update config.toml | 1 min |
+| **Total** | **~15 min** |
+
+**Estimated Credits:** 3-4 credits
+
+---
+
+## Testing Recommendations
+
+After implementation:
+1. Create a test employee account → verify welcome email arrives from support@learninghub.zone
+2. Submit newsletter signup → verify welcome email and admin notification
+3. Submit demo request → verify admin receives notification at support@learninghub.zone
+4. Assign training to employee → verify assignment email with correct branding
 
