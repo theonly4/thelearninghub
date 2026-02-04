@@ -36,6 +36,9 @@ interface ReleasedPackageResponse {
     package_name: string;
     workforce_group: string;
     training_year: number;
+    passing_score: number;
+    max_attempts: number | null;
+    attempts_used: number;
   } | null;
   questions: QuestionPublic[];
   training_status: {
@@ -163,6 +166,8 @@ async function handleReleasedPackageForUser(
         package_id,
         workforce_group,
         training_year,
+        passing_score_override,
+        max_attempts,
         question_packages (
           name
         )
@@ -284,12 +289,26 @@ async function handleReleasedPackageForUser(
         .sort((a: any, b: any) => a.question_number - b.question_number);
     }
 
+    // 7. Count previous quiz attempts for this user + package
+    const { count: attemptsCount } = await adminClient
+      .from("quiz_attempts")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("quiz_id", packageRelease.package_id);
+
+    const attemptsUsed = attemptsCount || 0;
+    const passingScore = packageRelease.passing_score_override || 80;
+    const maxAttempts = packageRelease.max_attempts || null;
+
     const response: ReleasedPackageResponse = {
       package: {
         package_id: packageRelease.package_id,
         package_name: (packageRelease.question_packages as any)?.name || "HIPAA Assessment",
         workforce_group: packageRelease.workforce_group,
         training_year: packageRelease.training_year,
+        passing_score: passingScore,
+        max_attempts: maxAttempts,
+        attempts_used: attemptsUsed,
       },
       questions,
       training_status: {
@@ -299,7 +318,7 @@ async function handleReleasedPackageForUser(
       },
     };
 
-    console.log(`Returned released package for user ${userId}: ${response.package?.package_id || 'none'}`);
+    console.log(`Returned released package for user ${userId}: ${response.package?.package_id || 'none'}, attempts: ${attemptsUsed}/${maxAttempts || 'unlimited'}`);
 
     return new Response(
       JSON.stringify(response),

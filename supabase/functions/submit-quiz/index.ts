@@ -103,6 +103,7 @@ serve(async (req) => {
 
     let quizTitle = "HIPAA Assessment";
     let passingScore = 80;
+    let maxAttempts: number | null = null;
     let hipaa_citations: string[] = [];
     let questions: { id: string; question_number: number; question_text: string; options: { label: string; text: string }[]; correct_answer: string; hipaa_section: string; rationale: string }[] = [];
     let quizIdForRecord: string;
@@ -127,6 +128,43 @@ serve(async (req) => {
       }
 
       quizTitle = packageData.name;
+
+      // Fetch package release for this org to get passing_score_override and max_attempts
+      const { data: packageRelease } = await supabaseAdmin
+        .from('package_releases')
+        .select('passing_score_override, max_attempts')
+        .eq('package_id', packageId)
+        .eq('organization_id', profile.organization_id)
+        .single();
+
+      if (packageRelease) {
+        if (packageRelease.passing_score_override) {
+          passingScore = packageRelease.passing_score_override;
+        }
+        maxAttempts = packageRelease.max_attempts;
+      }
+
+      // Check max attempts if configured
+      if (maxAttempts !== null) {
+        const { count: existingAttempts } = await supabaseAdmin
+          .from('quiz_attempts')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('quiz_id', packageId);
+
+        if (existingAttempts !== null && existingAttempts >= maxAttempts) {
+          console.log(`User ${user.id} has reached max attempts (${existingAttempts}/${maxAttempts}) for package ${packageId}`);
+          return new Response(
+            JSON.stringify({ 
+              error: 'Maximum attempts reached', 
+              message: 'You have used all available attempts for this quiz. Please contact your administrator for assistance.',
+              attempts_used: existingAttempts,
+              max_attempts: maxAttempts
+            }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
 
       // Check if a quizzes record already exists for this package
       const { data: existingQuiz, error: quizCheckError } = await supabaseAdmin

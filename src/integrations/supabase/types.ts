@@ -268,9 +268,11 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          max_attempts: number | null
           notes: string | null
           organization_id: string
           package_id: string
+          passing_score_override: number | null
           released_at: string
           released_by: string
           training_year: number
@@ -279,9 +281,11 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          max_attempts?: number | null
           notes?: string | null
           organization_id: string
           package_id: string
+          passing_score_override?: number | null
           released_at?: string
           released_by: string
           training_year: number
@@ -290,9 +294,11 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          max_attempts?: number | null
           notes?: string | null
           organization_id?: string
           package_id?: string
+          passing_score_override?: number | null
           released_at?: string
           released_by?: string
           training_year?: number

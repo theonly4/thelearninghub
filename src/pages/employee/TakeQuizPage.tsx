@@ -65,6 +65,9 @@ interface PackageData {
   package_name: string;
   workforce_group: WorkforceGroup;
   training_year: number;
+  passing_score: number;
+  max_attempts: number | null;
+  attempts_used: number;
 }
 
 export default function TakeQuizPage() {
@@ -83,6 +86,7 @@ export default function TakeQuizPage() {
   const [questionStartTime, setQuestionStartTime] = useState(Date.now());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serverResult, setServerResult] = useState<QuizResult | null>(null);
+  const [maxAttemptsReached, setMaxAttemptsReached] = useState(false);
 
   useEffect(() => {
     fetchQuizData();
@@ -134,7 +138,16 @@ export default function TakeQuizPage() {
         package_name: pkg.package_name,
         workforce_group: pkg.workforce_group as WorkforceGroup,
         training_year: pkg.training_year,
+        passing_score: pkg.passing_score || 80,
+        max_attempts: pkg.max_attempts || null,
+        attempts_used: pkg.attempts_used || 0,
       });
+      
+      // Check if max attempts reached
+      if (pkg.max_attempts && pkg.attempts_used >= pkg.max_attempts) {
+        setMaxAttemptsReached(true);
+      }
+      
       setQuestions(qs || []);
       setQuestionStartTime(Date.now());
     } catch (error) {
@@ -317,6 +330,46 @@ export default function TakeQuizPage() {
     );
   }
 
+  // Show max attempts reached screen
+  if (maxAttemptsReached && packageData) {
+    return (
+      <DashboardLayout userRole="workforce_user" userName={fullName || "User"}>
+        <div className="mx-auto max-w-2xl space-y-6">
+          <div className="text-center">
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+              <AlertCircle className="h-10 w-10" />
+            </div>
+            <h1 className="text-2xl font-bold">Maximum Attempts Reached</h1>
+            <p className="mt-2 text-muted-foreground">
+              You have used all {packageData.max_attempts} attempts for this quiz.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-6 text-center">
+            <p className="text-sm text-muted-foreground mb-2">Attempts Used</p>
+            <p className="text-3xl font-bold text-destructive">
+              {packageData.attempts_used} / {packageData.max_attempts}
+            </p>
+          </div>
+
+          <div className="rounded-xl border-2 border-muted bg-muted/30 p-6 text-center">
+            <AlertTriangle className="h-8 w-8 text-warning mx-auto mb-3" />
+            <h3 className="font-semibold mb-2">Need More Attempts?</h3>
+            <p className="text-sm text-muted-foreground">
+              Please contact your organization administrator to request additional attempts or assistance with your training requirements.
+            </p>
+          </div>
+
+          <div className="flex justify-center">
+            <Button variant="outline" onClick={() => navigate("/dashboard/quizzes")}>
+              Return to Quizzes
+            </Button>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   if (isSubmitting) {
     return (
       <DashboardLayout userRole="workforce_user" userName={fullName || "User"}>
@@ -376,16 +429,26 @@ export default function TakeQuizPage() {
                 <div>
                   <h3 className="font-semibold text-lg mb-1">Don't Give Up!</h3>
                   <p className="text-muted-foreground mb-4 max-w-md">
-                    Review the materials below and try again. You can retake this quiz unlimited times until you pass.
+                    Review the materials below and try again. 
+                    {packageData?.max_attempts 
+                      ? ` You have ${packageData.max_attempts - (packageData.attempts_used + 1)} attempts remaining.`
+                      : ' You can retake this quiz until you pass.'}
                   </p>
-                  <Button 
-                    size="lg" 
-                    className="gap-2"
-                    onClick={handleRetakeQuiz}
-                  >
-                    <RotateCcw className="h-5 w-5" />
-                    Retake Quiz Now
-                  </Button>
+                  {(!packageData?.max_attempts || (packageData.attempts_used + 1) < packageData.max_attempts) && (
+                    <Button 
+                      size="lg" 
+                      className="gap-2"
+                      onClick={handleRetakeQuiz}
+                    >
+                      <RotateCcw className="h-5 w-5" />
+                      Retake Quiz Now
+                    </Button>
+                  )}
+                  {packageData?.max_attempts && (packageData.attempts_used + 1) >= packageData.max_attempts && (
+                    <p className="text-sm text-destructive font-medium">
+                      You have used all available attempts. Contact your administrator for assistance.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -491,11 +554,21 @@ export default function TakeQuizPage() {
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <h1 className="text-xl font-bold">{packageData.package_name}</h1>
-            <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3">
               <WorkforceGroupBadge group={packageData.workforce_group} size="sm" />
               <span className="text-sm text-muted-foreground">
                 {packageData.training_year} Training Year
               </span>
+            </div>
+            <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+              <span className="bg-muted px-2 py-1 rounded">
+                Pass: {packageData.passing_score}%
+              </span>
+              {packageData.max_attempts && (
+                <span className="bg-muted px-2 py-1 rounded">
+                  Attempt {packageData.attempts_used + 1} of {packageData.max_attempts}
+                </span>
+              )}
             </div>
           </div>
           <div className="text-right">
