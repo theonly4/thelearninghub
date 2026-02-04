@@ -34,6 +34,8 @@ interface QuizPackage {
   workforce_group: WorkforceGroup;
   training_year: number;
   question_count: number;
+  passing_score_override: number | null;
+  max_attempts: number | null;
 }
 
 export default function TrainingLibraryPage() {
@@ -95,6 +97,8 @@ export default function TrainingLibraryPage() {
           package_id,
           workforce_group,
           training_year,
+          passing_score_override,
+          max_attempts,
           question_packages (id, name, description)
         `)
         .eq("organization_id", profile.organization_id);
@@ -120,6 +124,8 @@ export default function TrainingLibraryPage() {
             workforce_group: pr.workforce_group as WorkforceGroup,
             training_year: pr.training_year,
             question_count: countMap[pr.package_id] || 0,
+            passing_score_override: pr.passing_score_override,
+            max_attempts: pr.max_attempts,
           }))
         );
       }
@@ -302,12 +308,20 @@ export default function TrainingLibraryPage() {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between mb-3">
                         <Badge variant="secondary">
                           {WORKFORCE_GROUP_LABELS[pkg.workforce_group]}
                         </Badge>
                         <span className="text-sm text-muted-foreground">
                           {pkg.question_count} questions
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span className="bg-muted px-2 py-1 rounded">
+                          Pass: {pkg.passing_score_override || 80}%
+                        </span>
+                        <span className="bg-muted px-2 py-1 rounded">
+                          {pkg.max_attempts ? `${pkg.max_attempts} attempts` : "Unlimited"}
                         </span>
                       </div>
                     </CardContent>

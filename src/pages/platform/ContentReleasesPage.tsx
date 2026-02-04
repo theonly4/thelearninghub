@@ -38,6 +38,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { 
   Send, 
   Building2, 
@@ -78,6 +79,8 @@ interface PackageRelease {
   notes: string | null;
   package_name?: string;
   package_description?: string;
+  passing_score_override?: number | null;
+  max_attempts?: number | null;
 }
 
 interface QuestionPackage {
@@ -133,7 +136,7 @@ export default function ContentReleasesPage() {
         supabase.from("content_releases").select("*").order("released_at", { ascending: false }),
         supabase
           .from("package_releases")
-          .select("id, package_id, organization_id, workforce_group, training_year, released_at, notes, question_packages(name)")
+          .select("id, package_id, organization_id, workforce_group, training_year, released_at, notes, passing_score_override, max_attempts, question_packages(name)")
           .order("released_at", { ascending: false }),
         supabase.from("question_packages").select("id, name, workforce_group, sequence_number").order("workforce_group").order("sequence_number"),
         supabase.from("training_materials").select("id, title, sequence_number, workforce_groups").order("sequence_number"),
@@ -158,6 +161,8 @@ export default function ContentReleasesPage() {
         released_at: pr.released_at,
         notes: pr.notes,
         package_name: pr.question_packages?.name || "Unknown Package",
+        passing_score_override: pr.passing_score_override,
+        max_attempts: pr.max_attempts,
       }));
       setPackageReleases(mappedPackageReleases);
       
@@ -365,10 +370,17 @@ export default function ContentReleasesPage() {
                       </TableCell>
                       <TableCell>{getOrgName(release.organization_id)}</TableCell>
                       <TableCell>
-                        <div className="text-sm text-muted-foreground">
-                          <span className="capitalize">{release.workforce_group.replace("_", " ")}</span>
-                          <span className="mx-1">•</span>
-                          <span>{release.training_year}</span>
+                        <div className="text-sm text-muted-foreground space-y-0.5">
+                          <div>
+                            <span className="capitalize">{release.workforce_group.replace("_", " ")}</span>
+                            <span className="mx-1">•</span>
+                            <span>{release.training_year}</span>
+                          </div>
+                          <div className="text-xs">
+                            {release.passing_score_override ? `${release.passing_score_override}% pass` : "80% pass"}
+                            <span className="mx-1">•</span>
+                            {release.max_attempts ? `${release.max_attempts} attempts` : "Unlimited"}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -523,6 +535,8 @@ function UnifiedReleaseForm({
   const [selectedMaterials, setSelectedMaterials] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [passingScore, setPassingScore] = useState<number | "">("");
+  const [maxAttempts, setMaxAttempts] = useState<number | "">("");
 
   // Filter packages by workforce group
   const filteredPackages = workforceGroup
@@ -611,6 +625,8 @@ function UnifiedReleaseForm({
               training_year: trainingYear,
               released_by: userData.user.id,
               notes: notes || null,
+              passing_score_override: passingScore || null,
+              max_attempts: maxAttempts || null,
             });
           }
         }
@@ -893,6 +909,51 @@ function UnifiedReleaseForm({
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Quiz Settings */}
+        {selectedPackage && (
+          <div className="space-y-3 rounded-md border border-border p-4 bg-muted/30">
+            <div className="flex items-center gap-2">
+              <Package className="h-4 w-4 text-primary" />
+              <Label className="text-sm font-medium">Quiz Settings (Optional)</Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Configure passing requirements for this organization. Leave blank for defaults.
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="passing-score" className="text-xs">
+                  Passing Score (%)
+                </Label>
+                <Input
+                  id="passing-score"
+                  type="number"
+                  min={50}
+                  max={100}
+                  placeholder="80"
+                  value={passingScore}
+                  onChange={(e) => setPassingScore(e.target.value ? parseInt(e.target.value) : "")}
+                />
+                <p className="text-xs text-muted-foreground">Default: 80%</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="max-attempts" className="text-xs">
+                  Max Attempts
+                </Label>
+                <Input
+                  id="max-attempts"
+                  type="number"
+                  min={1}
+                  max={10}
+                  placeholder="Unlimited"
+                  value={maxAttempts}
+                  onChange={(e) => setMaxAttempts(e.target.value ? parseInt(e.target.value) : "")}
+                />
+                <p className="text-xs text-muted-foreground">Default: Unlimited</p>
+              </div>
+            </div>
           </div>
         )}
 
