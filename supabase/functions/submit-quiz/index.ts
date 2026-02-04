@@ -104,7 +104,7 @@ serve(async (req) => {
     let quizTitle = "HIPAA Assessment";
     let passingScore = 80;
     let hipaa_citations: string[] = [];
-    let questions: { id: string; question_number: number; question_text: string; options: { label: string; text: string }[]; correct_answer: string; hipaa_section: string }[] = [];
+    let questions: { id: string; question_number: number; question_text: string; options: { label: string; text: string }[]; correct_answer: string; hipaa_section: string; rationale: string }[] = [];
     let quizIdForRecord: string;
 
     // Handle package-based submission (new flow)
@@ -187,10 +187,10 @@ serve(async (req) => {
 
       const questionIds = packageQuestions.map(pq => pq.question_id);
 
-      // Fetch question details with correct answers AND question text for audit trail
+      // Fetch question details with correct answers, rationale, AND question text for audit trail
       const { data: questionsData, error: questionsError } = await supabaseAdmin
         .from('quiz_questions')
-        .select('id, question_number, question_text, options, correct_answer, hipaa_section')
+        .select('id, question_number, question_text, options, correct_answer, hipaa_section, rationale')
         .in('id', questionIds)
         .order('question_number', { ascending: true });
 
@@ -231,10 +231,10 @@ serve(async (req) => {
       hipaa_citations = quiz.hipaa_citations || [];
       quizIdForRecord = quizId;
 
-      // Fetch quiz questions from database with correct answers AND question text
+      // Fetch quiz questions from database with correct answers, rationale, AND question text
       const { data: questionsData, error: questionsError } = await supabaseAdmin
         .from('quiz_questions')
-        .select('id, question_number, question_text, options, correct_answer, hipaa_section')
+        .select('id, question_number, question_text, options, correct_answer, hipaa_section, rationale')
         .eq('quiz_id', quizId)
         .order('question_number', { ascending: true });
 
@@ -296,7 +296,8 @@ serve(async (req) => {
         correct_option_letter: question.correct_answer,
         is_correct: isCorrect,
         timeSpent: answer.timeSpent,
-        hipaaSection: question.hipaa_section
+        hipaaSection: question.hipaa_section,
+        rationale: question.rationale
       });
     }
 
@@ -414,7 +415,9 @@ serve(async (req) => {
         gradedAnswers: gradedAnswers.map(a => ({
           questionId: a.questionId,
           is_correct: a.is_correct,
-          hipaaSection: a.hipaaSection
+          correct_answer: a.correct_answer,
+          hipaaSection: a.hipaaSection,
+          rationale: a.rationale
         }))
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -23,8 +23,8 @@ interface QuestionPublic {
   scenario: string | null;
   question_text: string;
   options: { label: string; text: string }[];
-  // correct_answer is intentionally excluded - answers are only revealed after quiz submission via submit-quiz edge function
-  rationale: string;
+  // correct_answer is intentionally excluded - answers are only revealed after quiz submission
+  // rationale is intentionally excluded - revealed only after user answers each question
   hipaa_section: string;
   hipaa_topic_id: string | null;
   workforce_groups: string[];
@@ -257,7 +257,6 @@ async function handleReleasedPackageForUser(
           scenario,
           question_text,
           options,
-          rationale,
           hipaa_section,
           hipaa_topic_id,
           workforce_groups
@@ -277,8 +276,7 @@ async function handleReleasedPackageForUser(
           scenario: q.scenario,
           question_text: q.question_text,
           options: q.options,
-          // correct_answer intentionally excluded - revealed only after quiz submission
-          rationale: q.rationale,
+          // correct_answer and rationale intentionally excluded - revealed only after quiz submission
           hipaa_section: q.hipaa_section,
           hipaa_topic_id: q.hipaa_topic_id,
           workforce_groups: q.workforce_groups,
@@ -333,7 +331,7 @@ async function handleGetQuestionsByIds(
     );
   }
 
-  // Fetch questions - explicitly exclude correct_answer
+  // Fetch questions - explicitly exclude correct_answer and rationale
   const { data: questions, error: questionsError } = await adminClient
     .from("quiz_questions")
     .select(`
@@ -343,7 +341,6 @@ async function handleGetQuestionsByIds(
       scenario,
       question_text,
       options,
-      rationale,
       hipaa_section,
       hipaa_topic_id,
       workforce_groups
@@ -367,7 +364,7 @@ async function handleGetQuestionsByIds(
     );
   }
 
-  // Map to public format without correct_answer
+  // Map to public format without correct_answer and rationale
   const publicQuestions: QuestionPublic[] = filteredQuestions.map((q: any) => ({
     id: q.id,
     quiz_id: q.quiz_id,
@@ -375,7 +372,7 @@ async function handleGetQuestionsByIds(
     scenario: q.scenario,
     question_text: q.question_text,
     options: q.options,
-    rationale: q.rationale,
+    // correct_answer and rationale excluded - revealed only after quiz submission
     hipaa_section: q.hipaa_section,
     hipaa_topic_id: q.hipaa_topic_id,
     workforce_groups: q.workforce_groups,
