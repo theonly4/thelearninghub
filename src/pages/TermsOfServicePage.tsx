@@ -56,7 +56,7 @@ export default function TermsOfServicePage() {
             <strong>Renewal Notifications:</strong> We will send email reminders at least 3 days before each monthly renewal to the email address on file.
           </p>
           <p>
-            <strong>Cancellation:</strong> You can cancel anytime with no minimum commitment required. To cancel, email us at learninghubsupport@proton.me. When you cancel, access to the Service ends at the end of your current billing period. No refunds are provided for partial months or unused time.
+            <strong>Cancellation:</strong> You can cancel anytime with no minimum commitment required. To cancel, email us at support@learninghub.zone. When you cancel, access to the Service ends at the end of your current billing period. No refunds are provided for partial months or unused time.
           </p>
 
           <h3>Important Washington State Requirement</h3>
@@ -144,7 +144,7 @@ export default function TermsOfServicePage() {
             <strong>California and Other State Privacy Rights:</strong> We do not sell personal information to third parties. California residents have additional rights under the California Consumer Privacy Act (CCPA), Colorado residents under the Colorado Privacy Act (CPA), and Washington residents under Washington state privacy laws. See our Privacy Policy for complete details on your rights.
           </p>
           <p>
-            To exercise any privacy rights or request information about your data, contact us at learninghubsupport@proton.me.
+            To exercise any privacy rights or request information about your data, contact us at support@learninghub.zone.
           </p>
 
           <h2>8. Payment Terms</h2>
@@ -153,7 +153,7 @@ export default function TermsOfServicePage() {
             All payments are processed securely through Stripe, Inc. ("Stripe"), our third-party payment processor. We never receive or store your credit card information. Stripe's terms and conditions also apply to your payment (available at stripe.com).
           </p>
           <p>
-            For billing inquiries or subscription questions, contact us at learninghubsupport@proton.me. For payment processing issues such as declined cards or fraud alerts, contact Stripe at stripe.com/support.
+            For billing inquiries or subscription questions, contact us at support@learninghub.zone. For payment processing issues such as declined cards or fraud alerts, contact Stripe at stripe.com/support.
           </p>
 
           <h3>Monthly Charges</h3>
@@ -288,7 +288,7 @@ export default function TermsOfServicePage() {
 
           <h3>Dispute Resolution</h3>
           <p>
-            Before filing a lawsuit, you must contact us at learninghubsupport@proton.me to try to resolve the dispute informally. We'll try to resolve it within 60 days. If we can't resolve it informally, either party may proceed with legal action in the courts specified above.
+            Before filing a lawsuit, you must contact us at support@learninghub.zone to try to resolve the dispute informally. We'll try to resolve it within 60 days. If we can't resolve it informally, either party may proceed with legal action in the courts specified above.
           </p>
 
           <h3>Waiver</h3>
@@ -317,7 +317,7 @@ export default function TermsOfServicePage() {
 
           <h2>16. Contact Us</h2>
           <p>If you have questions about these Terms, please contact us:</p>
-          <p>Email: learninghubsupport@proton.me</p>
+          <p>Email: support@learninghub.zone</p>
           <p>Business Hours: 9:00 AM to 4:00 PM Pacific Standard Time</p>
 
           <h2>Acknowledgment</h2>

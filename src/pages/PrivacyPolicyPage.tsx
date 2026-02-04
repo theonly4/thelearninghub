@@ -36,7 +36,7 @@ export default function PrivacyPolicyPage() {
           </ul>
           <p>Contact details:</p>
           <ul>
-            <li>Email: learninghubsupport@proton.me</li>
+            <li>Email: support@learninghub.zone</li>
           </ul>
 
           <h2>2. What Information We Collect</h2>
@@ -203,7 +203,7 @@ export default function PrivacyPolicyPage() {
           <p>You may authorize an agent to submit requests on your behalf. We may require verification of the agent's authority to act on your behalf.</p>
 
           <h3>How to Exercise Your Rights</h3>
-          <p>To exercise any of these rights, please contact us at: learninghubsupport@proton.me and tell us:</p>
+          <p>To exercise any of these rights, please contact us at: support@learninghub.zone and tell us:</p>
           <ul>
             <li>What you are asking for (for example, access, correction, deletion)</li>
             <li>The country or state where you live</li>
@@ -248,7 +248,7 @@ export default function PrivacyPolicyPage() {
 
           <h2>Questions or concerns?</h2>
           <p>
-            If you have any questions about this Privacy Statement or how we handle your personal information, please contact us at: learninghubsupport@proton.me.
+            If you have any questions about this Privacy Statement or how we handle your personal information, please contact us at: support@learninghub.zone.
           </p>
         </article>
       </main>
