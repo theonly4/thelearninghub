@@ -265,10 +265,10 @@ export function SingleEmployeeAssignmentDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <BookOpen className="h-5 w-5" />
-            Assign Training
+            Assign Learning
           </DialogTitle>
           <DialogDescription>
-            Assign training to {employee.first_name} {employee.last_name}
+            Assign learning to {employee.first_name} {employee.last_name}
           </DialogDescription>
         </DialogHeader>
 
@@ -298,7 +298,7 @@ export function SingleEmployeeAssignmentDialog({
                   <p className="text-sm font-medium">No Content Released</p>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  No training materials or quiz packages have been released for this employee's workforce groups. Contact your platform administrator.
+                  No learning materials or quiz packages have been released for this employee's workforce groups. Contact your platform administrator.
                 </p>
               </div>
             )}
@@ -394,7 +394,7 @@ export function SingleEmployeeAssignmentDialog({
             onClick={handleAssign}
             disabled={loading || !dueDate || !hasReleasedContent || loadingData}
           >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Assign Training"}
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Assign Learning"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -24,7 +24,7 @@ export default function AdminHelpGuidePage() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">How To Guide</h1>
           <p className="text-muted-foreground mt-1">
-            Step-by-step instructions for managing your organization's training
+            Step-by-step instructions for managing your organization's learning
           </p>
         </div>
 
@@ -36,14 +36,14 @@ export default function AdminHelpGuidePage() {
               Getting Started Overview
             </CardTitle>
             <CardDescription>
-              The basic workflow for managing employee training
+              The basic workflow for managing employee learning
             </CardDescription>
           </CardHeader>
           <CardContent>
             <ol className="space-y-3 text-sm">
               <li className="flex items-start gap-3">
                 <Badge variant="outline" className="mt-0.5">1</Badge>
-                <span><strong>Add Employees</strong> - Create accounts for your staff members on the training platform</span>
+                <span><strong>Add Employees</strong> - Create accounts for your staff members on the learning platform</span>
               </li>
               <li className="flex items-start gap-3">
                 <Badge variant="outline" className="mt-0.5">2</Badge>
@@ -51,11 +51,11 @@ export default function AdminHelpGuidePage() {
               </li>
               <li className="flex items-start gap-3">
                 <Badge variant="outline" className="mt-0.5">3</Badge>
-                <span><strong>Assign Training with Deadline</strong> - Set a completion deadline for individual employees</span>
+                <span><strong>Assign Learning with Deadline</strong> - Set a completion deadline for individual employees</span>
               </li>
               <li className="flex items-start gap-3">
                 <Badge variant="outline" className="mt-0.5">4</Badge>
-                <span><strong>Monitor Progress</strong> - Track who has completed their training and met deadlines</span>
+                <span><strong>Monitor Progress</strong> - Track who has completed their learning and met deadlines</span>
               </li>
               <li className="flex items-start gap-3">
                 <Badge variant="outline" className="mt-0.5">5</Badge>
@@ -114,15 +114,15 @@ export default function AdminHelpGuidePage() {
                   <ol className="space-y-2 text-muted-foreground">
                     <li>1. Find the employee in the Users list</li>
                     <li>2. Click the <strong>trash icon</strong> in the Actions column</li>
-                    <li>3. Confirm the deletion - this permanently removes the employee and all their training records</li>
+                    <li>3. Confirm the deletion - this permanently removes the employee and all their learning records</li>
                   </ol>
                 </div>
                 
                 <div>
                   <h4 className="font-medium mb-2">Employee Status Types</h4>
                   <ul className="space-y-2 text-muted-foreground">
-                    <li><strong>Pending</strong> - Employee has been created but has not yet logged in or been assigned training</li>
-                    <li><strong>Active</strong> - Employee can access training materials and take quizzes</li>
+                    <li><strong>Pending</strong> - Employee has been created but has not yet logged in or been assigned learning</li>
+                    <li><strong>Active</strong> - Employee can access learning materials and take quizzes</li>
                     <li><strong>Suspended</strong> - Account is temporarily disabled</li>
                   </ul>
                 </div>
@@ -205,7 +205,7 @@ export default function AdminHelpGuidePage() {
                   <BarChart3 className="h-5 w-5 text-primary" />
                 </div>
                 <div className="text-left">
-                  <p className="font-medium">How to Monitor Training Progress</p>
+                  <p className="font-medium">How to Monitor Learning Progress</p>
                   <p className="text-sm text-muted-foreground font-normal">Track employee completion status</p>
                 </div>
               </div>
@@ -215,16 +215,16 @@ export default function AdminHelpGuidePage() {
                 <div>
                   <h4 className="font-medium mb-2">Dashboard Overview</h4>
                   <p className="text-muted-foreground">
-                    Your main dashboard shows a summary of your organization's training compliance, including how many employees have completed their training and overall pass rates.
+                    Your main dashboard shows a summary of your organization's learning compliance, including how many employees have completed their learning and overall pass rates.
                   </p>
                 </div>
                 
                   <div>
                     <h4 className="font-medium mb-2">What You Can Track</h4>
                     <ul className="space-y-2 text-muted-foreground">
-                      <li><strong>Completion Rate</strong> - Percentage of employees who have finished all required training</li>
+                      <li><strong>Completion Rate</strong> - Percentage of employees who have finished all required learning</li>
                       <li><strong>Quiz Scores</strong> - Average scores and individual results for each quiz</li>
-                      <li><strong>Training Materials</strong> - Which educational content has been read</li>
+                      <li><strong>Learning Materials</strong> - Which educational content has been read</li>
                     </ul>
                   </div>
 
@@ -233,7 +233,7 @@ export default function AdminHelpGuidePage() {
                   <ol className="space-y-2 text-muted-foreground">
                     <li>1. Go to <strong>Users</strong> in the left menu</li>
                     <li>2. Find the employee you want to review</li>
-                    <li>3. Click on their name to see their detailed training history</li>
+                    <li>3. Click on their name to see their detailed learning history</li>
                     <li>4. View their quiz attempts, scores, and completion dates</li>
                   </ol>
                 </div>
@@ -259,7 +259,7 @@ export default function AdminHelpGuidePage() {
                 <div>
                   <h4 className="font-medium mb-2">What is Workforce Analysis?</h4>
                   <p className="text-muted-foreground">
-                    The workforce analysis feature uses artificial intelligence to review your organization's training data and identify patterns, risks, and recommendations for improvement.
+                    The workforce analysis feature uses artificial intelligence to review your organization's learning data and identify patterns, risks, and recommendations for improvement.
                   </p>
                 </div>
                 
@@ -278,7 +278,7 @@ export default function AdminHelpGuidePage() {
                   <h4 className="font-medium mb-2">What the Analysis Shows</h4>
                   <ul className="space-y-2 text-muted-foreground">
                     <li><strong>Risk Areas</strong> - HIPAA topics where employees are struggling</li>
-                    <li><strong>Training Gaps</strong> - Employees who have not completed required training</li>
+                    <li><strong>Learning Gaps</strong> - Employees who have not completed required learning</li>
                     <li><strong>Recommendations</strong> - Suggested actions to improve compliance</li>
                     <li><strong>Trends</strong> - How your organization's performance is changing over time</li>
                   </ul>
@@ -287,15 +287,15 @@ export default function AdminHelpGuidePage() {
             </AccordionContent>
           </AccordionItem>
 
-          {/* Assign Training */}
-          <AccordionItem value="assign-training" className="border rounded-lg px-4">
+          {/* Assign Learning */}
+          <AccordionItem value="assign-learning" className="border rounded-lg px-4">
             <AccordionTrigger className="hover:no-underline">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-primary/10">
                   <CalendarClock className="h-5 w-5 text-primary" />
                 </div>
                 <div className="text-left">
-                  <p className="font-medium">How to Assign Training with Deadlines</p>
+                  <p className="font-medium">How to Assign Learning with Deadlines</p>
                   <p className="text-sm text-muted-foreground font-normal">Set completion deadlines for employees</p>
                 </div>
               </div>
@@ -303,22 +303,22 @@ export default function AdminHelpGuidePage() {
             <AccordionContent className="pt-4 pb-6">
               <div className="space-y-4 text-sm">
                 <div>
-                  <h4 className="font-medium mb-2">What is Training Assignment?</h4>
+                  <h4 className="font-medium mb-2">What is Learning Assignment?</h4>
                   <p className="text-muted-foreground">
-                    Training assignment allows you to officially assign training materials and quizzes to individual employees, with a specific completion deadline. Employees will see their deadline prominently displayed and receive alerts as the deadline approaches.
+                    Learning assignment allows you to officially assign learning materials and quizzes to individual employees, with a specific completion deadline. Employees will see their deadline prominently displayed and receive alerts as the deadline approaches.
                   </p>
                 </div>
                 
                 <div>
-                  <h4 className="font-medium mb-2">Assigning Training to an Employee</h4>
+                  <h4 className="font-medium mb-2">Assigning Learning to an Employee</h4>
                   <ol className="space-y-3 text-muted-foreground">
                     <li>1. Go to <strong>Users</strong> in the left menu</li>
-                    <li>2. Find the employee you want to assign training to</li>
-                    <li>3. Click the <strong>book icon</strong> in the Actions column (this is the Assign Training button)</li>
+                    <li>2. Find the employee you want to assign learning to</li>
+                    <li>3. Click the <strong>book icon</strong> in the Actions column (this is the Assign Learning button)</li>
                     <li>4. Review the employee's workforce groups and available content</li>
                     <li>5. Choose a <strong>Completion Deadline</strong> using the date picker</li>
                     <li>6. Add any optional notes or instructions</li>
-                    <li>7. Click <strong>Assign Training</strong></li>
+                    <li>7. Click <strong>Assign Learning</strong></li>
                   </ol>
                 </div>
 
@@ -326,7 +326,7 @@ export default function AdminHelpGuidePage() {
                   <div className="flex items-start gap-2">
                     <AlertCircle className="h-4 w-4 text-info mt-0.5" />
                     <p className="text-muted-foreground">
-                      <strong>Note:</strong> The Assign Training button is only available for employees who have a workforce group assigned. If the button is disabled, first assign the employee to a workforce group.
+                      <strong>Note:</strong> The Assign Learning button is only available for employees who have a workforce group assigned. If the button is disabled, first assign the employee to a workforce group.
                     </p>
                   </div>
                 </div>
@@ -337,14 +337,14 @@ export default function AdminHelpGuidePage() {
                     <li><strong>Deadline Banner</strong> - A prominent display showing the completion deadline</li>
                     <li><strong>Days Remaining</strong> - A countdown to the deadline</li>
                     <li><strong>Overdue Warning</strong> - Red alert if the deadline has passed</li>
-                    <li><strong>Progress Tracker</strong> - Visual progress through training materials</li>
+                    <li><strong>Progress Tracker</strong> - Visual progress through learning materials</li>
                   </ul>
                 </div>
 
                 <div>
                   <h4 className="font-medium mb-2">After Assignment</h4>
                   <p className="text-muted-foreground">
-                    Once training is assigned, employees must complete all training materials before the quiz is unlocked. When they finish the materials, the quiz becomes available automatically. Passing the quiz generates their compliance certificate.
+                    Once learning is assigned, employees must complete all learning materials before the quiz is unlocked. When they finish the materials, the quiz becomes available automatically. Passing the quiz generates their compliance certificate.
                   </p>
                 </div>
 

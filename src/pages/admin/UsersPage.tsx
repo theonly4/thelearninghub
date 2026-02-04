@@ -418,6 +418,24 @@ export default function UsersPage() {
               onChange={handleCSVFileSelect}
               className="hidden"
             />
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                const csv = "email,first_name,last_name,workforce_role\njohn.doe@company.com,John,Doe,clinical\njane.smith@company.com,Jane,Smith,administrative";
+                const blob = new Blob([csv], { type: "text/csv" });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = "employee_import_template.csv";
+                link.click();
+                URL.revokeObjectURL(url);
+                toast({ title: "Template downloaded", description: "Fill in the CSV and import it." });
+              }}
+              className="gap-2"
+            >
+              <FileText className="h-4 w-4" />
+              CSV Template
+            </Button>
             <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="gap-2">
               <Upload className="h-4 w-4" />
               Import CSV
@@ -521,7 +539,7 @@ export default function UsersPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          title="Assign Training"
+                          title="Assign Learning"
                           onClick={() => {
                             setSelectedEmployee(emp);
                             setIsAssignDialogOpen(true);
@@ -567,7 +585,7 @@ export default function UsersPage() {
           <DialogHeader>
             <DialogTitle>Add Employee</DialogTitle>
             <DialogDescription>
-              Create an account for a new employee. You'll receive their temporary password to share with them.
+              Create an account for a new employee. They'll receive their temporary password via automated email.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -650,36 +668,16 @@ export default function UsersPage() {
           </DialogHeader>
           {credentials && (
             <div className="space-y-4 py-4">
-              <div className="p-4 bg-success/10 border border-success/30 rounded-lg">
-                <p className="text-sm text-center">
-                  ✉️ A welcome email with login instructions has been sent to <strong>{credentials.email}</strong>
+              <div className="p-4 bg-success/10 border border-success/30 rounded-lg text-center">
+                <CheckCircle2 className="h-8 w-8 text-success mx-auto mb-2" />
+                <p className="text-sm">
+                  ✉️ A welcome email with login instructions has been sent to:
                 </p>
+                <p className="font-medium mt-1">{credentials.email}</p>
               </div>
               
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">Backup copy of credentials (in case email didn't arrive):</p>
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <div className="flex gap-2">
-                    <Input value={credentials.email} readOnly className="bg-muted" />
-                    <Button variant="outline" size="icon" onClick={() => copyToClipboard(credentials.email)}>
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Temporary Password</Label>
-                  <div className="flex gap-2">
-                    <Input value={credentials.password} readOnly className="bg-muted font-mono" />
-                    <Button variant="outline" size="icon" onClick={() => copyToClipboard(credentials.password)}>
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
               <div className="p-3 bg-muted border rounded-lg text-sm text-muted-foreground">
-                💡 The employee will receive an email with these credentials and instructions to set up MFA.
+                💡 The employee will receive an email with their temporary credentials and instructions to set up MFA.
               </div>
             </div>
           )}
