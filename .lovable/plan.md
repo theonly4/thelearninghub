@@ -1,185 +1,255 @@
 
-# Per-Customer Quiz Configuration for Platform Owner
+# Implementation Plan: UI/Text Fixes + Features
 
-This plan adds the ability for Platform Owners to set a custom **passing percentage** and **maximum number of attempts** for each organization when releasing quiz packages.
-
----
-
-## Current State
-
-| Feature | Status | Location |
-|---------|--------|----------|
-| Passing Score | Global only (80% default) | `quizzes.passing_score` column |
-| Max Attempts | Not implemented | No column exists |
-| Per-Customer Config | Not available | No override mechanism |
-
-When releasing a package, the Platform Owner can only select:
-- Organization(s)
-- Workforce group
-- Training year
-- Notes
+This plan implements terminology updates, employee management enhancements, Learning Library features, and Reports page improvements while maintaining zero schema changes.
 
 ---
 
-## Solution Overview
-
-Add two new columns to the `package_releases` table that allow per-organization configuration:
-
-```text
-package_releases table
-├── passing_score_override (integer, nullable, range 50-100)
-└── max_attempts (integer, nullable, range 1-10)
-```
-
-When these values are set:
-- **passing_score_override**: Overrides the default 80% for this organization
-- **max_attempts**: Limits how many times employees can retake a failed quiz
-
----
-
-## Technical Implementation
-
-### Database Changes
-
-**Add two columns to `package_releases`:**
-
-```text
-ALTER TABLE public.package_releases 
-ADD COLUMN passing_score_override INTEGER CHECK (passing_score_override >= 50 AND passing_score_override <= 100),
-ADD COLUMN max_attempts INTEGER CHECK (max_attempts >= 1 AND max_attempts <= 10);
-```
+## Priority 1: Global Text Replacements
 
 ### Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/pages/platform/ContentReleasesPage.tsx` | Add input fields for passing score and max attempts in the release form |
-| `supabase/functions/submit-quiz/index.ts` | Check max attempts before allowing submission; use org-specific passing score |
-| `supabase/functions/get-quiz-questions/index.ts` | Return max attempts and passing score to the frontend |
-| `src/pages/employee/TakeQuizPage.tsx` | Display remaining attempts; block quiz if limit reached |
-| `src/pages/admin/TrainingLibraryPage.tsx` | Display the configured settings for each package |
+| `src/pages/admin/TrainingLibraryPage.tsx` | "Training Library" to "Learning Library", "Assign Training" to "Assign Learning", "Training Materials" to "Learning Materials", "Quiz Packages" to "Quizzes" |
+| `src/pages/admin/ReportsPage.tsx` | "Training Reports" to "Completion Reports", "Training Completions" to "Learning Completions" |
+| `src/components/DashboardLayout.tsx` | Update navigation labels |
+| `src/pages/admin/HelpGuidePage.tsx` | Replace all "training" with "learning" |
+| `src/components/admin/TrainingAssignmentDialog.tsx` | Update all training references |
+| `src/components/admin/SingleEmployeeAssignmentDialog.tsx` | Update dialog titles and text |
+
+### Dynamic Year Logic
+
+The system will display quiz years relative to the current year:
+- First annual release per workforce group = Current Year - 1 (e.g., "2025" in February 2026)
+- Second annual release = Current Year - 2 (e.g., "2024")
+
+This will be computed from the `training_year` field in `package_releases` and displayed as a simple label.
 
 ---
 
-## User Experience
+## Priority 2: Admin Add Employee Page
 
-### Platform Owner View (Content Releases Page)
+### File: `src/pages/admin/UsersPage.tsx`
 
-When releasing a package, new fields appear:
+**Change 1: Update popup description text**
 
-```text
+Current:
+```
+You'll receive their temporary password to share with them.
+```
+
+New:
+```
+They'll receive their temporary password via automated email.
+```
+
+**Change 2: Remove temp password display from credentials popup**
+
+The credentials dialog will be simplified to:
+- Show success message with green checkmark
+- Confirm email was sent automatically
+- Remove the backup password display section
+
+**Change 3: Add CSV Template Download**
+
+Add a "Download CSV Template" button that triggers a popup explaining:
+- Required columns: `email, first_name, last_name, workforce_role`
+- Downloads a sample CSV file with headers
+
+Implementation:
+```
 ┌─────────────────────────────────────────────────────┐
-│ Quiz Settings (Optional - per organization)        │
+│ 📄 CSV Import Template                              │
 ├─────────────────────────────────────────────────────┤
-│ Passing Score: [___80___] %  (50-100, default 80)  │
-│ Max Attempts:  [___3____]    (1-10, blank=unlimited)│
+│ Your CSV file must include these columns:           │
+│                                                     │
+│ • email - Employee's work email                     │
+│ • first_name - First name                           │
+│ • last_name - Last name                             │
+│ • workforce_role - One of: all_staff, clinical,    │
+│   administrative, management, it                    │
+│                                                     │
+│ [Download Template CSV]                             │
 └─────────────────────────────────────────────────────┘
 ```
 
-### Employee View (Take Quiz Page)
+---
 
-If max attempts is configured:
+## Priority 3: Learning Library Page
 
-```text
-┌──────────────────────────────────────────┐
-│ Passing Score: 85%                       │
-│ Attempts: 1 of 3 remaining               │
-└──────────────────────────────────────────┘
+### File: `src/pages/admin/TrainingLibraryPage.tsx`
+
+**Change 1: "Request Learning" Button**
+
+Replace "Assign Training" with "Request Learning" button that opens a dialog with workforce group checkboxes:
+
 ```
-
-If all attempts are used:
-
-```text
-┌──────────────────────────────────────────┐
-│ ⚠️ Maximum attempts reached              │
-│ Contact your administrator for help.    │
-└──────────────────────────────────────────┘
-```
-
-### Customer Admin View (Training Library Page)
-
-Shows the configured settings for released packages:
-
-```text
 ┌─────────────────────────────────────────────────────┐
-│ Administrative Staff - Set 1                        │
-│ Passing: 85%  •  Max Attempts: 3  •  25 questions  │
+│ Request Learning Content                            │
+├─────────────────────────────────────────────────────┤
+│ Select the workforce groups you need content for:   │
+│                                                     │
+│ ☐ All Staff                                         │
+│ ☐ Clinical Staff                                    │
+│ ☐ Administrative Staff                              │
+│ ☐ Management & Leadership                           │
+│ ☐ IT/Security Personnel                             │
+│                                                     │
+│ [Cancel] [Send Request]                             │
+└─────────────────────────────────────────────────────┘
+```
+
+On submit, sends email to `yiplawcenter@protonmail.com` via new edge function:
+```
+Subject: Learning Content Request from [ORG NAME]
+
+Organization [ORG NAME] has requested learning content for:
+- Clinical Staff
+- Administrative Staff
+
+Requested by: [ADMIN NAME] ([ADMIN EMAIL])
+Date: [CURRENT DATE]
+```
+
+**Change 2: Remove Stats Boxes**
+
+Remove these 4 stat cards entirely:
+- Training Completion
+- Quiz Attempts  
+- Passed Quizzes
+- Failed Quizzes
+
+Keep only:
+- Learning Materials count
+- Quizzes count
+- Total Duration
+- Workforce Groups
+
+**Change 3: Visual Archive Section**
+
+Add a collapsible "Archived (YYYY)" section at the bottom that groups completed items older than 6 months. This is UI-only filtering - no database changes.
+
+```
+┌─────────────────────────────────────────────────────┐
+│ ▶ Archived (2025)                                   │
+│   Items completed more than 6 months ago            │
 └─────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Backend Logic
+## Priority 4: Reports Page
 
-### Submit Quiz Function Changes
+### File: `src/pages/admin/ReportsPage.tsx`
 
-```text
-1. Fetch package_release for user's organization
-2. Get passing_score_override and max_attempts from release
-3. If max_attempts is set:
-   - Count existing attempts for this user + package
-   - If count >= max_attempts → reject with "Maximum attempts reached"
-4. Use passing_score_override if set, otherwise use default 80%
-5. Score the quiz and return result
+**Change 1: PDF Export Filename**
+
+Current: `training_report_2026-02-04.pdf`
+
+New: `[ORG_NAME]_Completions-Report_04-Feb-2026.pdf`
+
+**Change 2: PDF Header Format**
+
+```
+[ORG NAME] | Completion Report | Generated February 04, 2026
 ```
 
-### Get Quiz Questions Function Changes
+**Change 3: PDF Footer**
 
-```text
-1. Fetch package_release for user's organization
-2. Include in response:
-   - passing_score (override or default)
-   - max_attempts (if set)
-   - attempts_used (count of existing attempts)
-3. Frontend uses this to show attempt count and passing requirement
+```
+The Learning Hub | learninghub.zone
 ```
 
----
+**Change 4: Updated Columns**
 
-## Implementation Steps
+| Employee Name | Learning Material | Quiz (YYYY-1/YYYY-2) | Score | Date Completed | Attempts |
+|---------------|-------------------|----------------------|-------|----------------|----------|
+| John Doe      | HIPAA Basics      | 2025 Annual          | 92%   | Feb 04, 2026   | 1        |
 
-1. **Database Migration**
-   - Add `passing_score_override` and `max_attempts` columns to `package_releases`
+**Change 5: Remove Print Button**
 
-2. **Update Content Releases Form** (`ContentReleasesPage.tsx`)
-   - Add number inputs for passing score and max attempts
-   - Include values in the insert payload
-   - Show current settings when viewing existing releases
+Remove the "Print" button entirely. Keep only "Export" dropdown with:
+- Export as PDF (standard report)
+- Export as CSV
+- Export Full Details (new - includes quiz questions/answers/rationales)
 
-3. **Update Submit Quiz Function** (`submit-quiz/index.ts`)
-   - Fetch package release settings for the user's organization
-   - Enforce max attempts limit before processing
-   - Use organization-specific passing score for grading
+**Change 6: Add Year Filter**
 
-4. **Update Get Quiz Questions Function** (`get-quiz-questions/index.ts`)
-   - Return passing score and max attempts info
-   - Include count of previous attempts
+Add a "Year" dropdown to the filters:
+- Options: 2026, 2025, 2024 (dynamically generated from data)
+- Filters completions by completion date year
 
-5. **Update Take Quiz Page** (`TakeQuizPage.tsx`)
-   - Display passing score requirement
-   - Show attempts remaining (if limited)
-   - Block quiz access if max attempts reached
+**Change 7: Export Full Details Option**
 
-6. **Update Training Library Page** (`TrainingLibraryPage.tsx`)
-   - Display passing score and max attempts for each package
+New "Export Full Details" option generates a comprehensive PDF including:
+- All completion data
+- Quiz questions with all options
+- Correct answers highlighted
+- Rationales for each question
 
----
-
-## Edge Cases Handled
-
-| Scenario | Behavior |
-|----------|----------|
-| No override set | Uses default 80% passing, unlimited attempts |
-| Score set, attempts blank | Custom passing score, unlimited attempts |
-| Attempts set, score blank | Default 80%, limited attempts |
-| User passed on attempt 1 | No more attempts needed (show certificate) |
-| User failed all attempts | Cannot retake, must contact admin |
-| Admin changes settings after release | Existing attempts still count |
+This will be a separate, larger export.
 
 ---
 
-## Security Considerations
+## Priority 5: Other Changes
 
-- Only Platform Owners can set these values (enforced by RLS on `package_releases`)
-- Backend validates attempt count server-side (cannot be bypassed)
-- Passing score validation happens in the backend function, not frontend
+### File: `src/components/DashboardLayout.tsx`
+
+**Hide "How To Guide" for org_admin**
+
+Remove the "How To Guide" nav item from `adminNavItems` array. Platform owner layout is unaffected.
+
+### Files: Various
+
+**Enhanced Search**
+
+The Reports page search already supports name/email/content. Add Year dropdown filter as specified above.
+
+---
+
+## New Edge Function Required
+
+### File: `supabase/functions/send-learning-request/index.ts`
+
+Creates a new edge function to send learning content request emails:
+- Validates user is org_admin
+- Fetches organization name
+- Sends email to hardcoded recipient: yiplawcenter@protonmail.com
+- Includes selected workforce groups, org name, requester info
+
+---
+
+## Implementation Summary
+
+| Priority | Task | Files Changed |
+|----------|------|---------------|
+| 1 | Text replacements (training to learning) | 6 files |
+| 1 | Quiz packages to Quizzes | 3 files |
+| 1 | Dynamic year display | 2 files |
+| 2 | Add Employee popup text | 1 file |
+| 2 | Remove temp password display | 1 file |
+| 2 | CSV template download | 1 file |
+| 3 | Request Learning dialog + email | 2 files + 1 edge function |
+| 3 | Remove stats boxes | 1 file |
+| 3 | Visual archive section | 1 file |
+| 4 | PDF filename, header, footer | 1 file |
+| 4 | Updated report columns | 1 file |
+| 4 | Remove Print button | 1 file |
+| 4 | Add Year filter | 1 file |
+| 4 | Export Full Details option | 1 file |
+| 5 | Hide How To Guide | 1 file |
+
+**Total: ~10 files modified, 1 new edge function created**
+
+---
+
+## Technical Notes
+
+- **Zero Schema Changes**: All changes use existing database tables and columns
+- **Dynamic Year Calculation**: Uses `new Date().getFullYear()` for current year reference
+- **Archive Logic**: Filter by `completed_at < 6 months ago` in frontend
+- **Quiz Year Display**: Format `training_year` as "YYYY-1" or "YYYY-2" based on sequence
+- **PDF Generation**: Uses existing jsPDF library with updated formatting
+- **Email**: Uses existing Resend integration with RESEND_API_KEY secret
+
