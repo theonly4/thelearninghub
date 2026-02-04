@@ -36,12 +36,10 @@ import jsPDF from "jspdf";
 import Papa from "papaparse";
 import {
   FileText,
-  Printer,
   Search,
   BookOpen,
   ClipboardCheck,
   Calendar,
-  Users,
   CheckCircle2,
   XCircle,
   Download,
@@ -80,6 +78,7 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterGroup, setFilterGroup] = useState<string>("all");
+  const [filterYear, setFilterYear] = useState<string>("all");
   const [activeTab, setActiveTab] = useState("training");
   const [organizationName, setOrganizationName] = useState<string>("");
   const printRef = useRef<HTMLDivElement>(null);
@@ -222,7 +221,9 @@ export default function ReportsPage() {
       t.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       t.materialTitle.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesGroup = filterGroup === "all" || t.workforceGroups.includes(filterGroup as WorkforceGroup);
-    return matchesSearch && matchesGroup;
+    const completionYear = new Date(t.completedAt).getFullYear().toString();
+    const matchesYear = filterYear === "all" || completionYear === filterYear;
+    return matchesSearch && matchesGroup && matchesYear;
   });
 
   const filteredQuiz = quizCompletions.filter(q => {
@@ -231,7 +232,9 @@ export default function ReportsPage() {
       q.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       q.quizTitle.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesGroup = filterGroup === "all" || q.workforceGroups.includes(filterGroup as WorkforceGroup);
-    return matchesSearch && matchesGroup;
+    const completionYear = q.completedAt ? new Date(q.completedAt).getFullYear().toString() : "";
+    const matchesYear = filterYear === "all" || completionYear === filterYear;
+    return matchesSearch && matchesGroup && matchesYear;
   });
 
   // HTML escape function to prevent XSS attacks
@@ -405,37 +408,34 @@ export default function ReportsPage() {
   // Export to CSV
   function handleExportCSV() {
     let csv: string;
-    let fileName: string;
+    const orgSlug = organizationName.replace(/[^a-zA-Z0-9]/g, '_');
+    const dateStr = format(new Date(), "dd-MMM-yyyy");
     
     if (activeTab === "training") {
       const data = filteredTraining.map(t => ({
         "Employee Name": t.userName,
         "Email": t.email,
         "Workforce Group": t.workforceGroups.map(g => WORKFORCE_GROUP_LABELS[g]).join(", "),
-        "Training Material": t.materialTitle,
-        "Completed At": format(new Date(t.completedAt), "yyyy-MM-dd HH:mm:ss"),
-        "Version": t.version,
+        "Learning Material": t.materialTitle,
+        "Date Completed": format(new Date(t.completedAt), "MMM dd, yyyy"),
       }));
       csv = Papa.unparse(data);
-      fileName = `training_report_${format(new Date(), "yyyy-MM-dd")}.csv`;
     } else {
       const data = filteredQuiz.map(q => ({
         "Employee Name": q.userName,
         "Email": q.email,
         "Workforce Group": q.workforceGroups.map(g => WORKFORCE_GROUP_LABELS[g]).join(", "),
-        "Quiz Title": q.quizTitle,
+        "Quiz": q.quizTitle,
         "Score": `${q.score}%`,
-        "Result": q.passed ? "PASSED" : "FAILED",
-        "Completed At": q.completedAt ? format(new Date(q.completedAt), "yyyy-MM-dd HH:mm:ss") : "In Progress",
+        "Date Completed": q.completedAt ? format(new Date(q.completedAt), "MMM dd, yyyy") : "In Progress",
       }));
       csv = Papa.unparse(data);
-      fileName = `quiz_report_${format(new Date(), "yyyy-MM-dd")}.csv`;
     }
 
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = fileName;
+    link.download = `${orgSlug}_Completions-Report_${dateStr}.csv`;
     link.click();
     toast.success("CSV exported successfully");
   }
@@ -443,21 +443,19 @@ export default function ReportsPage() {
   // Export to PDF
   function handleExportPDF() {
     const doc = new jsPDF();
-    const title = activeTab === "training" ? "Training Completion Report" : "Quiz Completion Report";
-    const dateGenerated = format(new Date(), "MMMM d, yyyy");
+    const dateGenerated = format(new Date(), "MMMM dd, yyyy");
+    const orgSlug = organizationName.replace(/[^a-zA-Z0-9]/g, '_');
+    const dateStr = format(new Date(), "dd-MMM-yyyy");
 
     // Header
-    doc.setFontSize(20);
-    doc.setTextColor(0, 102, 204);
-    doc.text(title, 20, 20);
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Generated: ${dateGenerated}`, 20, 28);
-    if (filterGroup !== "all") {
-      doc.text(`Filtered by: ${WORKFORCE_GROUP_LABELS[filterGroup as WorkforceGroup]}`, 20, 34);
-    }
+    doc.setFontSize(12);
+    doc.setTextColor(30, 58, 95);
+    doc.text(`${organizationName || 'Organization'} | Completion Report | Generated ${dateGenerated}`, 20, 15);
+    
+    doc.setDrawColor(200);
+    doc.line(20, 18, 190, 18);
 
-    let yPos = 45;
+    let yPos = 30;
     doc.setFontSize(9);
     doc.setTextColor(0);
 
@@ -467,19 +465,19 @@ export default function ReportsPage() {
       doc.rect(15, yPos - 5, 180, 8, "F");
       doc.setFont(undefined, "bold");
       doc.text("Employee", 17, yPos);
-      doc.text("Material", 70, yPos);
-      doc.text("Completed", 150, yPos);
+      doc.text("Learning Material", 65, yPos);
+      doc.text("Date Completed", 145, yPos);
       doc.setFont(undefined, "normal");
       yPos += 8;
 
-      filteredTraining.slice(0, 40).forEach(t => {
-        if (yPos > 270) {
+      filteredTraining.slice(0, 50).forEach(t => {
+        if (yPos > 265) {
           doc.addPage();
           yPos = 20;
         }
         doc.text(t.userName.substring(0, 25), 17, yPos);
-        doc.text(t.materialTitle.substring(0, 40), 70, yPos);
-        doc.text(format(new Date(t.completedAt), "MMM d, yyyy"), 150, yPos);
+        doc.text(t.materialTitle.substring(0, 40), 65, yPos);
+        doc.text(format(new Date(t.completedAt), "MMM dd, yyyy"), 145, yPos);
         yPos += 6;
       });
     } else {
@@ -490,23 +488,19 @@ export default function ReportsPage() {
       doc.text("Employee", 17, yPos);
       doc.text("Quiz", 55, yPos);
       doc.text("Score", 110, yPos);
-      doc.text("Result", 135, yPos);
-      doc.text("Date", 160, yPos);
+      doc.text("Date", 145, yPos);
       doc.setFont(undefined, "normal");
       yPos += 8;
 
-      filteredQuiz.slice(0, 40).forEach(q => {
-        if (yPos > 270) {
+      filteredQuiz.slice(0, 50).forEach(q => {
+        if (yPos > 265) {
           doc.addPage();
           yPos = 20;
         }
-        doc.text(q.userName.substring(0, 18), 17, yPos);
-        doc.text(q.quizTitle.substring(0, 25), 55, yPos);
+        doc.text(q.userName.substring(0, 20), 17, yPos);
+        doc.text(q.quizTitle.substring(0, 28), 55, yPos);
         doc.text(`${q.score}%`, 110, yPos);
-        doc.setTextColor(q.passed ? 0 : 150, q.passed ? 128 : 0, 0);
-        doc.text(q.passed ? "PASS" : "FAIL", 135, yPos);
-        doc.setTextColor(0);
-        doc.text(q.completedAt ? format(new Date(q.completedAt), "MMM d") : "-", 160, yPos);
+        doc.text(q.completedAt ? format(new Date(q.completedAt), "MMM dd, yyyy") : "-", 145, yPos);
         yPos += 6;
       });
     }
@@ -514,10 +508,10 @@ export default function ReportsPage() {
     // Footer
     doc.setFontSize(8);
     doc.setTextColor(100);
-    doc.text(`Total Records: ${activeTab === "training" ? filteredTraining.length : filteredQuiz.length}`, 20, 285);
+    doc.text("The Learning Hub | learninghub.zone", 20, 285);
+    doc.text(`Records: ${activeTab === "training" ? filteredTraining.length : filteredQuiz.length}`, 160, 285);
 
-    const fileName = `${activeTab === "training" ? "training" : "quiz"}_report_${format(new Date(), "yyyy-MM-dd")}.pdf`;
-    doc.save(fileName);
+    doc.save(`${orgSlug}_Completions-Report_${dateStr}.pdf`);
     toast.success("PDF exported successfully");
   }
 
@@ -527,9 +521,9 @@ export default function ReportsPage() {
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Training Reports</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Completion Reports</h1>
             <p className="text-muted-foreground">
-              View employee training and quiz completion records
+              View employee learning and quiz completion records
             </p>
           </div>
           <div className="flex gap-2">
@@ -552,64 +546,51 @@ export default function ReportsPage() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button onClick={handlePrint} className="gap-2">
-              <Printer className="h-4 w-4" />
-              Print
-            </Button>
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Training Completions</CardTitle>
-              <BookOpen className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{trainingCompletions.length}</div>
-              <p className="text-xs text-muted-foreground">Total completions</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Quiz Attempts</CardTitle>
-              <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{quizCompletions.length}</div>
-              <p className="text-xs text-muted-foreground">Total attempts</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Passed Quizzes</CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {quizCompletions.filter(q => q.passed).length}
+        {/* Filters */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col gap-4 sm:flex-row">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name, email, or content..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
               </div>
-              <p className="text-xs text-muted-foreground">
-                {quizCompletions.length > 0 
-                  ? `${Math.round((quizCompletions.filter(q => q.passed).length / quizCompletions.length) * 100)}% pass rate`
-                  : "No data"}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Failed Quizzes</CardTitle>
-              <XCircle className="h-4 w-4 text-destructive" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-destructive">
-                {quizCompletions.filter(q => !q.passed).length}
-              </div>
-              <p className="text-xs text-muted-foreground">Require retake</p>
-            </CardContent>
-          </Card>
-        </div>
+              <Select value={filterGroup} onValueChange={setFilterGroup}>
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue placeholder="Filter by group" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Workforce Groups</SelectItem>
+                  {(Object.keys(WORKFORCE_GROUP_LABELS) as WorkforceGroup[]).map(group => (
+                    <SelectItem key={group} value={group}>
+                      {WORKFORCE_GROUP_LABELS[group]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={filterYear} onValueChange={setFilterYear}>
+                <SelectTrigger className="w-full sm:w-[120px]">
+                  <SelectValue placeholder="Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Years</SelectItem>
+                  {[2026, 2025, 2024].map(year => (
+                    <SelectItem key={year} value={year.toString()}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Filters */}
         <Card>

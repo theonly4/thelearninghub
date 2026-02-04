@@ -26,7 +26,6 @@ const adminNavItems = [
   { icon: Users, label: "Users", href: "/admin/users" },
   { icon: BookOpen, label: "Learning Library", href: "/admin/training-library" },
   { icon: BarChart3, label: "Reports", href: "/admin/reports" },
-  { icon: HelpCircle, label: "How To Guide", href: "/admin/help" },
 ];
 
 const userNavItems = [

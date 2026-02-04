@@ -4,6 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { TrainingAssignmentDialog } from "@/components/admin/TrainingAssignmentDialog";
@@ -15,6 +19,8 @@ import {
   FileText,
   Loader2,
   Send,
+  ChevronRight,
+  Archive,
 } from "lucide-react";
 import { WORKFORCE_GROUP_LABELS, WorkforceGroup } from "@/types/hipaa";
 
@@ -36,6 +42,18 @@ interface QuizPackage {
   question_count: number;
   passing_score_override: number | null;
   max_attempts: number | null;
+  released_at: string;
+}
+
+// Helper to format training year as relative label
+function formatTrainingYear(year: number): string {
+  const currentYear = new Date().getFullYear();
+  if (year === currentYear - 1) {
+    return `${year} Annual`;
+  } else if (year === currentYear - 2) {
+    return `${year} Annual`;
+  }
+  return `${year} Annual`;
 }
 
 export default function TrainingLibraryPage() {
@@ -43,8 +61,13 @@ export default function TrainingLibraryPage() {
   const [packages, setPackages] = useState<QuizPackage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [userName, setUserName] = useState("Admin");
+  const [selectedGroups, setSelectedGroups] = useState<WorkforceGroup[]>([]);
+  const [isSendingRequest, setIsSendingRequest] = useState(false);
+  const [archivedMaterialsOpen, setArchivedMaterialsOpen] = useState(false);
+  const [archivedPackagesOpen, setArchivedPackagesOpen] = useState(false);
 
   useEffect(() => {
     fetchLibrary();
@@ -99,6 +122,7 @@ export default function TrainingLibraryPage() {
           training_year,
           passing_score_override,
           max_attempts,
+          released_at,
           question_packages (id, name, description)
         `)
         .eq("organization_id", profile.organization_id);
@@ -126,18 +150,70 @@ export default function TrainingLibraryPage() {
             question_count: countMap[pr.package_id] || 0,
             passing_score_override: pr.passing_score_override,
             max_attempts: pr.max_attempts,
+            released_at: pr.released_at,
           }))
         );
       }
     } catch (error) {
       console.error("Error fetching library:", error);
-      toast.error("Failed to load training library");
+      toast.error("Failed to load learning library");
     } finally {
       setIsLoading(false);
     }
   }
 
+  // Filter for archive (released more than 6 months ago)
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+  const archivedPackages = packages.filter(
+    (p) => new Date(p.released_at) < sixMonthsAgo
+  );
+  const currentPackages = packages.filter(
+    (p) => new Date(p.released_at) >= sixMonthsAgo
+  );
+
   const totalMinutes = materials.reduce((sum, m) => sum + m.estimated_minutes, 0);
+
+  const handleSendRequest = async () => {
+    if (selectedGroups.length === 0) {
+      toast.error("Please select at least one workforce group");
+      return;
+    }
+
+    setIsSendingRequest(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error("Not authenticated");
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(`${supabaseUrl}/functions/v1/send-learning-request`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ workforceGroups: selectedGroups }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to send request");
+      }
+
+      toast.success("Learning content request sent successfully!");
+      setRequestDialogOpen(false);
+      setSelectedGroups([]);
+    } catch (error: any) {
+      console.error("Error sending request:", error);
+      toast.error(error.message || "Failed to send request");
+    } finally {
+      setIsSendingRequest(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -157,16 +233,22 @@ export default function TrainingLibraryPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
               <BookOpen className="h-6 w-6" />
-              Training Library
+              Learning Library
             </h1>
             <p className="text-muted-foreground">
               Content released to your organization for assignment
             </p>
           </div>
-          <Button onClick={() => setAssignDialogOpen(true)} className="gap-2">
-            <Send className="h-4 w-4" />
-            Assign Training
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setRequestDialogOpen(true)} className="gap-2">
+              <Send className="h-4 w-4" />
+              Request Learning
+            </Button>
+            <Button onClick={() => setAssignDialogOpen(true)} className="gap-2">
+              <Send className="h-4 w-4" />
+              Assign Learning
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -175,7 +257,7 @@ export default function TrainingLibraryPage() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <FileText className="h-4 w-4" />
-                Training Materials
+                Learning Materials
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -186,7 +268,7 @@ export default function TrainingLibraryPage() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <Package className="h-4 w-4" />
-                Quiz Packages
+                Quizzes
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -231,7 +313,7 @@ export default function TrainingLibraryPage() {
             </TabsTrigger>
             <TabsTrigger value="packages" className="gap-2">
               <Package className="h-4 w-4" />
-              Quiz Packages ({packages.length})
+              Quizzes ({packages.length})
             </TabsTrigger>
           </TabsList>
 
@@ -240,9 +322,9 @@ export default function TrainingLibraryPage() {
               <Card>
                 <CardContent className="py-12 text-center">
                   <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="font-medium mb-2">No Training Materials</h3>
+                  <h3 className="font-medium mb-2">No Learning Materials</h3>
                   <p className="text-sm text-muted-foreground">
-                    No training materials have been released to your organization yet.
+                    No learning materials have been released to your organization yet.
                   </p>
                 </CardContent>
               </Card>
@@ -279,59 +361,150 @@ export default function TrainingLibraryPage() {
             )}
           </TabsContent>
 
-          <TabsContent value="packages" className="mt-4">
+          <TabsContent value="packages" className="mt-4 space-y-4">
             {packages.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center">
                   <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="font-medium mb-2">No Quiz Packages</h3>
+                  <h3 className="font-medium mb-2">No Quizzes</h3>
                   <p className="text-sm text-muted-foreground">
-                    No quiz packages have been released to your organization yet.
+                    No quizzes have been released to your organization yet.
                   </p>
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2">
-                {packages.map((pkg) => (
-                  <Card key={pkg.id}>
-                    <CardHeader>
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <CardTitle className="text-lg">{pkg.name}</CardTitle>
-                          {pkg.description && (
-                            <CardDescription className="line-clamp-2 mt-1">
-                              {pkg.description}
-                            </CardDescription>
-                          )}
+              <>
+                {/* Current Packages */}
+                <div className="grid gap-4 md:grid-cols-2">
+                  {currentPackages.map((pkg) => (
+                    <Card key={pkg.id}>
+                      <CardHeader>
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <CardTitle className="text-lg">{pkg.name}</CardTitle>
+                            {pkg.description && (
+                              <CardDescription className="line-clamp-2 mt-1">
+                                {pkg.description}
+                              </CardDescription>
+                            )}
+                          </div>
+                          <Badge variant="outline">{formatTrainingYear(pkg.training_year)}</Badge>
                         </div>
-                        <Badge variant="outline">{pkg.training_year}</Badge>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center justify-between mb-3">
+                          <Badge variant="secondary">
+                            {WORKFORCE_GROUP_LABELS[pkg.workforce_group]}
+                          </Badge>
+                          <span className="text-sm text-muted-foreground">
+                            {pkg.question_count} questions
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="bg-muted px-2 py-1 rounded">
+                            Pass: {pkg.passing_score_override || 80}%
+                          </span>
+                          <span className="bg-muted px-2 py-1 rounded">
+                            {pkg.max_attempts ? `${pkg.max_attempts} attempts` : "Unlimited"}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* Archived Packages */}
+                {archivedPackages.length > 0 && (
+                  <Collapsible open={archivedPackagesOpen} onOpenChange={setArchivedPackagesOpen}>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" className="w-full justify-start gap-2 text-muted-foreground">
+                        <ChevronRight className={`h-4 w-4 transition-transform ${archivedPackagesOpen ? "rotate-90" : ""}`} />
+                        <Archive className="h-4 w-4" />
+                        Archived ({archivedPackages.length})
+                        <span className="text-xs ml-2">Released more than 6 months ago</span>
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-2">
+                      <div className="grid gap-4 md:grid-cols-2 opacity-70">
+                        {archivedPackages.map((pkg) => (
+                          <Card key={pkg.id}>
+                            <CardHeader>
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <CardTitle className="text-lg">{pkg.name}</CardTitle>
+                                  {pkg.description && (
+                                    <CardDescription className="line-clamp-2 mt-1">
+                                      {pkg.description}
+                                    </CardDescription>
+                                  )}
+                                </div>
+                                <Badge variant="outline">{formatTrainingYear(pkg.training_year)}</Badge>
+                              </div>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="flex items-center justify-between mb-3">
+                                <Badge variant="secondary">
+                                  {WORKFORCE_GROUP_LABELS[pkg.workforce_group]}
+                                </Badge>
+                                <span className="text-sm text-muted-foreground">
+                                  {pkg.question_count} questions
+                                </span>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
                       </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between mb-3">
-                        <Badge variant="secondary">
-                          {WORKFORCE_GROUP_LABELS[pkg.workforce_group]}
-                        </Badge>
-                        <span className="text-sm text-muted-foreground">
-                          {pkg.question_count} questions
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="bg-muted px-2 py-1 rounded">
-                          Pass: {pkg.passing_score_override || 80}%
-                        </span>
-                        <span className="bg-muted px-2 py-1 rounded">
-                          {pkg.max_attempts ? `${pkg.max_attempts} attempts` : "Unlimited"}
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+              </>
             )}
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Request Learning Dialog */}
+      <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5" />
+              Request Learning Content
+            </DialogTitle>
+            <DialogDescription>
+              Select the workforce groups you need content for. A request will be sent to the platform administrator.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Label className="text-sm font-medium">Workforce Groups</Label>
+            <div className="border rounded-lg p-3 space-y-3">
+              {(Object.keys(WORKFORCE_GROUP_LABELS) as WorkforceGroup[]).map((group) => (
+                <label key={group} className="flex items-center gap-3 cursor-pointer">
+                  <Checkbox
+                    checked={selectedGroups.includes(group)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedGroups([...selectedGroups, group]);
+                      } else {
+                        setSelectedGroups(selectedGroups.filter((g) => g !== group));
+                      }
+                    }}
+                  />
+                  <span className="text-sm">{WORKFORCE_GROUP_LABELS[group]}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRequestDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSendRequest} disabled={isSendingRequest || selectedGroups.length === 0}>
+              {isSendingRequest ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send Request"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <TrainingAssignmentDialog
         open={assignDialogOpen}

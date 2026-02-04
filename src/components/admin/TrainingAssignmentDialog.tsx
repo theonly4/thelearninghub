@@ -290,10 +290,10 @@ export function TrainingAssignmentDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <BookOpen className="h-5 w-5" />
-            Assign Training
+            Assign Learning
           </DialogTitle>
           <DialogDescription>
-            Assign released training materials and quizzes to a workforce group.
+            Assign released learning materials and quizzes to a workforce group.
           </DialogDescription>
         </DialogHeader>
 
@@ -328,7 +328,7 @@ export function TrainingAssignmentDialog({
                 <p className="text-sm font-medium">No Content Released</p>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                No training materials or quiz packages have been released for this workforce group. Contact your platform administrator.
+                No learning materials or quiz packages have been released for this workforce group. Contact your platform administrator.
               </p>
             </div>
           )}
@@ -413,7 +413,7 @@ export function TrainingAssignmentDialog({
               {filteredMaterials.length > 0 && (
                 <div className="pt-2 border-t border-border">
                   <p className="text-xs text-muted-foreground mb-2">
-                    Training Materials:
+                    Learning Materials:
                   </p>
                   <div className="flex flex-wrap gap-1">
                     {filteredMaterials.map((m) => (
@@ -458,7 +458,7 @@ export function TrainingAssignmentDialog({
               !hasReleasedContent
             }
           >
-            {loading ? "Assigning..." : "Assign Training"}
+            {loading ? "Assigning..." : "Assign Learning"}
           </Button>
         </DialogFooter>
       </DialogContent>
