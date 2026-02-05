@@ -1,255 +1,112 @@
 
-# Implementation Plan: UI/Text Fixes + Features
+# Fix Duplicate Filter Card & Complete CSV Template
 
-This plan implements terminology updates, employee management enhancements, Learning Library features, and Reports page improvements while maintaining zero schema changes.
-
----
-
-## Priority 1: Global Text Replacements
-
-### Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/pages/admin/TrainingLibraryPage.tsx` | "Training Library" to "Learning Library", "Assign Training" to "Assign Learning", "Training Materials" to "Learning Materials", "Quiz Packages" to "Quizzes" |
-| `src/pages/admin/ReportsPage.tsx` | "Training Reports" to "Completion Reports", "Training Completions" to "Learning Completions" |
-| `src/components/DashboardLayout.tsx` | Update navigation labels |
-| `src/pages/admin/HelpGuidePage.tsx` | Replace all "training" with "learning" |
-| `src/components/admin/TrainingAssignmentDialog.tsx` | Update all training references |
-| `src/components/admin/SingleEmployeeAssignmentDialog.tsx` | Update dialog titles and text |
-
-### Dynamic Year Logic
-
-The system will display quiz years relative to the current year:
-- First annual release per workforce group = Current Year - 1 (e.g., "2025" in February 2026)
-- Second annual release = Current Year - 2 (e.g., "2024")
-
-This will be computed from the `training_year` field in `package_releases` and displayed as a simple label.
+This plan addresses two issues: removing the duplicate filter section in the Reports page and updating the CSV template to include all workforce groups.
 
 ---
 
-## Priority 2: Admin Add Employee Page
+## Issue 1: Duplicate Filter Card in Reports Page
 
-### File: `src/pages/admin/UsersPage.tsx`
+### Current Problem
 
-**Change 1: Update popup description text**
+The `ReportsPage.tsx` has **two identical filter Card components**:
 
-Current:
+| Lines | Content |
+|-------|---------|
+| 552-593 | Filter card with Search, Workforce Group dropdown, AND Year dropdown |
+| 595-623 | Duplicate filter card with Search and Workforce Group dropdown (NO Year filter) |
+
+This creates a confusing UI where the same search/filter controls appear twice on the page.
+
+### Solution
+
+Delete the duplicate filter section at **lines 595-623**. Keep only the first filter card (lines 552-593) which includes all three filters:
+- Search input
+- Workforce Group dropdown
+- Year dropdown
+
+---
+
+## Issue 2: CSV Template Missing Workforce Groups
+
+### Current Problem
+
+The CSV template button generates a file with only 2 example workforce roles:
+
+```csv
+email,first_name,last_name,workforce_role
+john.doe@company.com,John,Doe,clinical
+jane.smith@company.com,Jane,Smith,administrative
 ```
-You'll receive their temporary password to share with them.
-```
 
-New:
-```
-They'll receive their temporary password via automated email.
-```
+Users don't know about `all_staff`, `management`, or `it` options.
 
-**Change 2: Remove temp password display from credentials popup**
+### Solution
 
-The credentials dialog will be simplified to:
-- Show success message with green checkmark
-- Confirm email was sent automatically
-- Remove the backup password display section
+Update the template to include examples for all 5 workforce groups:
 
-**Change 3: Add CSV Template Download**
-
-Add a "Download CSV Template" button that triggers a popup explaining:
-- Required columns: `email, first_name, last_name, workforce_role`
-- Downloads a sample CSV file with headers
-
-Implementation:
-```
-┌─────────────────────────────────────────────────────┐
-│ 📄 CSV Import Template                              │
-├─────────────────────────────────────────────────────┤
-│ Your CSV file must include these columns:           │
-│                                                     │
-│ • email - Employee's work email                     │
-│ • first_name - First name                           │
-│ • last_name - Last name                             │
-│ • workforce_role - One of: all_staff, clinical,    │
-│   administrative, management, it                    │
-│                                                     │
-│ [Download Template CSV]                             │
-└─────────────────────────────────────────────────────┘
+```csv
+email,first_name,last_name,workforce_role
+john.doe@company.com,John,Doe,all_staff
+jane.nurse@company.com,Jane,Nurse,clinical
+mike.admin@company.com,Mike,Admin,administrative
+sarah.director@company.com,Sarah,Director,management
+tom.tech@company.com,Tom,Tech,it
 ```
 
 ---
 
-## Priority 3: Learning Library Page
+## Files to Modify
 
-### File: `src/pages/admin/TrainingLibraryPage.tsx`
+| File | Change |
+|------|--------|
+| `src/pages/admin/ReportsPage.tsx` | Remove duplicate filter Card component (lines 595-623) |
+| `src/pages/admin/UsersPage.tsx` | Update CSV template to include all 5 workforce groups |
 
-**Change 1: "Request Learning" Button**
+---
 
-Replace "Assign Training" with "Request Learning" button that opens a dialog with workforce group checkboxes:
+## Implementation Details
 
-```
-┌─────────────────────────────────────────────────────┐
-│ Request Learning Content                            │
-├─────────────────────────────────────────────────────┤
-│ Select the workforce groups you need content for:   │
-│                                                     │
-│ ☐ All Staff                                         │
-│ ☐ Clinical Staff                                    │
-│ ☐ Administrative Staff                              │
-│ ☐ Management & Leadership                           │
-│ ☐ IT/Security Personnel                             │
-│                                                     │
-│ [Cancel] [Send Request]                             │
-└─────────────────────────────────────────────────────┘
-```
+### ReportsPage.tsx Changes
 
-On submit, sends email to `yiplawcenter@protonmail.com` via new edge function:
-```
-Subject: Learning Content Request from [ORG NAME]
+Remove this entire duplicate section:
 
-Organization [ORG NAME] has requested learning content for:
-- Clinical Staff
-- Administrative Staff
-
-Requested by: [ADMIN NAME] ([ADMIN EMAIL])
-Date: [CURRENT DATE]
+```text
+// Lines 595-623 - DELETE THIS BLOCK
+{/* Filters */}
+<Card>
+  <CardContent className="pt-6">
+    <div className="flex flex-col gap-4 sm:flex-row">
+      <div className="relative flex-1">
+        <Search .../>
+        <Input placeholder="Search by name, email, or content..." .../>
+      </div>
+      <Select value={filterGroup} ...>
+        ...All Workforce Groups...
+      </Select>
+    </div>
+  </CardContent>
+</Card>
 ```
 
-**Change 2: Remove Stats Boxes**
+### UsersPage.tsx Changes
 
-Remove these 4 stat cards entirely:
-- Training Completion
-- Quiz Attempts  
-- Passed Quizzes
-- Failed Quizzes
+Update the CSV template generation (around line 424-425):
 
-Keep only:
-- Learning Materials count
-- Quizzes count
-- Total Duration
-- Workforce Groups
-
-**Change 3: Visual Archive Section**
-
-Add a collapsible "Archived (YYYY)" section at the bottom that groups completed items older than 6 months. This is UI-only filtering - no database changes.
-
+**Before:**
+```javascript
+const csv = "email,first_name,last_name,workforce_role\njohn.doe@company.com,John,Doe,clinical\njane.smith@company.com,Jane,Smith,administrative";
 ```
-┌─────────────────────────────────────────────────────┐
-│ ▶ Archived (2025)                                   │
-│   Items completed more than 6 months ago            │
-└─────────────────────────────────────────────────────┘
+
+**After:**
+```javascript
+const csv = "email,first_name,last_name,workforce_role\njohn.doe@company.com,John,Doe,all_staff\njane.nurse@company.com,Jane,Nurse,clinical\nmike.admin@company.com,Mike,Admin,administrative\nsarah.director@company.com,Sarah,Director,management\ntom.tech@company.com,Tom,Tech,it";
 ```
 
 ---
 
-## Priority 4: Reports Page
+## Result
 
-### File: `src/pages/admin/ReportsPage.tsx`
-
-**Change 1: PDF Export Filename**
-
-Current: `training_report_2026-02-04.pdf`
-
-New: `[ORG_NAME]_Completions-Report_04-Feb-2026.pdf`
-
-**Change 2: PDF Header Format**
-
-```
-[ORG NAME] | Completion Report | Generated February 04, 2026
-```
-
-**Change 3: PDF Footer**
-
-```
-The Learning Hub | learninghub.zone
-```
-
-**Change 4: Updated Columns**
-
-| Employee Name | Learning Material | Quiz (YYYY-1/YYYY-2) | Score | Date Completed | Attempts |
-|---------------|-------------------|----------------------|-------|----------------|----------|
-| John Doe      | HIPAA Basics      | 2025 Annual          | 92%   | Feb 04, 2026   | 1        |
-
-**Change 5: Remove Print Button**
-
-Remove the "Print" button entirely. Keep only "Export" dropdown with:
-- Export as PDF (standard report)
-- Export as CSV
-- Export Full Details (new - includes quiz questions/answers/rationales)
-
-**Change 6: Add Year Filter**
-
-Add a "Year" dropdown to the filters:
-- Options: 2026, 2025, 2024 (dynamically generated from data)
-- Filters completions by completion date year
-
-**Change 7: Export Full Details Option**
-
-New "Export Full Details" option generates a comprehensive PDF including:
-- All completion data
-- Quiz questions with all options
-- Correct answers highlighted
-- Rationales for each question
-
-This will be a separate, larger export.
-
----
-
-## Priority 5: Other Changes
-
-### File: `src/components/DashboardLayout.tsx`
-
-**Hide "How To Guide" for org_admin**
-
-Remove the "How To Guide" nav item from `adminNavItems` array. Platform owner layout is unaffected.
-
-### Files: Various
-
-**Enhanced Search**
-
-The Reports page search already supports name/email/content. Add Year dropdown filter as specified above.
-
----
-
-## New Edge Function Required
-
-### File: `supabase/functions/send-learning-request/index.ts`
-
-Creates a new edge function to send learning content request emails:
-- Validates user is org_admin
-- Fetches organization name
-- Sends email to hardcoded recipient: yiplawcenter@protonmail.com
-- Includes selected workforce groups, org name, requester info
-
----
-
-## Implementation Summary
-
-| Priority | Task | Files Changed |
-|----------|------|---------------|
-| 1 | Text replacements (training to learning) | 6 files |
-| 1 | Quiz packages to Quizzes | 3 files |
-| 1 | Dynamic year display | 2 files |
-| 2 | Add Employee popup text | 1 file |
-| 2 | Remove temp password display | 1 file |
-| 2 | CSV template download | 1 file |
-| 3 | Request Learning dialog + email | 2 files + 1 edge function |
-| 3 | Remove stats boxes | 1 file |
-| 3 | Visual archive section | 1 file |
-| 4 | PDF filename, header, footer | 1 file |
-| 4 | Updated report columns | 1 file |
-| 4 | Remove Print button | 1 file |
-| 4 | Add Year filter | 1 file |
-| 4 | Export Full Details option | 1 file |
-| 5 | Hide How To Guide | 1 file |
-
-**Total: ~10 files modified, 1 new edge function created**
-
----
-
-## Technical Notes
-
-- **Zero Schema Changes**: All changes use existing database tables and columns
-- **Dynamic Year Calculation**: Uses `new Date().getFullYear()` for current year reference
-- **Archive Logic**: Filter by `completed_at < 6 months ago` in frontend
-- **Quiz Year Display**: Format `training_year` as "YYYY-1" or "YYYY-2" based on sequence
-- **PDF Generation**: Uses existing jsPDF library with updated formatting
-- **Email**: Uses existing Resend integration with RESEND_API_KEY secret
-
+After these changes:
+1. Reports page will show only one filter section with all 3 filter options
+2. CSV template will include all 5 workforce groups with clear examples
