@@ -421,7 +421,7 @@ export default function UsersPage() {
             <Button 
               variant="outline" 
               onClick={() => {
-                const csv = "email,first_name,last_name,workforce_role\njohn.doe@company.com,John,Doe,clinical\njane.smith@company.com,Jane,Smith,administrative";
+                const csv = "email,first_name,last_name,workforce_role\njohn.doe@company.com,John,Doe,all_staff\njane.nurse@company.com,Jane,Nurse,clinical\nmike.admin@company.com,Mike,Admin,administrative\nsarah.director@company.com,Sarah,Director,management\ntom.tech@company.com,Tom,Tech,it";
                 const blob = new Blob([csv], { type: "text/csv" });
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement("a");
