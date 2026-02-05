@@ -592,35 +592,6 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
 
-        {/* Filters */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-col gap-4 sm:flex-row">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search by name, email, or content..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              <Select value={filterGroup} onValueChange={setFilterGroup}>
-                <SelectTrigger className="w-full sm:w-[200px]">
-                  <SelectValue placeholder="Filter by group" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Workforce Groups</SelectItem>
-                  {(Object.keys(WORKFORCE_GROUP_LABELS) as WorkforceGroup[]).map(group => (
-                    <SelectItem key={group} value={group}>
-                      {WORKFORCE_GROUP_LABELS[group]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Data Tables */}
         <div ref={printRef}>
