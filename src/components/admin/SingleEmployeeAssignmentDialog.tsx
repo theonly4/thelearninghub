@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { format, addDays } from "date-fns";
-import { CalendarIcon, Clock, BookOpen, FileText, Package, AlertTriangle, Loader2 } from "lucide-react";
+import { CalendarIcon, Clock, BookOpen, FileText, Package, AlertTriangle, Loader2, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -63,6 +63,7 @@ export function SingleEmployeeAssignmentDialog({
   const [releasedPackages, setReleasedPackages] = useState<ReleasedPackage[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [adminOrgId, setAdminOrgId] = useState<string | null>(null);
+  const [hasExistingCompleted, setHasExistingCompleted] = useState(false);
 
   useEffect(() => {
     if (open && employee) {
@@ -132,6 +133,17 @@ export function SingleEmployeeAssignmentDialog({
           package_name: p.question_packages?.name || "Question Package",
         }))
       );
+
+      // Check if employee already has completed assignments
+      const { data: existingCompleted } = await supabase
+        .from("training_assignments")
+        .select("id")
+        .eq("assigned_to", employee.user_id)
+        .eq("organization_id", profile.organization_id)
+        .eq("status", "completed")
+        .limit(1);
+
+      setHasExistingCompleted((existingCompleted?.length || 0) > 0);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Failed to load assignment data");
@@ -289,6 +301,19 @@ export function SingleEmployeeAssignmentDialog({
                 ))}
               </div>
             </div>
+
+            {/* Completion Notice */}
+            {hasExistingCompleted && (
+              <div className="rounded-lg border border-accent/30 bg-accent/5 p-3">
+                <div className="flex items-center gap-2 text-accent">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <p className="text-sm font-medium">Has Prior Completions</p>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  This employee has completed previous training. New assignments will be added.
+                </p>
+              </div>
+            )}
 
             {/* No Content Warning */}
             {!hasReleasedContent && (

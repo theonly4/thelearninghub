@@ -26,6 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { format, addDays } from "date-fns";
 import { CalendarIcon, Clock, BookOpen, FileText, Users, Package, AlertTriangle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -77,6 +78,8 @@ export function TrainingAssignmentDialog({
   const [releasedMaterialIds, setReleasedMaterialIds] = useState<string[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [adminOrgId, setAdminOrgId] = useState<string | null>(null);
+  const [excludeCompleted, setExcludeCompleted] = useState(true);
+  const [completedUserIds, setCompletedUserIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (open) {
@@ -166,6 +169,16 @@ export function TrainingAssignmentDialog({
           workforce_groups: (e.workforce_groups || []) as WorkforceGroup[],
         }))
       );
+
+      // Fetch users who already have completed assignments
+      const { data: completedAssignments } = await supabase
+        .from("training_assignments")
+        .select("assigned_to")
+        .eq("organization_id", profile.organization_id)
+        .eq("status", "completed");
+
+      const completedIds = [...new Set(completedAssignments?.map(a => a.assigned_to) || [])];
+      setCompletedUserIds(completedIds);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Failed to load assignment data");
@@ -183,6 +196,12 @@ export function TrainingAssignmentDialog({
   const filteredEmployees = workforceGroup
     ? employees.filter((e) => e.workforce_groups.includes(workforceGroup))
     : [];
+
+  // Apply exclusion filter for completed employees
+  const employeesToAssign = excludeCompleted
+    ? filteredEmployees.filter(emp => !completedUserIds.includes(emp.user_id))
+    : filteredEmployees;
+  const excludedCount = filteredEmployees.length - employeesToAssign.length;
 
   // Get released package for this workforce group
   const packageForGroup = workforceGroup
@@ -204,8 +223,8 @@ export function TrainingAssignmentDialog({
       return;
     }
 
-    if (filteredEmployees.length === 0) {
-      toast.error("No employees found in the selected workforce group");
+    if (employeesToAssign.length === 0) {
+      toast.error("No employees to assign (all may have already completed)");
       return;
     }
 
@@ -222,8 +241,8 @@ export function TrainingAssignmentDialog({
 
       if (!adminOrgId) throw new Error("Organization not found");
 
-      // Create assignment for each employee
-      const assignments = filteredEmployees.map((emp) => ({
+      // Create assignment for each employee (excluding completed)
+      const assignments = employeesToAssign.map((emp) => ({
         organization_id: adminOrgId,
         assigned_to: emp.user_id,
         assigned_by: user.id,
@@ -240,7 +259,7 @@ export function TrainingAssignmentDialog({
       if (error) throw error;
 
       toast.success(
-        `Training assigned to ${filteredEmployees.length} employee${filteredEmployees.length > 1 ? "s" : ""}`
+        `Training assigned to ${employeesToAssign.length} employee${employeesToAssign.length > 1 ? "s" : ""}`
       );
 
       // Send email notifications to all assigned employees (in background) - requires authentication
@@ -248,7 +267,7 @@ export function TrainingAssignmentDialog({
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (!session?.access_token) return;
         
-        filteredEmployees.forEach((emp) => {
+        employeesToAssign.forEach((emp) => {
           fetch(`${supabaseUrl}/functions/v1/send-assignment-email`, {
             method: 'POST',
             headers: { 
@@ -376,6 +395,27 @@ export function TrainingAssignmentDialog({
             />
           </div>
 
+          {/* Smart Exclusion Toggle */}
+          {workforceGroup && filteredEmployees.length > 0 && (
+            <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 p-3">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="excludeCompleted"
+                  checked={excludeCompleted}
+                  onCheckedChange={(checked) => setExcludeCompleted(!!checked)}
+                />
+                <Label htmlFor="excludeCompleted" className="text-sm cursor-pointer">
+                  Exclude employees who already completed
+                </Label>
+              </div>
+              {excludedCount > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  {excludedCount} excluded
+                </Badge>
+              )}
+            </div>
+          )}
+
           {/* Assignment Preview */}
           {workforceGroup && (
             <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
@@ -385,8 +425,8 @@ export function TrainingAssignmentDialog({
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4 text-muted-foreground" />
                   <span>
-                    <strong>{filteredEmployees.length}</strong> employee
-                    {filteredEmployees.length !== 1 ? "s" : ""}
+                    <strong>{employeesToAssign.length}</strong> of {filteredEmployees.length} employee{filteredEmployees.length !== 1 ? "s" : ""}
+                    {excludedCount > 0 && <span className="text-muted-foreground"> ({excludedCount} completed)</span>}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -454,7 +494,7 @@ export function TrainingAssignmentDialog({
               loading || 
               !workforceGroup || 
               !dueDate || 
-              filteredEmployees.length === 0 ||
+              employeesToAssign.length === 0 ||
               !hasReleasedContent
             }
           >
