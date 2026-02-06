@@ -12,6 +12,7 @@ import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import MfaEnrollPage from "./pages/MfaEnrollPage";
 import MfaVerifyPage from "./pages/MfaVerifyPage";
+import MfaSelectPage from "./pages/MfaSelectPage";
 import DemoPage from "./pages/DemoPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import TermsOfServicePage from "./pages/TermsOfServicePage";
@@ -65,6 +66,7 @@ const App = () => (
             <Route path="/login" element={<LoginPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/mfa-select" element={<MfaSelectPage />} />
             <Route path="/mfa-enroll" element={<MfaEnrollPage />} />
             <Route path="/mfa-verify" element={<MfaVerifyPage />} />
             <Route path="/demo" element={<DemoPage />} />
