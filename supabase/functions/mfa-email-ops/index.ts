@@ -133,7 +133,7 @@ serve(async (req) => {
       const resend = new Resend(resendApiKey);
 
       const { error: emailError } = await resend.emails.send({
-        from: "The Learning Hub <noreply@thelearninghub.lovable.app>",
+        from: "The Learning Hub <support@learninghub.zone>",
         to: [userEmail!],
         subject: "Your Verification Code - The Learning Hub",
         html: `
