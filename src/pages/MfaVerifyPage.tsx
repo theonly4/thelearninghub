@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/Logo";
 import { useToast } from "@/hooks/use-toast";
@@ -9,14 +9,23 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { Shield, Lock, Loader2, ArrowLeft } from "lucide-react";
+import { Shield, Lock, Loader2, ArrowLeft, Mail, RefreshCw } from "lucide-react";
+
+type MfaMethod = "totp" | "email";
 
 export default function MfaVerifyPage() {
+  const [searchParams] = useSearchParams();
+  const methodParam = searchParams.get("method") as MfaMethod | null;
+
   const [verifyCode, setVerifyCode] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isSendingCode, setIsSendingCode] = useState(false);
   const [factorId, setFactorId] = useState<string>("");
   const [userEmail, setUserEmail] = useState<string>("");
+  const [mfaMethod, setMfaMethod] = useState<MfaMethod>("totp");
+  const [codeSent, setCodeSent] = useState(false);
+  const [resendCountdown, setResendCountdown] = useState(0);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -24,11 +33,18 @@ export default function MfaVerifyPage() {
     checkMfaStatus();
   }, []);
 
+  // Countdown timer for resend button
+  useEffect(() => {
+    if (resendCountdown > 0) {
+      const timer = setTimeout(() => setResendCountdown(resendCountdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCountdown]);
+
   const checkMfaStatus = async () => {
     try {
       setIsLoading(true);
       
-      // Check if user is authenticated
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         navigate("/login");
@@ -40,24 +56,58 @@ export default function MfaVerifyPage() {
       // Check current AAL level
       const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
       
-      // If already at aal2, redirect to dashboard
+      // If already at aal2, check email MFA session or redirect to dashboard
       if (aalData?.currentLevel === 'aal2') {
         navigateByRole(session.user.id);
         return;
       }
 
-      // Get enrolled factors
-      const { data: factorsData } = await supabase.auth.mfa.listFactors();
-      const verifiedFactors = factorsData?.totp?.filter(f => f.status === 'verified') || [];
+      // Get user's mfa_method from profile
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("mfa_method, email")
+        .eq("user_id", session.user.id)
+        .single();
 
-      if (verifiedFactors.length === 0) {
-        // No MFA enrolled, redirect to enrollment
-        navigate("/mfa-enroll");
-        return;
+      if (profile?.email) {
+        setUserEmail(profile.email);
       }
 
-      // Use the first verified factor
-      setFactorId(verifiedFactors[0].id);
+      // Use method from URL param or profile
+      const method = methodParam || profile?.mfa_method as MfaMethod || "totp";
+      setMfaMethod(method);
+
+      if (method === "totp") {
+        // Get enrolled TOTP factors
+        const { data: factorsData } = await supabase.auth.mfa.listFactors();
+        const verifiedFactors = factorsData?.totp?.filter(f => f.status === 'verified') || [];
+
+        if (verifiedFactors.length === 0) {
+          // No MFA enrolled, redirect to selection
+          navigate("/mfa-select");
+          return;
+        }
+
+        setFactorId(verifiedFactors[0].id);
+      } else if (method === "email") {
+        // Check if email MFA session is already valid
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mfa-email-ops`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ action: "check-session" }),
+          }
+        );
+        const result = await response.json();
+        if (result.verified) {
+          navigateByRole(session.user.id);
+          return;
+        }
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -86,7 +136,51 @@ export default function MfaVerifyPage() {
     }
   };
 
-  const handleVerify = async () => {
+  const handleSendEmailCode = async () => {
+    setIsSendingCode(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate("/login");
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mfa-email-ops`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ action: "send-code" }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Failed to send code");
+      }
+
+      setCodeSent(true);
+      setResendCountdown(60);
+      toast({
+        title: "Code Sent",
+        description: `Verification code sent to ${userEmail}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Failed to Send Code",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingCode(false);
+    }
+  };
+
+  const handleVerifyTotp = async () => {
     if (verifyCode.length !== 6) {
       toast({
         title: "Invalid Code",
@@ -98,13 +192,11 @@ export default function MfaVerifyPage() {
 
     setIsVerifying(true);
     try {
-      // Challenge the factor
       const { data: challengeData, error: challengeError } = 
         await supabase.auth.mfa.challenge({ factorId });
 
       if (challengeError) throw challengeError;
 
-      // Verify the code
       const { error: verifyError } = await supabase.auth.mfa.verify({
         factorId,
         challengeId: challengeData.id,
@@ -118,7 +210,6 @@ export default function MfaVerifyPage() {
         description: "Identity confirmed. Welcome back!",
       });
 
-      // Navigate to dashboard based on role
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         navigateByRole(session.user.id);
@@ -135,17 +226,71 @@ export default function MfaVerifyPage() {
     }
   };
 
+  const handleVerifyEmail = async () => {
+    if (verifyCode.length !== 6) {
+      toast({
+        title: "Invalid Code",
+        description: "Please enter a 6-digit verification code.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsVerifying(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate("/login");
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mfa-email-ops`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ action: "verify-code", code: verifyCode }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Verification failed");
+      }
+
+      toast({
+        title: "Verified",
+        description: "Identity confirmed. Welcome back!",
+      });
+
+      navigateByRole(session.user.id);
+    } catch (error: any) {
+      toast({
+        title: "Verification Failed",
+        description: error.message || "Invalid code. Please try again.",
+        variant: "destructive",
+      });
+      setVerifyCode("");
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  // Auto-submit when 6 digits are entered (TOTP only)
+  useEffect(() => {
+    if (verifyCode.length === 6 && !isVerifying && mfaMethod === "totp" && factorId) {
+      handleVerifyTotp();
+    }
+  }, [verifyCode]);
+
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     navigate("/login");
   };
-
-  // Auto-submit when 6 digits are entered
-  useEffect(() => {
-    if (verifyCode.length === 6 && !isVerifying && factorId) {
-      handleVerify();
-    }
-  }, [verifyCode]);
 
   if (isLoading) {
     return (
@@ -181,7 +326,9 @@ export default function MfaVerifyPage() {
                 Verify Your Identity
               </h1>
               <p className="mt-2 text-muted-foreground">
-                Enter the code from your authenticator app
+                {mfaMethod === "totp" 
+                  ? "Enter the code from your authenticator app"
+                  : "Verify with a code sent to your email"}
               </p>
             </div>
 
@@ -190,59 +337,149 @@ export default function MfaVerifyPage() {
               {/* User Info */}
               <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                  <Lock className="h-5 w-5 text-primary" />
+                  {mfaMethod === "totp" ? (
+                    <Lock className="h-5 w-5 text-primary" />
+                  ) : (
+                    <Mail className="h-5 w-5 text-primary" />
+                  )}
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Two-factor authentication</p>
+                  <p className="text-sm font-medium">
+                    {mfaMethod === "totp" ? "Two-factor authentication" : "Email verification"}
+                  </p>
                   <p className="text-xs text-muted-foreground">{userEmail}</p>
                 </div>
               </div>
 
-              {/* OTP Input */}
-              <div className="space-y-4">
-                <p className="text-sm text-center text-muted-foreground">
-                  Open your authenticator app and enter the 6-digit code
-                </p>
+              {mfaMethod === "totp" ? (
+                /* TOTP Verification */
+                <div className="space-y-4">
+                  <p className="text-sm text-center text-muted-foreground">
+                    Open your authenticator app and enter the 6-digit code
+                  </p>
 
-                <div className="flex justify-center">
-                  <InputOTP
-                    maxLength={6}
-                    value={verifyCode}
-                    onChange={setVerifyCode}
-                    disabled={isVerifying}
+                  <div className="flex justify-center">
+                    <InputOTP
+                      maxLength={6}
+                      value={verifyCode}
+                      onChange={setVerifyCode}
+                      disabled={isVerifying}
+                    >
+                      <InputOTPGroup>
+                        <InputOTPSlot index={0} />
+                        <InputOTPSlot index={1} />
+                        <InputOTPSlot index={2} />
+                        <InputOTPSlot index={3} />
+                        <InputOTPSlot index={4} />
+                        <InputOTPSlot index={5} />
+                      </InputOTPGroup>
+                    </InputOTP>
+                  </div>
+
+                  <Button
+                    onClick={handleVerifyTotp}
+                    className="w-full"
+                    disabled={verifyCode.length !== 6 || isVerifying}
                   >
-                    <InputOTPGroup>
-                      <InputOTPSlot index={0} />
-                      <InputOTPSlot index={1} />
-                      <InputOTPSlot index={2} />
-                      <InputOTPSlot index={3} />
-                      <InputOTPSlot index={4} />
-                      <InputOTPSlot index={5} />
-                    </InputOTPGroup>
-                  </InputOTP>
+                    {isVerifying ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Verifying...
+                      </>
+                    ) : (
+                      "Verify"
+                    )}
+                  </Button>
                 </div>
-
-                <Button
-                  onClick={handleVerify}
-                  className="w-full"
-                  disabled={verifyCode.length !== 6 || isVerifying}
-                >
-                  {isVerifying ? (
+              ) : (
+                /* Email Verification */
+                <div className="space-y-4">
+                  {!codeSent ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Verifying...
+                      <p className="text-sm text-center text-muted-foreground">
+                        Click below to receive a verification code at your registered email.
+                      </p>
+                      <Button 
+                        onClick={handleSendEmailCode} 
+                        className="w-full"
+                        disabled={isSendingCode}
+                      >
+                        {isSendingCode ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <Mail className="mr-2 h-4 w-4" />
+                            Send Verification Code
+                          </>
+                        )}
+                      </Button>
                     </>
                   ) : (
-                    "Verify"
+                    <>
+                      <p className="text-sm text-center text-muted-foreground">
+                        Enter the 6-digit code sent to your email
+                      </p>
+
+                      <div className="flex justify-center">
+                        <InputOTP
+                          maxLength={6}
+                          value={verifyCode}
+                          onChange={setVerifyCode}
+                          disabled={isVerifying}
+                        >
+                          <InputOTPGroup>
+                            <InputOTPSlot index={0} />
+                            <InputOTPSlot index={1} />
+                            <InputOTPSlot index={2} />
+                            <InputOTPSlot index={3} />
+                            <InputOTPSlot index={4} />
+                            <InputOTPSlot index={5} />
+                          </InputOTPGroup>
+                        </InputOTP>
+                      </div>
+
+                      <Button
+                        onClick={handleVerifyEmail}
+                        className="w-full"
+                        disabled={verifyCode.length !== 6 || isVerifying}
+                      >
+                        {isVerifying ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Verifying...
+                          </>
+                        ) : (
+                          "Verify"
+                        )}
+                      </Button>
+
+                      <div className="text-center">
+                        <button
+                          onClick={handleSendEmailCode}
+                          disabled={resendCountdown > 0 || isSendingCode}
+                          className="inline-flex items-center gap-2 text-sm text-accent hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                          {resendCountdown > 0 
+                            ? `Resend code in ${resendCountdown}s` 
+                            : "Resend code"}
+                        </button>
+                      </div>
+                    </>
                   )}
-                </Button>
-              </div>
+                </div>
+              )}
 
               {/* Help Text */}
               <div className="text-center text-xs text-muted-foreground">
-                <p>
-                  Having trouble? Make sure your device's time is synchronized.
-                </p>
+                {mfaMethod === "totp" ? (
+                  <p>Having trouble? Make sure your device's time is synchronized.</p>
+                ) : (
+                  <p>Check your spam folder if you don't see the email.</p>
+                )}
               </div>
             </div>
 

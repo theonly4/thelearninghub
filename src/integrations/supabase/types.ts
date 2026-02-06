@@ -183,6 +183,60 @@ export type Database = {
         }
         Relationships: []
       }
+      mfa_email_codes: {
+        Row: {
+          attempts: number | null
+          code_hash: string
+          created_at: string | null
+          expires_at: string
+          id: string
+          used: boolean | null
+          user_id: string
+        }
+        Insert: {
+          attempts?: number | null
+          code_hash: string
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          used?: boolean | null
+          user_id: string
+        }
+        Update: {
+          attempts?: number | null
+          code_hash?: string
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          used?: boolean | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      mfa_email_sessions: {
+        Row: {
+          expires_at: string
+          id: string
+          session_id: string
+          user_id: string
+          verified_at: string | null
+        }
+        Insert: {
+          expires_at: string
+          id?: string
+          session_id: string
+          user_id: string
+          verified_at?: string | null
+        }
+        Update: {
+          expires_at?: string
+          id?: string
+          session_id?: string
+          user_id?: string
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       newsletter_subscribers: {
         Row: {
           confirmed_at: string | null
@@ -330,6 +384,7 @@ export type Database = {
           is_contractor: boolean
           last_name: string
           mfa_enabled: boolean
+          mfa_method: string | null
           organization_id: string
           status: Database["public"]["Enums"]["user_status"]
           updated_at: string
@@ -346,6 +401,7 @@ export type Database = {
           is_contractor?: boolean
           last_name: string
           mfa_enabled?: boolean
+          mfa_method?: string | null
           organization_id: string
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
@@ -362,6 +418,7 @@ export type Database = {
           is_contractor?: boolean
           last_name?: string
           mfa_enabled?: boolean
+          mfa_method?: string | null
           organization_id?: string
           status?: Database["public"]["Enums"]["user_status"]
           updated_at?: string
